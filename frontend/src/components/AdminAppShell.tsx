@@ -20,6 +20,7 @@ const adminRoutes = new Set([
   '/classification-of-fees',
   '/fees',
   '/admin/fees',
+  '/spreadsheet',
   '/vat',
   '/quotations',
   '/notifications',

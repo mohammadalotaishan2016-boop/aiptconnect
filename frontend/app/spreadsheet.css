@@ -1,0 +1,112 @@
+.spreadsheet-page {
+  --sheet-teal: #16a8c2;
+  display: flex;
+  height: calc(100dvh - 94px);
+  min-height: 430px;
+  flex-direction: column;
+  margin: 8px 10px 12px;
+  overflow: hidden;
+  border: 1px solid #d7e5ee;
+  border-radius: 10px;
+  background: #fff;
+  color: #172a46;
+  box-shadow: 0 8px 25px rgba(30, 62, 92, .08);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+.spreadsheet-title { display:flex; align-items:center; gap:12px; min-height:66px; padding:10px 18px; border-bottom:1px solid #e6edf3; }
+.spreadsheet-title-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:7px; background:#e4f6f8; color:#159bb4; font-size:22px; }
+.spreadsheet-title h1 { margin:0; color:#173554; font-size:18px; font-weight:700; }
+.spreadsheet-title p { margin:3px 0 0; color:#728399; font-size:11px; }
+.spreadsheet-local-status { margin-left:auto; color:#7d8c9b; font-size:11px; white-space:nowrap; }
+.spreadsheet-local-status::first-letter { color:#20a777; }
+.spreadsheet-toolbar,.spreadsheet-formatting-toolbar { display:flex; align-items:center; gap:4px; min-height:50px; padding:6px 12px; border-bottom:1px solid #e5edf3; }
+.spreadsheet-toolbar { gap:10px; }
+.spreadsheet-toolbar button,.spreadsheet-formatting-toolbar button,.sheet-color-control { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:33px; border:1px solid transparent; border-radius:5px; padding:0 9px; background:transparent; color:#34536d; font:500 12px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; white-space:nowrap; }
+.spreadsheet-toolbar button:hover,.spreadsheet-formatting-toolbar button:hover,.spreadsheet-formatting-toolbar button.is-pressed { border-color:#c9eaf0; background:#eef9fb; color:#098faa; }
+.spreadsheet-toolbar button:disabled { opacity:.38; cursor:default; }
+.sheet-primary-button { background:#0d9fba!important; color:white!important; }
+.sheet-primary-button:hover { background:#078da7!important; }
+.sheet-toolbar-group { display:flex; align-items:center; gap:2px; padding-right:8px; border-right:1px solid #e3ebf0; }
+.sheet-toolbar-group button { font-size:17px; color:#1785aa; }
+.sheet-toolbar-group button span { font-size:11px; }
+.sheet-search { display:flex; align-items:center; gap:7px; width:min(240px,26vw); height:33px; margin-left:auto; padding:0 9px; border:1px solid #dce7ed; border-radius:6px; color:#387ca2; }
+.sheet-search span { font-size:20px; line-height:1; }
+.sheet-search input { width:100%; min-width:0; border:0; outline:0; color:#22384d; font:11px Inter,"Segoe UI",Arial,sans-serif; }
+.spreadsheet-file-input { display:none; }
+.spreadsheet-formatting-toolbar { min-height:43px; gap:3px; }
+.spreadsheet-formatting-toolbar button { min-width:32px; padding:0 7px; font-size:14px; }
+.sheet-font-name,.sheet-font-size { display:grid; place-items:center; height:29px; margin-right:4px; border:1px solid #dce6ec; border-radius:4px; color:#4b6178; font-size:11px; }
+.sheet-font-name { width:103px; }.sheet-font-size { width:47px; }
+.sheet-color-control { position:relative; min-width:31px; height:30px; font-weight:700; border-color:#e2e9ee; }
+.sheet-color-control input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.sheet-fill-control { color:#c79812; }
+.sheet-toolbar-divider { height:24px; margin:0 5px; border-left:1px solid #e1eaf0; }
+.spreadsheet-formula-bar { display:flex; align-items:center; gap:9px; min-height:44px; padding:5px 12px; border-bottom:1px solid #dce6ed; }
+.spreadsheet-formula-bar input { height:30px; border:1px solid #dce6ec; border-radius:4px; outline:0; padding:0 9px; color:#263e57; font:12px Inter,"Segoe UI",Arial,sans-serif; }
+.spreadsheet-formula-bar input:first-child { width:91px; }
+.spreadsheet-formula-bar input:last-of-type { flex:1; min-width:50px; }
+.spreadsheet-formula-bar input:focus { border-color:#40b9d0; box-shadow:0 0 0 2px #36b3ca20; }
+.formula-symbol { color:#557694; font:italic 600 14px Georgia,serif; }
+.spreadsheet-search-count { color:#738397; font-size:10px; white-space:nowrap; }
+.spreadsheet-grid-scroll { flex:1 1 auto; min-height:300px; overflow:auto; outline:0; overscroll-behavior:contain; background:#fff; }
+.spreadsheet-grid { width:max-content; min-width:100%; table-layout:fixed; border-collapse:collapse; color:#274260; font-size:11px; }
+.spreadsheet-grid .sheet-row-number-column { width:37px; }
+.spreadsheet-grid thead { position:sticky; z-index:3; top:0; }
+.spreadsheet-grid th,.spreadsheet-grid td { position:relative; height:26px; border-right:1px solid #dce8f1; border-bottom:1px solid #dce8f1; }
+.spreadsheet-grid thead th { min-width:48px; height:27px; background:#f3f7fa; text-align:center; font-weight:500; }
+.spreadsheet-grid thead th.is-active,.spreadsheet-grid tbody th.is-active { background:#e0f2f7; color:#087f9d; }
+.spreadsheet-grid .sheet-corner { position:sticky; left:0; z-index:4; width:37px; min-width:37px; background:#f2f6f9; }
+.spreadsheet-grid tbody th { position:sticky; z-index:2; left:0; width:37px; min-width:37px; background:#f8fafc; text-align:center; font-weight:400; }
+.spreadsheet-grid tbody td { min-width:48px; padding:0 5px; background:#fff; }
+.spreadsheet-grid td > span { display:block; overflow:hidden; height:100%; line-height:25px; white-space:nowrap; text-overflow:clip; }
+.spreadsheet-grid td.is-selected { z-index:1; outline:2px solid #1688ff; outline-offset:-2px; }
+.spreadsheet-grid td.is-selected::after { position:absolute; right:-1px; bottom:-1px; width:5px; height:5px; border-radius:50%; background:#1688ff; content:""; }
+.spreadsheet-grid td.is-search-match { background:#fff2c6; }
+.spreadsheet-grid td input { position:absolute; z-index:2; inset:0; width:100%; height:100%; border:0; outline:1px solid #1688ff; padding:0 5px; color:#253b51; font:11px Inter,"Segoe UI",Arial,sans-serif; }
+.column-resize-handle { position:absolute; z-index:1; top:0; right:-3px; width:7px; height:100%; cursor:col-resize; touch-action:none; }
+.worksheet-tabs { display:flex; align-items:stretch; min-height:39px; overflow-x:auto; border-top:1px solid #dce6ed; background:#f7fafc; }
+.worksheet-tab { position:relative; display:flex; align-items:stretch; border-right:1px solid #e5edf1; }
+.worksheet-tab > button:first-child { min-width:75px; padding:0 16px; border:0; border-bottom:2px solid transparent; background:transparent; color:#60758a; font:500 11px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; }
+.worksheet-tab > input { width:110px; height:27px; align-self:center; margin:0 7px; border:1px solid #16a8c2; border-radius:4px; outline:0; padding:0 7px; color:#263e57; font:500 11px Inter,"Segoe UI",Arial,sans-serif; }
+.worksheet-tab.is-active > button:first-child { border-bottom-color:#0eacc5; background:#fff; color:#098ba7; font-weight:700; }
+.worksheet-tab .sheet-tab-delete { display:none; position:absolute; top:2px; right:1px; width:17px; height:17px; border:0; border-radius:50%; background:#e8eff3; color:#506a7d; font-size:13px; line-height:1; cursor:pointer; }
+.worksheet-tab:hover .sheet-tab-delete { display:block; }
+.spreadsheet-statusbar { display:flex; justify-content:space-between; gap:10px; padding:6px 12px; border-top:1px solid #e3ebf0; background:#fbfcfd; color:#8291a0; font-size:10px; }
+.spreadsheet-local-status.is-saving { color:#9a6a08; }
+.spreadsheet-local-status.is-error,.spreadsheet-inline-error { color:#bb2d3b; }
+.spreadsheet-save-error { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 14px; border-bottom:1px solid #f0c7cb; background:#fff5f5; color:#a52634; font-size:12px; }
+.spreadsheet-save-error button,.spreadsheet-database-message button { min-height:30px; border:1px solid #d9a7ad; border-radius:5px; padding:0 10px; background:#fff; color:#9d2532; font:600 11px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; }
+.spreadsheet-inline-error { display:block; padding:5px 12px; background:#fff7f7; font-size:11px; }
+.spreadsheet-database-message { align-items:center; justify-content:center; gap:12px; min-height:220px; height:auto; padding:24px; color:#405872; text-align:center; }
+.spreadsheet-database-message p { max-width:650px; margin:0; font-size:14px; line-height:1.6; }
+.spreadsheet-database-message [role="alert"] { color:#a52634; }
+.spreadsheet-upload-progress { height:3px; overflow:hidden; background:#e1f2f5; }
+.spreadsheet-upload-progress span { display:block; width:36%; height:100%; background:#0d9fba; animation:spreadsheet-upload-progress 1.25s ease-in-out infinite; }
+.spreadsheet-save-notification { position:fixed; z-index:20; right:24px; bottom:24px; padding:12px 18px; border:1px solid #a7dfc6; border-radius:7px; background:#effbf5; color:#176c48; box-shadow:0 8px 24px #18334a24; font-size:13px; }
+.spreadsheet-modal-backdrop { position:fixed; z-index:30; inset:0; display:flex; align-items:center; justify-content:center; padding:20px; background:#172a4670; }
+.spreadsheet-delete-modal { width:min(430px,100%); border:1px solid #d7e5ee; border-radius:10px; padding:22px; background:#fff; color:#172a46; box-shadow:0 18px 60px #10263c40; }
+.spreadsheet-delete-modal h2 { margin:0 0 9px; color:#173554; font-size:17px; }
+.spreadsheet-delete-modal > p { margin:0 0 17px; color:#65798d; font-size:12px; line-height:1.6; }
+.spreadsheet-delete-modal form { display:flex; flex-direction:column; gap:8px; }
+.spreadsheet-delete-modal label { color:#405872; font-size:11px; font-weight:600; }
+.spreadsheet-delete-modal input { height:38px; border:1px solid #d3dfe7; border-radius:5px; padding:0 10px; color:#263e57; font:13px Inter,"Segoe UI",Arial,sans-serif; }
+.spreadsheet-delete-modal input:focus { border-color:#40b9d0; outline:2px solid #36b3ca20; }
+.spreadsheet-delete-error { margin:2px 0; color:#a52634; font-size:11px; line-height:1.5; }
+.spreadsheet-delete-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:9px; }
+.spreadsheet-delete-actions button { min-height:34px; border:1px solid #cbd9e2; border-radius:5px; padding:0 12px; background:#fff; color:#34536d; font:600 11px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; }
+.spreadsheet-delete-actions button:disabled { opacity:.55; cursor:default; }
+.spreadsheet-delete-actions .spreadsheet-delete-confirm { border-color:#c94b56; background:#c94b56; color:#fff; }
+@keyframes spreadsheet-upload-progress { 0% { transform:translateX(-110%); } 100% { transform:translateX(290%); } }
+@media(max-width:900px) {
+  .spreadsheet-page { height:calc(100dvh - 82px); min-height:360px; margin:6px; }
+  .spreadsheet-toolbar,.spreadsheet-formatting-toolbar { flex-wrap:wrap; }
+  .spreadsheet-toolbar { gap:4px; }
+  .spreadsheet-toolbar-group { padding-right:4px; }
+  .sheet-search { width:min(210px,100%); }
+}
+@media(max-width:560px) {
+  .spreadsheet-title { padding:10px; }.spreadsheet-title p { display:none; }.spreadsheet-local-status { font-size:9px; }
+  .spreadsheet-toolbar button { padding:0 6px; }.spreadsheet-toolbar button span { font-size:10px; }
+  .sheet-font-name { width:80px; }.spreadsheet-formatting-toolbar { max-height:none; }
+  .spreadsheet-grid-scroll { min-height:250px; }.spreadsheet-statusbar span:last-child { display:none; }
+}

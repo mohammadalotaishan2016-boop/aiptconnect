@@ -28,6 +28,7 @@ import './client-home.css';
 import './client-card-headers.css';
 import './client-reference.css';
 import './admin-reference.css';
+import './spreadsheet.css';
 import AdminAppShell from '../src/components/AdminAppShell';
 
 export const metadata: Metadata = {
@@ -38,4 +39,3 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en"><body><AdminAppShell>{children}</AdminAppShell></body></html>;
 }
-

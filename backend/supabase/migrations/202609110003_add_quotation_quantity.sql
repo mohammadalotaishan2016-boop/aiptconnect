@@ -6,4 +6,4 @@ alter table public.quotation_items
 
 alter table public.quotation_items
   add constraint quotation_items_class_type_check
-  check (class_type is null or class_type in ('Per Mark', 'Per Class', 'Single', 'Multi'));
+  check (class_type is null or class_type in ('Per Mark', 'Per Class', 'Single', 'Multi', 'Multi-class', 'Per mark per class'));
