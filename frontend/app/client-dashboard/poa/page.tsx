@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchSupabaseFunction } from '../../../src/lib/supabase/browser';
 import './poa.css';
 import '../client-documents.css';
@@ -59,6 +59,8 @@ function ClientPoaPage() {
   const [downloadingId, setDownloadingId] = useState('');
   const [error, setError] = useState('');
   const [downloadStatus, setDownloadStatus] = useState('');
+  const [preview, setPreview] = useState<{ item: POADocument; left: number; top: number } | null>(null);
+  const previewTimer = useRef<number | null>(null);
 
   const loadDocuments = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
@@ -82,6 +84,17 @@ function ClientPoaPage() {
     void loadDocuments(controller.signal);
     return () => controller.abort();
   }, [loadDocuments]);
+  useEffect(() => () => {
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
+  }, []);
+  useEffect(() => {
+    if (!preview) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreview(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [preview]);
 
   const filteredDocuments = useMemo(() => documents
     .filter(({ countries: linked }) => !appliedCountry || linked.some(country =>
@@ -109,6 +122,41 @@ function ClientPoaPage() {
       setError(cause instanceof Error ? cause.message : 'Unable to download this POA document.');
     } finally {
       setDownloadingId('');
+    }
+  };
+
+  const showPreview = (item: POADocument, row: HTMLTableRowElement) => {
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
+    const bounds = row.getBoundingClientRect();
+    const width = Math.min(350, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(bounds.left, window.innerWidth - width - 12));
+    const top = Math.max(12, Math.min(bounds.top, window.innerHeight - 250));
+    setPreview({ item, left, top });
+  };
+
+  const schedulePreviewClose = () => {
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
+    previewTimer.current = window.setTimeout(() => setPreview(null), 160);
+  };
+
+  const keepPreviewOpen = () => {
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
+  };
+
+  const openDocument = async (item: POADocument) => {
+    setPreview(null);
+    setError('');
+    try {
+      const url = await getDownloadUrl(item);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to open this POA document.');
     }
   };
 
@@ -160,7 +208,7 @@ function ClientPoaPage() {
           <thead><tr><th scope="col">Country</th><th scope="col">Doc Name</th><th scope="col">Download</th></tr></thead>
           <tbody>
             {loading && <tr><td colSpan={3} className="poa-empty"><span className="poa-loading-mark" aria-hidden="true" />Loading POA documents...</td></tr>}
-            {!loading && !error && visibleDocuments.map((item) => <tr key={item.id}>
+            {!loading && !error && visibleDocuments.map((item) => <tr key={item.id} tabIndex={0} onMouseEnter={event => showPreview(item, event.currentTarget)} onMouseLeave={schedulePreviewClose} onFocusCapture={event => showPreview(item, event.currentTarget)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) schedulePreviewClose(); }}>
               <td><span className="poa-country-list">{item.countries.map(country => <span className="poa-country-cell" key={country.id}>{country.flag_url ? <img src={country.flag_url} alt="" /> : <span className="poa-country-initials">{country.abbreviation}</span>}<span>{country.name}</span></span>)}</span></td>
               <td><span className="poa-document-cell"><strong className="poa-document-name">{item.document_name}</strong><span className="poa-document-meta">{[
                 item.key.split('.').pop()?.toUpperCase(),
@@ -185,6 +233,16 @@ function ClientPoaPage() {
         </nav>
       </footer>
     </section>
+    {preview && <aside className="poa-document-preview" style={{ left: preview.left, top: preview.top }} onMouseEnter={keepPreviewOpen} onMouseLeave={schedulePreviewClose} aria-label="POA document preview">
+      <strong>{preview.item.document_name}</strong>
+      <span><b>Countries</b>{preview.item.countries.map(country => country.name).join(', ') || 'Not specified'}</span>
+      <span><b>File details</b>{[
+        preview.item.key.split('.').pop()?.toUpperCase(),
+        formatFileSize(preview.item.aws_metadata?.size_bytes),
+        (preview.item.aws_metadata?.last_modified || preview.item.last_modified) ? `Updated ${formatUpdatedDate(preview.item.aws_metadata?.last_modified || preview.item.last_modified)}` : '',
+      ].filter(Boolean).join(' · ') || 'File details unavailable'}</span>
+      <button type="button" onClick={() => void openDocument(preview.item)}>View document</button>
+    </aside>}
   </main>;
 }
 

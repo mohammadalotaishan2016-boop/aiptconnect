@@ -47,5 +47,11 @@
 .poa-pagination nav button{cursor:pointer}
 .poa-pagination nav button:disabled{opacity:.5;cursor:default}
 .poa-pagination nav span{display:grid;place-items:center;border-color:#00a8c1;background:#00a8c1;color:#fff;font-weight:700}
+.poa-document-preview{position:fixed;z-index:1200;display:grid;width:min(350px,calc(100vw - 24px));gap:9px;padding:14px;border:1px solid #86def5;border-radius:8px;background:#fff;box-shadow:0 12px 32px rgba(12,101,124,.2);color:#168eb0;font:11px/1.45 Arial,Helvetica,sans-serif}
+.poa-document-preview>strong{padding-bottom:8px;border-bottom:1px solid #c4eff9;color:#008eac;font-size:12px;overflow-wrap:anywhere}
+.poa-document-preview>span b{display:block;margin-bottom:2px;color:#007e9b;font-size:9px;text-transform:uppercase}
+.poa-document-preview>button{justify-self:start;min-height:29px;padding:0 10px;border:1px solid #00afd0;border-radius:5px;background:#00a9c5;color:#fff;font:700 10px Arial,Helvetica,sans-serif;cursor:pointer}
+.poa-document-preview>button:hover{background:#078da5}
+.poa-table tbody tr:focus-visible{outline:2px solid #00a8c1;outline-offset:-2px}
 @media(max-width:680px){.poa-page{padding:14px 10px 25px}.poa-filter-panel{padding:11px}.poa-filter-controls{gap:7px}.poa-filter-controls select{width:min(230px,55vw)}.poa-filter-controls button{min-width:92px}.poa-results-toolbar{flex-wrap:wrap}.poa-table-search{flex:1 1 180px}.poa-table{min-width:640px}.poa-pagination{align-items:flex-start;flex-direction:column}.poa-pagination nav{align-self:flex-end}}
 @media print{.poa-page{padding:0}.poa-filter-panel,.poa-results-toolbar,.poa-pagination{display:none}.poa-results-panel{padding:0;border:0;box-shadow:none}.poa-table-wrap{overflow:visible}}

@@ -49,5 +49,11 @@ verify_jwt = false
 [functions.client-permissions]
 verify_jwt = false
 
+[functions.client-updates]
+verify_jwt = false
+
+[functions.google-translate]
+verify_jwt = false
+
 [functions.quotations]
 verify_jwt = false

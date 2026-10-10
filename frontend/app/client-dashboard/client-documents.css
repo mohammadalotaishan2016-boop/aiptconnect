@@ -182,6 +182,159 @@
   background: #fbfeff;
   color: #00a6c9;
 }
+.notification-row-preview {
+  position: fixed;
+  z-index: 1200;
+  display: grid;
+  width: min(350px, calc(100vw - 24px));
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid #86def5;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(12, 101, 124, .2);
+  color: #168eb0;
+  font: 11px/1.45 Arial, Helvetica, sans-serif;
+}
+.notification-row-preview > strong {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #c4eff9;
+  color: #008eac;
+  font-size: 12px;
+}
+.notification-row-preview > span b {
+  display: block;
+  margin-bottom: 2px;
+  color: #007e9b;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.notification-row-preview > button {
+  justify-self: start;
+  min-height: 29px;
+  padding: 0 10px;
+  border: 1px solid #00afd0;
+  border-radius: 5px;
+  background: #00a9c5;
+  color: #fff;
+  font: 700 10px Arial, Helvetica, sans-serif;
+  cursor: pointer;
+}
+.notification-details-backdrop {
+  position: fixed;
+  z-index: 1300;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(13, 55, 66, .48);
+}
+.notification-details-dialog {
+  width: min(620px, 100%);
+  max-height: min(760px, calc(100dvh - 36px));
+  overflow: auto;
+  border: 1px solid #86def5;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(10, 68, 83, .28);
+  color: #168eb0;
+  font: 12px/1.5 Arial, Helvetica, sans-serif;
+}
+.notification-details-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 17px;
+  background: #25a9c2;
+  color: #fff;
+}
+.notification-details-dialog > header span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.notification-details-dialog > header h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.notification-details-dialog > header button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255,255,255,.65);
+  border-radius: 5px;
+  background: transparent;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+.notification-details-dialog > dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+  margin: 0;
+  padding: 8px 17px;
+}
+.notification-details-dialog > dl > div {
+  min-width: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid #e0f3f7;
+}
+.notification-details-dialog dt {
+  margin-bottom: 4px;
+  color: #168eb0;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.notification-details-dialog dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #245563;
+}
+.notification-details-dialog .notification-detail-countries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.notification-details-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 17px;
+  border-top: 1px solid #c4eff9;
+}
+.notification-details-dialog > footer button {
+  min-height: 32px;
+  border-radius: 5px;
+  font: 700 10px Arial, Helvetica, sans-serif;
+  cursor: pointer;
+}
+.notification-details-dialog .notification-details-close {
+  padding: 0 12px;
+  border: 1px solid #86def5;
+  background: #fff;
+  color: #168eb0;
+}
+.notification-details-dialog > footer .reference-primary {
+  gap: 6px;
+}
+.client-notifications-page .notifications-open {
+  min-width: 78px;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .notification-details-dialog > dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .notification-row-preview {
+    max-height: min(270px, calc(100dvh - 24px));
+    overflow: auto;
+  }
+}
 .client-poa-page {
   width: 100%;
   max-width: none;

@@ -1,4 +1,14 @@
 .client-support-page{min-height:calc(100vh - 70px);padding:14px 18px 30px;background:#fafbff;color:#131046}
+.client-support-hero{min-height:72px}
+.client-support-hero h1{margin:0}
+.support-agent{padding-right:0}
+.client-chat-history .from-support{color:#1d2d36}
+.client-chat-history .from-support p,.client-chat-history .from-support blockquote{color:#1d2d36}
+.client-chat-history .from-client{color:#fff}
+.client-chat-history .from-client p,.client-chat-history .from-client blockquote{color:#fff}
+.client-chat-history .from-client time{color:rgba(255,255,255,.82)}
+.client-chat-card textarea{background:#fff;color:#1d2d36}
+.client-chat-card textarea::placeholder{color:#687981;opacity:1}
 .client-support-hero{display:flex;align-items:center;gap:16px;margin-bottom:14px;padding:17px 20px;border-radius:14px;background:linear-gradient(105deg,var(--primary-color-soft),var(--primary-color-soft));box-shadow:0 6px 24px #482ec20d}
 .support-mark{display:grid;width:44px;height:44px;place-items:center;border-radius:12px;color:var(--primary-color);font-size:28px}
 .client-support-hero h1{margin:0 0 4px;font-size:22px}.client-support-hero p{margin:0;color:#484775}

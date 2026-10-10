@@ -2,55 +2,41 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { fetchSupabaseFunction, getSupabaseBrowserClient } from '../lib/supabase/browser';
 import AccountMenu from './AccountMenu';
-import ClientDashboardIcon from './ClientDashboardIcon';
+import ClientAutoTranslator from './ClientAutoTranslator';
+import ClientDashboardLanguageSelector from './ClientDashboardLanguageSelector';
+import type { DashboardLanguage } from './ClientDashboardLanguageSelector';
+
 const ClientIdentity = createContext({ name: 'Client', email: '' });
 export const useClientIdentity = () => useContext(ClientIdentity);
-
-type IconName = 'dashboard' | 'projects' | 'notifications' | 'statements' | 'quotations' | 'requirements' | 'support' | 'menu' | 'search';
-
-const ClientIcon = ({ name }: { name: IconName }) => {
-  const paths = {
-    dashboard: <><rect x='3' y='3' width='7' height='7' rx='1'/><rect x='14' y='3' width='7' height='7' rx='1'/><rect x='3' y='14' width='7' height='7' rx='1'/><rect x='14' y='14' width='7' height='7' rx='1'/></>,
-    projects: <><path d='M4 7h16v12H4z'/><path d='M8 7V5h8v2M4 11h16M10 14h4'/></>,
-    notifications: <><path d='M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9'/><path d='M10 21h4'/></>,
-    statements: <><path d='M6 3h12v18H6z'/><path d='M9 8h6M9 12h6M9 16h4'/></>,
-    quotations: <><path d='M5 3h14v18H5z'/><path d='M8 7h8M8 11h8M8 15h5'/></>,
-    requirements: <><path d='M6 3h12v18H6z'/><path d='M9 8h6M9 12h6M9 16h4'/></>,
-    support: <><path d='M4 13a8 8 0 0 1 16 0'/><path d='M4 13v5h4v-6H4M20 13v5h-4v-6h4M16 18c0 2-2 3-4 3'/></>,
-    menu: <path d='M4 6h16M4 12h16M4 18h16'/>,
-    search: <><circle cx='11' cy='11' r='7'/><path d='m20 20-4-4'/></>,
-  };
-  return <svg viewBox='0 0 24 24' aria-hidden='true' fill='none' stroke='currentColor' strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round'>{paths[name]}</svg>;
+type ClientShellText = { welcome: string; back: string; controls: string; checking: string; denied: string; rights: string; service: string; logout: string; update: string; password: string };
+const shellTranslations: Record<DashboardLanguage, ClientShellText> = {
+  en: { welcome: 'Welcome,', back: 'Back to dashboard', controls: 'Dashboard controls', checking: 'Checking client access...', denied: 'Client access is required.', rights: '© AIP&T. All rights reserved.', service: 'Intellectual Property Services', logout: 'Logout', update: 'Update client information', password: 'Update password' },
+  ar: { welcome: 'مرحباً،', back: 'العودة إلى لوحة التحكم', controls: 'عناصر التحكم في لوحة المعلومات', checking: 'جارٍ التحقق من وصول العميل...', denied: 'يلزم الوصول كعميل.', rights: '© AIP&T. جميع الحقوق محفوظة.', service: 'خدمات الملكية الفكرية', logout: 'تسجيل الخروج', update: 'تحديث معلومات العميل', password: 'تحديث كلمة المرور' },
+  fil: { welcome: 'Maligayang pagdating,', back: 'Bumalik sa dashboard', controls: 'Mga kontrol ng dashboard', checking: 'Sinusuri ang access ng kliyente...', denied: 'Kinakailangan ang access ng kliyente.', rights: '© AIP&T. Nakalaan ang lahat ng karapatan.', service: 'Mga Serbisyo sa Intelektuwal na Ari-arian', logout: 'Mag-log out', update: 'I-update ang impormasyon ng kliyente', password: 'I-update ang password' },
+  zh: { welcome: '欢迎，', back: '返回仪表板', controls: '仪表板控制', checking: '正在检查客户访问权限...', denied: '需要客户访问权限。', rights: '© AIP&T. 保留所有权利。', service: '知识产权服务', logout: '退出登录', update: '更新客户信息', password: '更新密码' },
+};
+const readableDashboardRoutes: Record<string, string> = {
+  '/client-dashboard/schedule-of-fees': 'schedule-of-fees',
+  '/client-dashboard/quotations': 'quotations',
+  '/client-dashboard/requirements': 'requirements',
+  '/client-dashboard/statements': 'statements',
+  '/client-dashboard/poa': 'poa',
+  '/client-dashboard/projects': 'projects',
+  '/client-dashboard/notifications': 'notifications',
+  '/client-dashboard/customer-service': 'customer-service',
 };
 
-const links: Array<{ href: string; label: string; icon: IconName }> = [
-  { href: '/client-dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { href: '/client-dashboard/projects', label: 'Projects', icon: 'projects' },
-  { href: '/client-dashboard/notifications', label: 'Notifications', icon: 'notifications' },
-  { href: '/client-dashboard/statements', label: 'Statements', icon: 'statements' },
-  { href: '/client-dashboard/invoices', label: 'Invoices', icon: 'statements' },
-  { href: '/client-dashboard/quotations', label: 'Quotations', icon: 'quotations' },
-  { href: '/client-dashboard/poa', label: 'POA', icon: 'requirements' },
-  { href: '/client-dashboard/requirements', label: 'Requirements', icon: 'requirements' },
-  { href: '/client-dashboard/customer-service', label: 'Customer Service', icon: 'support' },
-];
-
 export default function ClientShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isHome = pathname === '/client-dashboard';
-  const brandedHeaderClass = pathname === '/client-dashboard/schedule-of-fees' ? ' client-schedule-fees-topbar' : pathname === '/client-dashboard/requirements' ? ' client-requirements-topbar' : pathname === '/client-dashboard/notifications' ? ' client-notifications-topbar' : pathname === '/client-dashboard/poa' ? ' client-poa-topbar' : '';
-  const showBrandedHeader = pathname === '/client-dashboard/quotations' || Boolean(brandedHeaderClass);
   const router = useRouter();
+  const pathname = usePathname();
+  const shellRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState('Client');
   const [email, setEmail] = useState('');
-  const [collapsed, setCollapsed] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
   const [accessState, setAccessState] = useState<'checking' | 'allowed' | 'denied'>('checking');
-  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [language, setLanguage] = useState<DashboardLanguage>('en');
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -78,80 +64,91 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   }, [router]);
 
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 1024px)');
-    const syncBreakpoint = () => setIsDesktop(media.matches);
-    setCollapsed(window.localStorage.getItem('aipt-client-sidebar-collapsed') === 'true');
-    syncBreakpoint();
-    media.addEventListener('change', syncBreakpoint);
-    return () => media.removeEventListener('change', syncBreakpoint);
+    const saved = window.localStorage.getItem('aipt-client-dashboard-language') as DashboardLanguage | null;
+    if (saved && ['ar', 'en', 'fil', 'zh'].includes(saved)) setLanguage(saved);
+    const handleLanguageChange = (event: Event) => {
+      const code = (event as CustomEvent<DashboardLanguage>).detail;
+      if (['ar', 'en', 'fil', 'zh'].includes(code)) setLanguage(code);
+    };
+    window.addEventListener('aipt-client-dashboard-language-change', handleLanguageChange);
+    return () => window.removeEventListener('aipt-client-dashboard-language-change', handleLanguageChange);
   }, []);
 
-  useEffect(() => { if (isDesktop) setDrawerOpen(false); }, [isDesktop]);
-
   useEffect(() => {
-    if (accessState !== 'allowed') return;
-    let active = true;
-    const refreshUnread = async () => {
-      const supabase = getSupabaseBrowserClient();
-      const session = supabase ? (await supabase.auth.getSession()).data.session : null;
-      if (!session) return;
-      const response = await fetchSupabaseFunction('customer-service', { headers: { Authorization: `Bearer ${session.access_token}` } });
-      if (!response.ok) return;
-      const body = await response.json();
-      if (active) setUnreadMessages((body.tickets ?? []).reduce((total: number, ticket: { unread_count?: number }) => total + (ticket.unread_count ?? 0), 0));
+    const category = readableDashboardRoutes[pathname];
+    if (accessState !== 'allowed' || !category) return;
+    const markRead = async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const session = (await supabase?.auth.getSession())?.data.session;
+        if (!session) throw new Error('Please sign in to update read status.');
+        const response = await fetchSupabaseFunction('client-updates', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || 'Unable to update read status.');
+        window.dispatchEvent(new CustomEvent('aipt-client-dashboard-update-read', { detail: category }));
+      } catch (cause) {
+        console.error('Could not save the client dashboard read status:', cause);
+      }
     };
-    void refreshUnread();
-    const timer = window.setInterval(() => void refreshUnread(), 10000);
-    window.addEventListener('focus', refreshUnread);
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refreshUnread); };
-  }, [accessState, pathname]);
+    void markRead();
+  }, [pathname, accessState]);
 
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'CL';
-  const toggleSidebar = () => {
-    if (!isDesktop) { setDrawerOpen((value) => !value); return; }
-    setCollapsed((value) => {
-      window.localStorage.setItem('aipt-client-sidebar-collapsed', String(!value));
-      return !value;
-    });
+  const goBack = () => router.push('/client-dashboard');
+  const shellText = shellTranslations[language];
+  const logout = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) await supabase.auth.signOut();
+    router.replace('/login');
   };
-  const closeDrawer = () => setDrawerOpen(false);
-  const sidebarClass = `client-sidebar${isDesktop && collapsed ? ' is-collapsed' : ''}${!isDesktop && drawerOpen ? ' is-drawer-open' : ''}`;
-  const breadcrumb = pathname === '/client-dashboard' ? 'Dashboard' : pathname.includes('overview') ? 'Overview' : pathname.includes('schedule-of-fees') ? 'Schedule of Fees' : pathname.includes('fees') ? 'Fees' : pathname.includes('poa') ? 'POA' : pathname.includes('quotations') ? 'Quotations' : pathname.includes('notifications') ? 'Notifications' : pathname.includes('requirements') ? 'Requirements' : pathname.includes('customer-service') ? 'Customer Service' : pathname.includes('settings') ? 'Settings' : pathname.includes('statements') ? 'Statements' : pathname.includes('invoices') ? 'Invoices' : 'Projects';
 
-  if (isHome) return <ClientIdentity.Provider value={{ name, email }}><div className="client-app-shell client-home-shell">
-    <main className="client-main">
-      <header className="client-home-header">
-        <Link className="client-home-brand" href="/client-dashboard" aria-label="AIP&T home"><span className="client-home-brand-mark">AIP</span><strong>&amp;T</strong></Link>
-        <h1 className="client-home-welcome"><span>Welcome,</span><strong>{name}</strong></h1>
-        <div className="client-home-account"><AccountMenu name={name} email={email} initials={initials} updateHref="/client-dashboard/settings" className="client-home-account-menu" navigationLinks={[{ href: '/client-dashboard/overview', label: 'Portfolio overview' }, { href: '/client-dashboard/invoices', label: 'Invoices' }, { href: '/client-dashboard/customer-service', label: unreadMessages ? `Help & Support (${unreadMessages} unread)` : 'Help & Support' }]} /></div>
+  return <ClientIdentity.Provider value={{ name, email }}>
+    <div className="client-app-shell client-home-shell" ref={shellRef}>
+      {accessState === 'allowed' && <ClientAutoTranslator rootRef={shellRef} language={language} />}
+      <header className="client-home-header" dir="ltr">
+        <Link className="client-home-brand" href="/client-dashboard" aria-label="AIP&T home">
+          <img className="client-home-brand-logo" src="/images/aipt-client-logo.svg" alt="AIP&T" />
+        </Link>
+        <h1 className="client-home-welcome" dir={language === 'ar' ? 'rtl' : 'ltr'}><span>{shellText.welcome}</span><strong>{name}</strong></h1>
+        <div className="client-home-account">
+          <ClientDashboardLanguageSelector />
+          <span className="client-home-header-divider" aria-hidden="true" />
+          <AccountMenu
+            name={name}
+            email={email}
+            initials={initials}
+            updateHref="/client-dashboard/settings"
+            className="client-home-account-menu"
+            passwordFirst
+            updateLabel={shellText.update}
+            passwordLabel={shellText.password}
+            signOutLabel={shellText.logout}
+          />
+        </div>
       </header>
-      {accessState === 'checking' && <section className="client-access-state">Checking client access...</section>}
-      {accessState === 'denied' && <section className="client-access-state client-error">Client access is required.</section>}
-      {accessState === 'allowed' && children}
-    </main>
-  </div></ClientIdentity.Provider>;
-
-  return <div className='client-app-shell'>
-    {!isDesktop && <button className='client-mobile-toggle' type='button' aria-label={drawerOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={drawerOpen} onClick={toggleSidebar}><ClientIcon name='menu'/></button>}
-    {!isDesktop && drawerOpen && <button className='client-sidebar-backdrop' type='button' aria-label='Close navigation' onClick={closeDrawer}/>} 
-    <aside className={sidebarClass}>
-      <Link className='client-brand' href='/client-dashboard' onClick={closeDrawer}><strong>AIP&amp;T</strong><small>INTELLECTUAL PROPERTY</small></Link>
-      <button className='client-sidebar-toggle' type='button' aria-label={isDesktop ? (collapsed ? 'Expand sidebar' : 'Collapse sidebar') : 'Close navigation'} aria-expanded={isDesktop ? !collapsed : drawerOpen} onClick={toggleSidebar}><ClientIcon name='menu'/></button>
-      <div className='client-search'><ClientIcon name='search'/><span>Search</span><kbd>Ctrl K</kbd></div>
-      <nav className='client-nav' aria-label='Client navigation'>
-        {links.map((link) => {
-          const hasUnread = link.label === 'Customer Service' && unreadMessages > 0;
-          return <Link key={link.href} href={link.href} className={`${pathname === link.href ? 'is-active' : ''}${hasUnread ? ' has-unread' : ''}`} onClick={closeDrawer}><i><ClientIcon name={link.icon}/></i><span>{link.label}</span>{hasUnread && <b aria-label={`${unreadMessages} unread support messages`}>{unreadMessages > 99 ? '99+' : unreadMessages}</b>}</Link>;
-        })}
-      </nav>
-      <Link className={`client-support${unreadMessages ? ' has-unread' : ''}`} href='/client-dashboard/customer-service' onClick={closeDrawer}><ClientIcon name='support'/><span>Help &amp; Support</span>{unreadMessages > 0 && <b>{unreadMessages > 99 ? '99+' : unreadMessages}</b>}</Link>
-      <AccountMenu name={name} email={email} initials={initials} updateHref='/client-dashboard/settings' className='client-account'/>
-    </aside>
-    <main className='client-main'>
-      {showBrandedHeader ? <header className={`client-topbar client-quotation-topbar${brandedHeaderClass}`}><Link className='client-quotation-brand' href='/client-dashboard' aria-label='AIP&T dashboard'><span>AIP</span><b>&amp;T</b></Link><div className='client-quotation-welcome'><span>Welcome,</span><strong>{name}</strong></div><span className='client-quotation-avatar'>{initials}</span></header> : <header className='client-topbar'><p>Home <i>/</i> <b>{breadcrumb}</b></p><div className='client-user'><button type='button' aria-label='Notifications' onClick={() => router.push('/client-dashboard/notifications')}><ClientIcon name='notifications'/></button><span>{initials}</span><strong>{name}<small>{email || 'Client'}</small></strong></div></header>}
-      {accessState === 'checking' && <section className='client-access-state'>Checking client access...</section>}
-      {accessState === 'denied' && <section className='client-access-state client-error'>Client access is required.</section>}
-      {accessState === 'allowed' && children}
-    </main>
-  </div>;
+      <div className="client-home-layout">
+        <aside className="client-home-rail" aria-label={shellText.controls}>
+          <button className="client-home-rail-button" type="button" aria-label={shellText.back} title={shellText.back} onClick={goBack} disabled={pathname === '/client-dashboard'}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5m7 7-7-7 7-7" /></svg>
+          </button>
+          <button className="client-home-rail-button client-home-rail-logout" type="button" aria-label={shellText.logout} onClick={() => void logout()}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H5v18h9" /><path d="M12 12h9m-4-4 4 4-4 4" /><path d="M10 12h.01" /></svg>
+          </button>
+        </aside>
+        <main className="client-main client-home-content">
+          {accessState === 'checking' && <section className="client-access-state">{shellText.checking}</section>}
+          {accessState === 'denied' && <section className="client-access-state client-error">{shellText.denied}</section>}
+          {accessState === 'allowed' && children}
+          <footer className="client-home-footer">
+            <span>{shellText.rights}</span>
+            <span>{shellText.service}</span>
+          </footer>
+        </main>
+      </div>
+    </div>
+  </ClientIdentity.Provider>;
 }

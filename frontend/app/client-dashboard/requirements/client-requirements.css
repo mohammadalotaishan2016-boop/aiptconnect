@@ -276,3 +276,139 @@
     min-width: 900px;
   }
 }
+.reference-statements {
+  min-height: calc(100vh - 106px);
+  padding: 12px 20px 24px;
+  background: #fff;
+  color: #00a6c9;
+  font: 12px Arial, Helvetica, sans-serif;
+}
+.reference-statements .reference-title {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: #25a9c2;
+}
+.reference-statements .reference-title h1 {
+  min-height: 30px;
+  padding: 5px 0;
+}
+.reference-statements .reference-title .client-secondary {
+  min-height: 26px;
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 5px;
+  background: transparent;
+  color: #fff;
+}
+.reference-statements .client-toolbar {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 7px 9px;
+  border: 1px solid #a6eafa;
+  border-radius: 6px;
+  background: #fbfeff;
+  color: #00a6c9;
+}
+.reference-statements .client-toolbar label {
+  display: flex;
+  width: min(100%, 420px);
+  min-height: 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #86def5;
+  border-radius: 6px;
+  background: #fff;
+  color: #00a6c9;
+}
+.reference-statements .client-toolbar input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: #168eb0;
+  font: 11px Arial, Helvetica, sans-serif;
+}
+.reference-statements .client-toolbar .result-count {
+  color: #168eb0;
+  font-size: 11px;
+}
+.reference-statements .reference-table-card {
+  margin-top: 0;
+  padding: 6px;
+}
+.reference-statements .statement-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 0 6px;
+}
+.reference-statements .statement-tabs button {
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid #a6eafa;
+  border-radius: 5px;
+  background: #fbfeff;
+  color: #168eb0;
+  font: 700 10px Arial, Helvetica, sans-serif;
+}
+.reference-statements .statement-tabs button.active {
+  border-color: #00a9c5;
+  background: #00a9c5;
+  color: #fff;
+}
+.reference-statements .panel-title {
+  min-height: 30px;
+  margin: 0 0 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #25a9c2;
+  color: #fff;
+}
+.reference-statements .panel-title h2,
+.reference-statements .panel-title span {
+  color: #fff;
+  font-size: 11px;
+}
+.reference-statements .reference-table {
+  min-width: 790px;
+}
+.reference-statements .reference-table tbody td {
+  padding: 6px 8px;
+  color: #168eb0;
+  font: 10px/1.35 Arial, Helvetica, sans-serif;
+}
+.reference-statements .country-pagination {
+  padding: 8px 0 0;
+  color: #00a6c9;
+  font: 10px Arial, Helvetica, sans-serif;
+}
+.reference-statements .country-pagination button {
+  min-height: 30px;
+  border: 1px solid #a1e5f8;
+  border-radius: 5px;
+  background: #fbfeff;
+  color: #00a6c9;
+}
+@media (max-width: 600px) {
+  .reference-statements {
+    padding: 12px 10px 18px;
+  }
+  .reference-statements .client-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .reference-statements .client-toolbar label {
+    width: 100%;
+  }
+  .reference-statements .statement-tabs {
+    flex-wrap: wrap;
+  }
+}

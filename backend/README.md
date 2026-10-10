@@ -9,6 +9,25 @@ This folder owns the Supabase backend independently of the frontend.
 - `supabase/seed.sql` — non-production sample data when approved.
 - `.env` — local secrets (never commit this file).
 
+## Client portal translations
+
+Client portal text, controls, tables, and displayed record values are translated
+through the authenticated `google-translate` Edge Function. Configure Google
+Cloud Translation v2 and its billing/quota in Google Cloud, then set the API key
+only as a Supabase Edge Function secret:
+
+```sh
+supabase secrets set GOOGLE_TRANSLATE_API_KEY=your-google-cloud-translation-key
+supabase functions deploy google-translate
+```
+
+Apply the `202610090001_client_dashboard_read_state.sql` migration and deploy
+`client-updates` as well if persistent client unread counts are enabled. Do not
+put the Google API key in frontend environment variables. Client-visible text
+and record values are sent to Google Cloud Translation when a client selects
+Arabic, Filipino, or Chinese; configure the provider's data handling and
+retention options to meet your privacy requirements.
+
 ## Project image storage
 
 Project images use the same private, pre-created Amazon S3 bucket as the other

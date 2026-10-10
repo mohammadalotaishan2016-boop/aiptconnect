@@ -155,7 +155,7 @@ export default function ClientCustomerServicePage() {
 
   const chatHeader = <header>
     <div><h2>Chat with Support Agent <span>Online</span></h2>{selected && <em className={`customer-status ${selected.status.toLowerCase()}`}>{selected.status}</em>}</div>
-    <div className={'support-agent'}><b>Customer Support</b><small>AIP&amp;T Support Team</small><i>CS</i></div>
+    <div className={'support-agent'}><b>Customer Support</b><small>AIP&amp;T Support Team</small></div>
   </header>;
 
   const chatHistory = <div className={'client-chat-history'} ref={chatHistoryRef}>
@@ -207,8 +207,7 @@ export default function ClientCustomerServicePage() {
 
   return <section className={'client-support-page'}>
     <div className={'client-support-hero'}>
-      <div className={'support-mark'}>CS</div>
-      <div><h1>Customer Support</h1><p>We&apos;re here to help you. Send us your questions and concerns.</p></div>
+      <div><h1>Customer Support</h1></div>
       <button type={'button'} onClick={() => setModalOpen(true)} data-action="add" title="New Support Request"><ActionIcon name="add" /><span className="aipt-action-label">New Support Request</span></button>
     </div>
     {error && <p className={'client-error'} role={'alert'}>{error}</p>}
