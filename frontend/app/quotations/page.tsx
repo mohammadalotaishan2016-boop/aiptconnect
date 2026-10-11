@@ -74,7 +74,8 @@ type Fee = {
 };
 type Lookup = {
   class_rates: ClassRate[];
-  fee_dataset?: { id: string; version_number: number; published_at: string | null } | null;
+  spreadsheet_revision?: number;
+  spreadsheet_updated_at?: string | null;
   role?: "administrator" | "client";
   current_client_id?: string | null;
   clients: Client[];
@@ -221,6 +222,7 @@ export default function QuotationsPage() {
   const [vatable, setVatable] = useState(true);
   const [discount, setDiscount] = useState(0);
   const [category, setCategory] = useState<Category>("Trademark");
+  const [serviceSelectionConfirmed, setServiceSelectionConfirmed] = useState(false);
   const [countryIds, setCountryIds] = useState<string[]>([]);
   const [procedureNames, setProcedureNames] = useState<string[]>([]);
   const [requirementIds, setRequirementIds] = useState<string[]>([]);
@@ -363,14 +365,45 @@ export default function QuotationsPage() {
         availableProcedures.some((procedure) => procedure.name === procedureName && procedure.id === item.procedure_id),
       ),
   );
-  const classTypeOptions = availableClassTypes(countryIds, lookup.class_rates ?? [], lookup.fees.filter(fee => fee.category === 'Trademark' && fee.available !== false && (!procedureNames.length || procedureNames.includes(fee.procedure_name))).map(fee => fee.country_id));
+  const selectedProceduresHaveWorkbookFees = countryIds.length > 0 && procedureNames.length > 0 &&
+    countryIds.every((countryId) => procedureNames.every((procedureName) => {
+      const matches = lookup.fees.filter((fee) =>
+        fee.country_id === countryId && fee.category === category && fee.procedure_name === procedureName,
+      );
+      return matches.length === 1 && matches[0].available !== false && matches[0].currency === "USD" &&
+        [matches[0].official_fee, matches[0].attorney_fee, matches[0].total_fee].every((value) =>
+          typeof value === "number" && Number.isFinite(value) && value >= 0,
+        );
+    }));
+  const classTypeSelectionReady = serviceSelectionConfirmed && category === "Trademark" && countryIds.length > 0 && procedureNames.length > 0;
+  const classTypeOptions = classTypeSelectionReady
+    ? availableClassTypes(
+      countryIds,
+      lookup.class_rates ?? [],
+      countryIds.filter((countryId) => procedureNames.every((procedureName) =>
+        lookup.fees.some((fee) => fee.country_id === countryId && fee.category === "Trademark" &&
+          fee.procedure_name === procedureName && fee.available !== false && fee.currency === "USD"),
+      )),
+      classCount,
+    )
+    : [];
   useEffect(() => {
     if (classType && !classTypeOptions.includes(classType)) setClassType('');
-  }, [countryIds, category, lookup, procedureNames, classType]);
-  const selectionFees = countryIds.flatMap((countryId) => procedureNames.map((procedureName) => {
+  }, [countryIds, category, lookup, procedureNames, classCount, serviceSelectionConfirmed, classType]);
+  const validServiceSelection = serviceSelectionConfirmed && serviceOptions.some((service) => service.name === category);
+  const validCountrySelection = countryIds.length > 0 && countryIds.every((id) => lookup.countries.some((country) => country.id === id));
+  const validProcedureSelection = procedureNames.length > 0 && procedureNames.every((name) => availableProcedures.some((procedure) => procedure.name === name));
+  const validClassSelection = category !== "Trademark" || (
+    Boolean(classType) && classTypeOptions.includes(classType as ClassType) &&
+    Number.isInteger(classCount) && classCount >= 1 && classCount <= 45 &&
+    (!selectedClassNumbers.length || selectedClassNumbers.length === classCount)
+  );
+  const selectionReady = !lookupLoading && Boolean(lookup.spreadsheet_revision) &&
+    validServiceSelection && validCountrySelection && validProcedureSelection && validClassSelection;
+  const selectionFees = selectionReady ? countryIds.flatMap((countryId) => procedureNames.map((procedureName) => {
     const matches = lookup.fees.filter((fee) => fee.country_id === countryId && fee.category === category && fee.procedure_name === procedureName);
     const fee = matches.length === 1 ? matches[0] : null;
-    if (!fee) return { countryId, procedureName, fee: null, issue: matches.length > 1 ? 'Multiple matching procedure rates; resolve the fee data before quoting.' : 'No published procedure fee is available for this combination.' };
+    if (!fee) return { countryId, procedureName, fee: null, issue: matches.length > 1 ? 'Multiple matching procedure rates; resolve the fee data before quoting.' : 'No saved spreadsheet fee is available for this combination.' };
     try {
       if (category === 'Trademark') {
         if (!classType || !classTypeOptions.includes(classType)) throw Error('Select a type of class available for the selected countries.');
@@ -378,14 +411,14 @@ export default function QuotationsPage() {
         const pricing = calculateClassPricing(fee, countryId, classType, classCount, lookup.class_rates ?? []);
         return { countryId, procedureName, fee: { ...fee, ...pricing, class_pricing_rows: pricing.rows }, issue: '' };
       }
-      if (fee.available === false || fee.currency !== 'USD' || ![fee.official_fee, fee.attorney_fee, fee.total_fee].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) throw Error(fee.issue || 'No complete published fee is available for this combination.');
+      if (fee.available === false || fee.currency !== 'USD' || ![fee.official_fee, fee.attorney_fee, fee.total_fee].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) throw Error(fee.issue || 'No complete saved spreadsheet fee is available for this combination.');
       return { countryId, procedureName, fee, issue: '' };
     } catch (cause) {
       return { countryId, procedureName, fee: null, issue: cause instanceof Error ? cause.message : 'Unable to calculate class fees.' };
     }
-  }));
+  })) : [];
   const generatedFees = selectionFees.map((item) => item.fee).filter((fee): fee is NonNullable<typeof fee> => Boolean(fee));
-  const allExactFeesFound = selectionFees.length > 0 && selectionFees.every((item) => item.fee) && Boolean(lookup.fee_dataset?.id);
+  const allExactFeesFound = selectionReady && selectionFees.length > 0 && selectionFees.every((item) => item.fee);
   useEffect(() => {
     setRequirementIds((current) => {
       const valid = current.filter((id) => availableRequirements.some((item) => item.id === id));
@@ -493,6 +526,7 @@ export default function QuotationsPage() {
     setVatable(true);
     setDiscount(0);
     setCategory("Trademark");
+    setServiceSelectionConfirmed(false);
     setCountryIds([]);
     setProcedureNames([]);
     setRequirementIds([]);
@@ -521,6 +555,7 @@ export default function QuotationsPage() {
     setVatable(quote.vatable);
     setDiscount(quote.discount);
     setCart(quote.quotation_items ?? []);
+    setServiceSelectionConfirmed(false);
     setSelectedClassNumbers([]);
     setClassCount(1);
     setClassType("");
@@ -529,46 +564,61 @@ export default function QuotationsPage() {
     setError("");
     setModal("form");
   };
-  const generateFees = (editingIndex: number | null = null, quantity = 1) => {
-    if (!clientId || !countryIds.length || !procedureNames.length) {
-      setError(
-        "Select a client, at least one country, and at least one procedure.",
-      );
-      return;
-    }
-    if (!serviceOptions.some((service) => service.name === category)) {
+  const validateFeeSelection = () => {
+    if (!serviceSelectionConfirmed || !serviceOptions.some((service) => service.name === category)) {
       setError("Select a valid service from the Services page data.");
-      return;
+      return false;
+    }
+    if (!countryIds.length || !procedureNames.length) {
+      setError(
+        "Select a service, at least one country, and at least one procedure.",
+      );
+      return false;
+    }
+    if (!lookup.spreadsheet_revision) {
+      setError("Saved spreadsheet fees are unavailable. Retry loading the workbook before continuing.");
+      return false;
+    }
+    if (category === "Trademark" && (!classType || !classTypeOptions.includes(classType))) {
+      setError("Select a type of class available for the selected countries.");
+      return false;
     }
     if (category === "Trademark" && (!Number.isInteger(classCount) || classCount < 1 || classCount > 45)) {
       setError("Trademark class count must be a whole number from 1 to 45.");
-      return;
+      return false;
     }
     if (category === "Trademark" && selectedClassNumbers.some((classNumber) =>
       !Number.isInteger(classNumber) || classNumber < 1 || classNumber > 45,
     )) {
       setError("Trademark classes must be whole numbers from 1 to 45.");
-      return;
+      return false;
     }
     if (countryIds.some((id) => !lookup.countries.some((country) => country.id === id))) {
       setError("One or more selected countries are no longer available.");
-      return;
+      return false;
     }
     if (procedureNames.some((name) => !availableProcedures.some((procedure) => procedure.name === name))) {
       setError("One or more selected procedures do not belong to the selected service.");
-      return;
+      return false;
     }
     if (requirementIds.some((id) => !availableRequirements.some((requirement) => requirement.id === id))) {
       setError("One or more selected requirements do not match the selected fee filters.");
-      return;
+      return false;
     }
-    if (!lookup.fee_dataset?.id) { setError("Published fee version is unavailable. Refresh after deploying the updated quotation service."); return; }
     if (!allExactFeesFound) {
       setError(
-        "A fee is not configured for one or more selected country and procedure combinations. Choose procedures with configured fees before adding to the cart.",
+        "A workbook fee is not configured for one or more selected country and procedure combinations. Choose procedures with configured fees before adding to the cart.",
       );
-      return;
+      return false;
     }
+    if (!isClientRole && !clientId) {
+      setError("Select a client before adding fees.");
+      return false;
+    }
+    return true;
+  };
+  const generateFees = (editingIndex: number | null = null, quantity = 1) => {
+    if (!validateFeeSelection()) return;
     setError("");
     addGeneratedToCart(editingIndex, quantity);
     return true;
@@ -636,7 +686,7 @@ export default function QuotationsPage() {
       const saved = await api<{ id: string; reference_no: string; invoice_verification_token?: string }>(selected ? `quotations/${selected.id}` : "quotations", {
         method: selected ? "PUT" : "POST",
         body: JSON.stringify({
-          fee_dataset_version_id: lookup.fee_dataset?.id,
+          spreadsheet_revision: lookup.spreadsheet_revision,
           client_id: clientId,
           project_id: projectId || null,
           client_matter_ref: clientMatterRef,
@@ -738,12 +788,12 @@ export default function QuotationsPage() {
         }
         {clientView && <section className="client-fee-selection" aria-labelledby="client-fee-title">
           <h2 id="client-fee-title"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M2 3h20l-8 9v8l-4 2V12z" /></svg>Fee Selections</h2>
-          <form onSubmit={event => { event.preventDefault(); setSelected(null); setCart([]); setInvoiceDate(today()); setDiscount(0); setError(""); if (generateFees()) setModal("form"); }}>
-            <label>{category === "Trademark" ? "Trademark *" : "Services / Project *"}<select aria-label={category === "Trademark" ? "Trademark" : "Services / Project"} value={category} disabled={lookupLoading} onChange={event => { setCategory(event.target.value as Category); setProcedureNames([]); }}><option value="" disabled>Select {category === "Trademark" ? "Trademark" : "Services / Project"}</option>{serviceOptions.map(service => <option key={service.id} value={service.name}>{service.name}</option>)}</select></label>
-            <label>Country *<select aria-label="Country" value={countryIds[0] ?? ""} disabled={lookupLoading} onChange={event => setCountryIds(event.target.value ? [event.target.value] : [])}><option value="">Select Country</option>{lookup.countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}</select></label>
-            <div className="client-procedure-field"><span>Procedure * <small>(multiple allowed)</small></span><details ref={procedureDropdown}><summary>{procedureNames.length ? procedureNames.join(", ") : "Select Procedure"}</summary><div>{availableProcedures.map(procedure => <label key={procedure.id}><input type="checkbox" checked={procedureNames.includes(procedure.name)} onChange={event => { const checked = event.target.checked; setProcedureNames(current => checked ? [...current, procedure.name] : current.filter(name => name !== procedure.name)); }} />{procedure.name}</label>)}</div></details></div>
-            <label>Type of class *<select aria-label="Type of class" disabled={category !== "Trademark" || lookupLoading} value={classType} onChange={event => setClassType(event.target.value as ClassType)}><option value="">{category === "Trademark" ? "Select Type of class" : "Not applicable"}</option>{classTypeOptions.map(type => <option key={type}>{type}</option>)}</select></label>
-            <label>Number of classes *<input aria-label="Number of classes" type="number" min="1" max="45" step="1" disabled={category !== "Trademark"} value={classCount} onChange={event => { setClassCount(Number(event.target.value)); setSelectedClassNumbers([]); }} /></label>
+          <form onSubmit={event => { event.preventDefault(); if (!validateFeeSelection()) return; setSelected(null); setCart([]); setInvoiceDate(today()); setDiscount(0); setError(""); if (generateFees()) setModal("form"); }}>
+            <label>Services / Project *<select aria-label="Services / Project" value={serviceSelectionConfirmed ? category : ""} disabled={lookupLoading} onChange={event => { setCategory(event.target.value as Category); setServiceSelectionConfirmed(true); setCountryIds([]); setProcedureNames([]); setRequirementIds([]); setClassType(""); setClassCount(1); setSelectedClassNumbers([]); setError(""); }}><option value="" disabled>Select Services / Project</option>{serviceOptions.map(service => <option key={service.id} value={service.name}>{service.name}</option>)}</select></label>
+            <label>Country *<select aria-label="Country" value={countryIds[0] ?? ""} disabled={!serviceSelectionConfirmed || lookupLoading} onChange={event => { setCountryIds(event.target.value ? [event.target.value] : []); setRequirementIds([]); setClassType(""); setSelectedClassNumbers([]); setError(""); }}><option value="">Select Country</option>{lookup.countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}</select></label>
+            <div className="client-procedure-field"><span>Procedure * <small>(multiple allowed)</small></span><details ref={procedureDropdown}><summary>{!serviceSelectionConfirmed ? "Select service first" : procedureNames.length ? procedureNames.join(", ") : "Select Procedure"}</summary><div>{availableProcedures.map(procedure => <label key={procedure.id}><input type="checkbox" disabled={!serviceSelectionConfirmed} checked={procedureNames.includes(procedure.name)} onChange={event => { const checked = event.target.checked; setProcedureNames(current => checked ? [...current, procedure.name] : current.filter(name => name !== procedure.name)); setError(""); }} />{procedure.name}</label>)}</div></details></div>
+            <label>Type of class *<select aria-label="Type of class" disabled={!serviceSelectionConfirmed || category !== "Trademark" || !countryIds.length || !procedureNames.length || lookupLoading} value={classType} onChange={event => { setClassType(event.target.value as ClassType); setError(""); }}><option value="">{!serviceSelectionConfirmed || !countryIds.length ? "Select service and country first" : !procedureNames.length ? "Select procedure first" : category === "Trademark" ? "Select Type of class" : "Not applicable"}</option>{classTypeOptions.map(type => <option key={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}</select></label>
+            <label>Number of classes *<input aria-label="Number of classes" type="number" min="1" max="45" step="1" disabled={!serviceSelectionConfirmed || category !== "Trademark"} value={classCount} onChange={event => { setClassCount(Number(event.target.value)); setSelectedClassNumbers([]); setError(""); }} /></label>
             <button type="submit" disabled={lookupLoading || saving || !lookup.current_client_id}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></svg>Submit</button>
           </form>
           {lookupError && <p role="alert">{lookupError} <button type="button" onClick={() => void loadLookup()}>Retry fees</button></p>}
@@ -921,9 +971,21 @@ export default function QuotationsPage() {
             lookup={lookup}
             projects={projects}
             category={category}
+            serviceSelectionConfirmed={serviceSelectionConfirmed}
+            setServiceSelectionConfirmed={setServiceSelectionConfirmed}
+            selectionReady={selectionReady}
+            selectedProceduresHaveWorkbookFees={selectedProceduresHaveWorkbookFees}
+            setError={setError}
             setCategory={(value: Category) => {
               setCategory(value);
+              setServiceSelectionConfirmed(true);
+              setCountryIds([]);
+              setClassType("");
+              setClassCount(1);
+              setSelectedClassNumbers([]);
               setProcedureNames([]);
+              setRequirementIds([]);
+              setError("");
             }}
             serviceOptions={serviceOptions}
             availableCategories={availableCategories}
@@ -1023,6 +1085,7 @@ function SearchMulti({
   label,
   options,
   selected,
+  disabled = false,
   onChange,
   getId,
   getLabel,
@@ -1031,6 +1094,7 @@ function SearchMulti({
   label: string;
   options: Array<{ id?: string; name?: string; description?: string; class_number?: number; flag_url?: string }>;
   selected: string[];
+  disabled?: boolean;
   onChange: (value: string[]) => void;
   getId: (item: { id?: string; name?: string; description?: string; class_number?: number; flag_url?: string }) => string;
   getLabel: (item: {
@@ -1057,6 +1121,7 @@ function SearchMulti({
       {label}
       <input
         value={query}
+        disabled={disabled}
         onFocus={() => setFocused(true)}
         onChange={(event) => { setQuery(event.target.value); setFocused(true); }}
         placeholder={`Search ${label.toLowerCase()}`}
@@ -1075,6 +1140,7 @@ function SearchMulti({
             <label key={id}>
               <input
                 type="checkbox"
+                disabled={disabled}
                 checked={selected.includes(id)}
                 onChange={() => {
                   onChange(
@@ -1193,6 +1259,11 @@ function InvoiceModal(props: any) {
     lookup,
     projects,
     category,
+    serviceSelectionConfirmed,
+    setServiceSelectionConfirmed,
+    selectionReady,
+    selectedProceduresHaveWorkbookFees,
+    setError,
     setCategory,
     availableCategories,
     serviceOptions,
@@ -1232,15 +1303,19 @@ function InvoiceModal(props: any) {
     onClose,
     onSubmit,
   } = props;
+  const classTypeSelectionReady = serviceSelectionConfirmed && category === "Trademark" && countryIds.length > 0 && procedureNames.length > 0;
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [draftQuantity, setDraftQuantity] = useState("1");
   const validDraft = Number.isInteger(Number(draftQuantity)) && Number(draftQuantity) >= 1 && Number(draftQuantity) <= 1000;
   const previewMultiplier = editingRow === null ? 1 : Number(draftQuantity);
-  const cartBlocker = loadingFees ? "Loading fees..."
-    : !lookup.fee_dataset?.id ? "Published fees are unavailable. Retry loading fees or contact your administrator."
+  const cartBlocker = loadingFees ? "Loading workbook fees..."
+    : !lookup.spreadsheet_revision ? "Saved spreadsheet fees are unavailable. Retry loading the workbook or contact your administrator."
     : !clientId ? "Select a client before adding fees."
+    : !serviceSelectionConfirmed ? "Select a service before adding fees."
+    : !serviceOptions.some((service: { name: string }) => service.name === category) ? "Select a valid service before adding fees."
     : !countryIds.length || !procedureNames.length ? "Select a country and procedure to add fees."
+    : category === "Trademark" && (!classType || !classTypeOptions.includes(classType)) ? "Select a type of class before adding fees."
     : !allExactFeesFound ? "Resolve the unavailable rates shown above before adding fees."
     : editingRow !== null && !validDraft ? "Enter a whole-number quantity from 1 to 1,000." : "";
   const cancelEdit = () => {
@@ -1365,16 +1440,19 @@ function InvoiceModal(props: any) {
                 <SearchMulti
                   label={editingRow !== null && category === "Trademark" ? "Trademark *" : `Services / Project *`}
                   options={serviceOptions}
-                  selected={category ? [category] : []}
+                  selected={serviceSelectionConfirmed && category ? [category] : []}
                   onChange={(values) => {
                     const selectedService = values.at(-1);
                     if (selectedService) {
                       setCategory(selectedService as Category);
+                      setServiceSelectionConfirmed(true);
+                      setCountryIds([]);
                       setClassType("");
                       setClassCount(1);
                       setSelectedClassNumbers([]);
                       setProcedureNames([]);
                       setRequirementIds([]);
+                      setError("");
                     }
                   }}
                   getId={(item) => item.name!}
@@ -1387,7 +1465,8 @@ function InvoiceModal(props: any) {
                 label="Country *"
                 options={lookup.countries}
                 selected={countryIds}
-                onChange={(values) => { setCountryIds(values); setRequirementIds([]); setClassType(""); }}
+                disabled={!serviceSelectionConfirmed}
+                onChange={(values) => { setCountryIds(values); setRequirementIds([]); setClassType(""); setError(""); }}
                 getId={(item) => item.id!}
                 getLabel={(item) => item.name!}
                 compact
@@ -1399,7 +1478,8 @@ function InvoiceModal(props: any) {
                 label="Procedure * (multiple allowed)"
                 options={availableProcedures}
                 selected={procedureNames}
-                onChange={(values) => { setProcedureNames(values); setRequirementIds([]); }}
+                disabled={!serviceSelectionConfirmed}
+                onChange={(values) => { setProcedureNames(values); setRequirementIds([]); setError(""); }}
                 getId={(item) => item.name!}
                 getLabel={(item) => item.name!}
                 compact
@@ -1411,8 +1491,8 @@ function InvoiceModal(props: any) {
               </label>}
               {category === "Trademark" && <>
                 <label>Type of class *
-                  <select aria-label="Type of class" value={classType} onChange={(event) => setClassType(event.target.value as ClassType)} disabled={!countryIds.length}>
-                    <option value="">{countryIds.length ? 'Select type of class' : 'Select country first'}</option>
+                  <select aria-label="Type of class" value={classType} onChange={(event) => setClassType(event.target.value as ClassType)} disabled={!classTypeSelectionReady}>
+                    <option value="">{!serviceSelectionConfirmed || !countryIds.length ? 'Select service and country first' : !procedureNames.length ? 'Select procedure first' : 'Select type of class'}</option>
                     {classTypeOptions.map((type: ClassType) => <option key={type} value={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}
                   </select>
                 </label>
@@ -1433,9 +1513,12 @@ function InvoiceModal(props: any) {
               <RequirementTable countries={countries} requirements={availableRequirements} selected={requirementIds} onChange={setRequirementIds} />
             </div>
             <div className="fee-preview" aria-live="polite">
-              <p>{lookup.fee_dataset ? 'Published fee version ' + lookup.fee_dataset.version_number + (lookup.fee_dataset.published_at ? ' · ' + dateText(lookup.fee_dataset.published_at) : '') : ''}</p>
-              {category === 'Trademark' && <p>The first class uses the Trademark fee. Later classes use the selected class-type tab; classes 2 to 3 or 2 to 5 are summed in one row. Class numbers identify your selections; fees follow their order.</p>}
-              {category === 'Trademark' && countryIds.length > 0 && !classTypeOptions.length && <p className="fee-missing">No common class pricing is configured for these countries. Select countries with the same available class type.</p>}
+              <p>{lookup.spreadsheet_revision ? `Saved workbook revision ${lookup.spreadsheet_revision}${lookup.spreadsheet_updated_at ? ' · ' + dateText(lookup.spreadsheet_updated_at) : ''}` : ''}</p>
+              {selectionReady && category === 'Trademark' && <p>The first class uses the Trademark fee. Later classes use the selected class-type tab; classes 2 to 3 or 2 to 5 are summed in one row. Class numbers identify your selections; fees follow their order.</p>}
+              {classTypeSelectionReady && !classTypeOptions.length && <p className="fee-missing">No class pricing types are configured for the selected countries and class count.</p>}
+              {classType && classTypeSelectionReady && !selectedProceduresHaveWorkbookFees && <p className="fee-missing">The selected procedure does not have a valid base fee in the saved workbook. Class types are shown from the country rates, but this selection cannot be quoted until the procedure fee is available.</p>}
+              {!loadingFees && !lookup.spreadsheet_revision && <p className="fee-missing">Saved workbook fees are unavailable. Retry loading the workbook.</p>}
+              {!selectionReady && lookup.spreadsheet_revision && <p>Select a service, country, procedure, and— for trademarks—class type to display matching workbook fees.</p>}
               {selectionFees.length ? <table><thead><tr><th>Country</th><th>Procedure</th><th>Qty</th><th>Class numbers</th><th>Official (USD)</th><th>Attorney (USD)</th><th>VAT (USD)</th><th>Total (USD)</th></tr></thead><tbody>
                 {selectionFees.flatMap((item: { countryId: string; procedureName: string; fee: Fee | null; issue: string }) => {
                   const key = item.countryId + item.procedureName;
@@ -1451,11 +1534,11 @@ function InvoiceModal(props: any) {
                   return [...rows.map((row, index) => <tr key={key + index}><td>{index === 0 ? country : ''}</td><td>{index === 0 && <strong>{item.procedureName}</strong>}<span className="class-fee-description">{row.label || 'Procedure fee'}</span>{row.source && <small>Fees: {row.source}</small>}</td><td>{row.quantity}</td><td>{category === 'Trademark' ? row.class_numbers.join(', ') || 'Not specified' : '-'}</td><td>{money(row.official_fee)}</td><td>{money(row.attorney_fee)}</td><td>{money(row.vat)}</td><td>{money(row.official_fee + row.attorney_fee + row.other_fee + row.vat)}</td></tr>),
                     <tr key={key + '-subtotal'} className="class-pricing-subtotal"><td colSpan={4}>{item.procedureName} subtotal{classType ? ' / ' + classType : ''}</td><td>{money(official)}</td><td>{money(attorney)}</td><td>{money(rows.reduce((sum, row) => sum + row.vat, 0))}</td><td>{money(official + attorney + other + rows.reduce((sum, row) => sum + row.vat, 0))}</td></tr>];
                 })}
-              </tbody></table> : <p>Select a service, country and procedure to view matching requirements and fees.</p>}
+              </tbody></table> : <p>{!serviceSelectionConfirmed ? "Select a service to begin." : !countryIds.length ? "Select a country to continue." : !procedureNames.length ? "Select one or more procedures to continue." : category === "Trademark" && !classType ? "Select a type of class to display the matching fees." : "No matching fee selection is ready to display."}</p>}
             </div>
             {selectionFees.length > 0 && <p>Amounts reflect your selections. VAT and discount are shown in the cart.</p>}
             {cartBlocker && <p id="cart-blocker" role="status">{cartBlocker}</p>}
-            {!lookup.fee_dataset?.id && <button type="button" onClick={retryFees} disabled={loadingFees || saving}>{loadingFees ? "Loading fees..." : "Retry loading fees"}</button>}
+            {!lookup.spreadsheet_revision && <button type="button" onClick={retryFees} disabled={loadingFees || saving}>{loadingFees ? "Loading workbook..." : "Retry loading workbook"}</button>}
             <button
               className="outline-action generate-fees"
               type="button"

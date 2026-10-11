@@ -154,7 +154,19 @@ function findHeaderRows(rows: string[][]): number[] {
 
   if (candidates.length === 0) return [];
   const first = candidates[0].index;
-  const rowsFound = [first];
+  const parentHeader = rows[first - 1] || [];
+  const feeHeader = rows[first] || [];
+  const hasProcedureGroupHeaders = parentHeader.some((value, column) => {
+    const label = normalized(value);
+    if (!label || /^(group|code|class|classes|currency)$/.test(label) ||
+      COUNTRY_HEADERS.some((header) => label === header || label.includes(header)) ||
+      REGION_HEADERS.some((header) => label === header || label.includes(header)) ||
+      FEE_HEADERS.some((header) => label.includes(header))) return false;
+    return feeHeader.slice(column, column + 3).some((subheader) =>
+      FEE_HEADERS.some((header) => normalized(subheader).includes(header)),
+    );
+  });
+  const rowsFound = hasProcedureGroupHeaders ? [first - 1, first] : [first];
   for (let index = first + 1; index < Math.min(rows.length, first + 3); index += 1) {
     if (rows[index].some((value) => FEE_HEADERS.some((header) => normalized(value).includes(header)))) {
       rowsFound.push(index);
@@ -186,37 +198,40 @@ function detectCurrency(value: string): string | undefined {
 
 export function importClassesSheet(rows: string[][]): { records: ParsedClassRecord[]; issues: ImportIssue[] } {
   const issues: ImportIssue[] = [];
-  const headerIndex = rows.findIndex((row) => {
+  const hasClassMatrixHeaders = (row: string[]) => row.some((value) => /^class\s*\d{1,2}$/.test(normalized(value)));
+  const headerIndex = rows.findIndex((row, index) => {
     const headers = row.map(normalized);
     return headers.some((value) => /^(class|class number|number)$/.test(value))
       || headers.some((value) => COUNTRY_HEADERS.some((header) => value === header || value.includes(header)))
-        && headers.some((value) => /^class\s*\d{1,2}$/.test(value));
+        && (hasClassMatrixHeaders(row) || hasClassMatrixHeaders(rows[index - 1] || []));
   });
   if (headerIndex < 0) {
     return { records: [], issues: [{ sheet: 'Classes', row: 0, type: 'unrecognized_structure', message: 'The Classes sheet must contain a Class or Class Number column.' }] };
   }
   const headers = rows[headerIndex].map(normalized);
   const classIndex = headers.findIndex((value) => /^(class|class number|number)$/.test(value));
-  const countryIndex = headers.findIndex((value) => COUNTRY_HEADERS.some((header) => value === header || value.includes(header)));
-  const matrixClassColumns = headers
+  const countryIndex = headers.findIndex((value) => COUNTRY_HEADERS.some((header) => (value || '') === header || (value || '').includes(header)));
+  const usesGroupedHeaders = !hasClassMatrixHeaders(rows[headerIndex]) && hasClassMatrixHeaders(rows[headerIndex - 1] || []);
+  const classHeaders = usesGroupedHeaders ? (rows[headerIndex - 1] || []).map(normalized) : headers;
+  const matrixClassColumns = classHeaders
     .map((value, index) => ({ index, match: value.match(/^class\s*(\d{1,2})$/) }))
     .filter((item): item is { index: number; match: RegExpMatchArray } => Boolean(item.match))
     .map((item) => ({ index: item.index, classNumber: Number(item.match[1]) }))
     .filter((item) => item.classNumber >= 1 && item.classNumber <= 45);
-  const subheaders = rows[headerIndex + 1]?.map(normalized) || [];
+  const subheaders = (usesGroupedHeaders ? rows[headerIndex] : rows[headerIndex + 1])?.map(normalized) || [];
   const hasFeeSubheaders = subheaders.some((value) => /official|government|attorney|atty|total/.test(value));
   const matrixFeeColumns = hasFeeSubheaders
     ? matrixClassColumns.map((column) => ({
       ...column,
-      kind: subheaders[column.index].includes('official') || subheaders[column.index].includes('government')
+      kind: (subheaders[column.index] || '').includes('official') || (subheaders[column.index] || '').includes('government')
         ? 'official' as const
-        : subheaders[column.index].includes('attorney') || subheaders[column.index].includes('atty')
+        : (subheaders[column.index] || '').includes('attorney') || (subheaders[column.index] || '').includes('atty')
           ? 'attorney' as const
           : 'total' as const,
     }))
     : matrixClassColumns.map((column) => ({ ...column, kind: 'total' as const }));
   const claimingPriorityColumns = hasFeeSubheaders
-    ? headers.map((value, index) => ({ value, index, subheader: subheaders[index] || '' }))
+    ? classHeaders.map((value, index) => ({ value, index, subheader: subheaders[index] || '' }))
       .filter((item) => /claiming priority|priority claim/.test(item.value))
       .map((item) => ({
         ...item,
@@ -228,10 +243,10 @@ export function importClassesSheet(rows: string[][]): { records: ParsedClassReco
       }))
     : [];
   const nameIndex = headers.findIndex((value) => /^(name|description|class description|goods and services)$/.test(value));
-  const officialIndex = headers.findIndex((value) => value.includes('official') || value.includes('government'));
-  const attorneyIndex = headers.findIndex((value) => value.includes('attorney') || value.includes('atty'));
-  const totalIndex = headers.findIndex((value) => value.includes('total') || value === 'fee' || value === 'price' || value === 'cost');
-  const currencyIndex = headers.findIndex((value) => value.includes('currency'));
+  const officialIndex = headers.findIndex((value) => (value || '').includes('official') || (value || '').includes('government'));
+  const attorneyIndex = headers.findIndex((value) => (value || '').includes('attorney') || (value || '').includes('atty'));
+  const totalIndex = headers.findIndex((value) => (value || '').includes('total') || value === 'fee' || value === 'price' || value === 'cost');
+  const currencyIndex = headers.findIndex((value) => (value || '').includes('currency'));
   const records: ParsedClassRecord[] = [];
   if (countryIndex >= 0 && matrixClassColumns.length > 0) {
     for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {

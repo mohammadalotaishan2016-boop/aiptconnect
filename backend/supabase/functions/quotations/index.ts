@@ -1,6 +1,7 @@
 import { clientPermissionResponse, actionForRequest } from '../_shared/client-permissions.ts';
 import { calculateClassPricing, classTypes, type ClassType, type ClassRate } from '../_shared/quotation-class-pricing.ts';
 import { toPlainText } from '../_shared/plain-text.ts';
+import { parseSpreadsheetPricing } from '../_shared/spreadsheet-fees.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS' };
@@ -25,7 +26,7 @@ async function context(request: Request) {
   return { db, user, profile };
 }
 
-const listSelect = `id,reference_no,invoice_verification_token,status,approved_at,vat_rate,vatable,discount,currency,client_matter_ref,invoice_date,subject,total_official_fee,total_attorney_fee,total_other_fee,total_vat,grand_total,created_at,updated_at,client:clients(id,company_name,email,address,country_id),project:projects(id,project_name,aipt_ref_no),primary_country:countries(id,name,abbreviation,flag_url),quotation_items(id,country_id,category,procedure_name,quantity,class_numbers,class_type,class_count,class_pricing_rows,additional_fee_per_class,official_fee,attorney_fee,other_fee,claiming_priority,claiming_priority_fee,state_country_ids,state_fee_total,vat_rate,requirement_ids,country:countries(id,name,abbreviation,flag_url))`;
+const listSelect = `id,reference_no,invoice_verification_token,status,approved_at,spreadsheet_revision,vat_rate,vatable,discount,currency,client_matter_ref,invoice_date,subject,total_official_fee,total_attorney_fee,total_other_fee,total_vat,grand_total,created_at,updated_at,client:clients(id,company_name,email,address,country_id),project:projects(id,project_name,aipt_ref_no),primary_country:countries(id,name,abbreviation,flag_url),quotation_items(id,country_id,category,procedure_name,quantity,class_numbers,class_type,class_count,class_pricing_rows,additional_fee_per_class,official_fee,attorney_fee,other_fee,claiming_priority,claiming_priority_fee,state_country_ids,state_fee_total,vat_rate,requirement_ids,country:countries(id,name,abbreviation,flag_url))`;
 const publicSelect = `id,reference_no,invoice_verification_token,status,approved_at,vat_rate,vatable,discount,currency,client_matter_ref,invoice_date,subject,total_official_fee,total_attorney_fee,total_other_fee,total_vat,grand_total,client:clients(company_name,address),quotation_items(id,country_id,category,procedure_name,quantity,class_numbers,class_type,class_count,class_pricing_rows,additional_fee_per_class,official_fee,attorney_fee,other_fee,claiming_priority,claiming_priority_fee,state_country_ids,state_fee_total,vat_rate,requirement_ids,country:countries(name,abbreviation))`;
 
 // Validity is anchored to the saved administrator approval, never the PDF generation date.
@@ -83,18 +84,6 @@ function describeFee(row: any) {
   catch (cause) { return { official_fee: row.official_fee, attorney_fee: row.attorney_fee, total_fee: row.total_fee, currency: row.currency, available: false, issue: (cause as Error).message }; }
 }
 
-async function loadClassRates(db: any, versionId: string): Promise<ClassRate[]> {
-  const { data } = await allRows(() => db.from('fee_values')
-    .select('country_id,official_fee,attorney_fee,total_fee,currency,fee_services!inner(name),fee_categories!inner(name)')
-    .eq('dataset_version_id', versionId).eq('status', 'active')
-    .in('fee_categories.name', ['Multi-class', 'Up to 3 classes', 'Up to 5 classes']).order('id'));
-  return data.flatMap((row: any) => {
-    const match = /^class\s*(\d{1,2})$/i.exec(row.fee_services?.name ?? '');
-    const position = Number(match?.[1]);
-    return position >= 1 && position <= 45 ? [{ country_id: row.country_id, class_type: row.fee_categories.name, class_number: position, ...describeFee(row) }] : [];
-  });
-}
-
 async function loadLookups(db: any, profile: { role: string; client_id?: string | null }) {
   const [{ data: clients, error: clientsError }, { data: projects, error: projectsError }, { data: countries, error: countriesError }, { data: feeCategories, error: categoriesError }, { data: procedures, error: proceduresError }, { data: requirements, error: requirementsError }, { data: services, error: servicesError }, { data: vatRates, error: vatError }] = await Promise.all([
     allRows(() => { let query = db.from('clients').select('id,assigned_id,company_name,email,address,country_id,status').is('deleted_at', null).order('id'); return profile.role === 'client' ? query.eq('id', profile.client_id) : query; }),
@@ -109,19 +98,12 @@ async function loadLookups(db: any, profile: { role: string; client_id?: string 
   const error = [clientsError, projectsError, countriesError, categoriesError, proceduresError, requirementsError, servicesError, vatError].find(Boolean);
   if (error) throw error;
   const procedureById = new Map((procedures ?? []).map((item: any) => [item.id, item]));
-  const { data: latest, error: versionError } = await db.from('fee_dataset_versions').select('id,version_number,published_at').eq('status', 'published').order('version_number', { ascending: false }).limit(1).maybeSingle();
-  if (versionError) throw versionError;
-  const { data: feeRows, error: feesError } = latest
-    ? await allRows(() => db.from('fee_values').select('id,country_id,official_fee,attorney_fee,total_fee,currency,fee_services!inner(name),fee_categories!inner(name)').eq('dataset_version_id', latest.id).eq('status', 'active').order('id'))
-    : { data: [], error: null };
-  if (feesError) throw feesError;
-  const { data: claimingPriorityRows, error: claimingPriorityError } = latest
-    ? await allRows(() => db.from('fee_claiming_priority_values').select('country_id,official_fee,attorney_fee,total_fee,currency').eq('dataset_version_id', latest.id).order('country_id'))
-    : { data: [], error: null };
-  if (claimingPriorityError) throw claimingPriorityError;
-  const stateFeeRows = latest
-    ? (feeRows ?? []).filter((item: any) => item.fee_categories?.name === 'Trademark' && /state/i.test(item.fee_services?.name ?? ''))
-    : [];
+  const { data: sharedWorkbook, error: workbookError } = await db.from('spreadsheet_workbooks')
+    .select('workbook,revision,updated_at').eq('id', true).single();
+  if (workbookError) throw workbookError;
+  const spreadsheetRevision = Number(sharedWorkbook?.revision);
+  if (!Number.isSafeInteger(spreadsheetRevision) || spreadsheetRevision < 1) throw Error('The saved fee workbook revision is invalid.');
+  const spreadsheetPricing = parseSpreadsheetPricing(sharedWorkbook.workbook, countries ?? [], (procedures ?? []).map((item: any) => ({ name: item.description })));
   const visibleClients = profile.role === 'client'
     ? (clients ?? []).filter((item: any) => item.id === profile.client_id)
     : clients ?? [];
@@ -132,28 +114,32 @@ async function loadLookups(db: any, profile: { role: string; client_id?: string 
     role: profile.role,
     current_client_id: profile.client_id ?? null,
     clients: visibleClients.sort((a: any, b: any) => a.company_name.localeCompare(b.company_name)),
-    fee_dataset: latest,
-    class_rates: latest ? await loadClassRates(db, latest.id) : [],
+    spreadsheet_revision: spreadsheetRevision,
+    spreadsheet_updated_at: sharedWorkbook.updated_at,
+    class_rates: spreadsheetPricing.class_rates,
     services: (services ?? []).map((item: any) => ({ id: item.id, name: item.service, category: '', description: item.service, display_color: item.color })),
     projects: visibleProjects,
     countries: countries ?? [],
     categories: (feeCategories ?? []).filter((item: any) => categories.includes(item.name)),
     procedures: (procedures ?? []).map((item: any) => ({ id: item.id, name: item.description, category: item.services?.service ?? '' })).filter((item: any) => categories.includes(item.category)),
     requirements: (requirements ?? []).map((item: any) => ({ ...item, description: toPlainText(item.description), procedure_id: item.procedure_id ?? null, procedure: procedureById.get(item.procedure_id)?.description ?? null, service_id: procedureById.get(item.procedure_id)?.service_id ?? null })),
-    fees: (feeRows ?? []).map((item: any) => ({ id: item.id, country_id: item.country_id, category: item.fee_categories?.name, procedure_name: item.fee_services?.name, ...describeFee(item) })),
-    claiming_priority_fees: (claimingPriorityRows ?? []).map((item: any) => ({ country_id: item.country_id, ...describeFee(item) })),
-    state_fees: stateFeeRows.map((item: any) => ({ id: item.id, country_id: item.country_id, procedure_name: item.fee_services?.name, ...describeFee(item) })),
+    fees: spreadsheetPricing.fees,
+    claiming_priority_fees: spreadsheetPricing.claiming_priority_fees,
+    state_fees: spreadsheetPricing.state_fees,
     aripo_country_ids: (countries ?? []).filter((item: any) => aripoCountries.has(String(item.name).trim().toLowerCase())).map((item: any) => item.id),
     vat_rates: vatRates ?? [],
   };
 }
 
-async function resolveItems(db: any, items: any[], expectedVersion?: string) {
+async function resolveItems(db: any, items: any[], expectedSpreadsheetRevision?: number) {
   if (!Array.isArray(items) || items.length === 0) throw Error('Add at least one service to the quotation.');
-  const { data: latest, error: versionError } = await db.from('fee_dataset_versions').select('id').eq('status', 'published').order('version_number', { ascending: false }).limit(1).maybeSingle();
-  if (versionError) throw versionError;
-  if (expectedVersion && latest?.id !== expectedVersion) throw Error('Published fees changed. Refresh quotations and review the updated fees before saving.');
-  if (!latest) throw Error('No published fee data is available. Synchronize the Fees page first.');
+  if (!Number.isSafeInteger(expectedSpreadsheetRevision) || (expectedSpreadsheetRevision ?? 0) < 1) throw Error('Refresh quotations to load the saved fee workbook before saving.');
+  const { data: sharedWorkbook, error: workbookError } = await db.from('spreadsheet_workbooks')
+    .select('workbook,revision').eq('id', true).single();
+  if (workbookError) throw workbookError;
+  const spreadsheetRevision = Number(sharedWorkbook?.revision);
+  if (!Number.isSafeInteger(spreadsheetRevision) || spreadsheetRevision < 1) throw Error('The saved fee workbook revision is invalid.');
+  if (spreadsheetRevision !== expectedSpreadsheetRevision) throw Error('The fee workbook changed. Refresh quotations and review the updated fees before saving.');
   const { data: procedureRows, error: procedureError } = await allRows(() => db.from('procedures').select('id,description,services!inner(service)').is('deleted_at', null).order('id'));
   if (procedureError) throw procedureError;
   const procedureByKey = new Map((procedureRows ?? []).map((item: any) => [`${item.services?.service}|${item.description}`, item.id]));
@@ -164,18 +150,24 @@ async function resolveItems(db: any, items: any[], expectedVersion?: string) {
   const { data: vatRates, error: vatError } = await allRows(() => db.from('vat_rates').select('id,country_id,vat').is('deleted_at', null).order('id'));
   if (vatError) throw vatError;
   const vatByCountry = new Map((vatRates ?? []).map((row: any) => [row.country_id, money(row.vat)]));
-  const classRates = requestedCategories.includes('Trademark') ? await loadClassRates(db, latest.id) : [];
+  const { data: countryRows, error: countryError } = await allRows(() => db.from('countries').select('id,name').is('deleted_at', null).order('name'));
+  if (countryError) throw countryError;
+  const spreadsheetPricing = parseSpreadsheetPricing(sharedWorkbook.workbook, countryRows ?? [], (procedureRows ?? []).map((item: any) => ({ name: item.description })));
+  const classRates = spreadsheetPricing.class_rates;
   const resolved: any[] = [];
   for (const item of items) {
     const category = categoryOf(item.category);
     const countryId = typeof item.country_id === 'string' ? item.country_id : '';
     const procedureName = typeof item.procedure_name === 'string' ? item.procedure_name.trim() : '';
     if (!countryId || !procedureName) throw Error('Each service needs a country and procedure.');
-    const { data: fee, error } = await db.from('fee_values').select('id,official_fee,attorney_fee,total_fee,currency,category_id,country_id,fee_services!inner(id,name),fee_categories!inner(name),countries!inner(name)').eq('dataset_version_id', latest.id).eq('status', 'active').eq('country_id', countryId).eq('fee_categories.name', category).eq('fee_services.name', procedureName).maybeSingle();
-    if (error) throw error;
+    const matchingFees = spreadsheetPricing.fees.filter((fee) =>
+      fee.country_id === countryId && fee.category === category && fee.procedure_name === procedureName,
+    );
+    if (matchingFees.length > 1) throw Error(`The workbook has multiple rates for ${category}, ${procedureName}, and the selected country.`);
+    const fee = matchingFees[0];
     if (!fee) throw Error(`No matching fee found for ${category}, ${procedureName}, and the selected country.`);
     if (!procedureByKey.has(`${category}|${procedureName}`)) throw Error('The selected procedure does not belong to the selected service.');
-    let pricing = describeFee(fee);
+    let pricing = fee;
     const quantity = Number(item.quantity ?? 1);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) throw Error('Quantity must be a whole number between 1 and 1000.');
     const classNumbers = category === 'Trademark' && Array.isArray(item.class_numbers)
@@ -184,10 +176,12 @@ async function resolveItems(db: any, items: any[], expectedVersion?: string) {
     if (category === 'Trademark' && Array.isArray(item.class_numbers) && classNumbers.length !== item.class_numbers.length) throw Error('Trademark classes must be whole numbers from 1 to 45.');
     // Legacy Single/Multi rows retain per-mark pricing when edited and saved.
     const requestedClassType = item.class_type;
+    const usesLegacyClassType = requestedClassType == null || ['Single', 'Multi'].includes(requestedClassType);
+    if (category === 'Trademark' && usesLegacyClassType) throw Error('Select a type of class before saving the quotation.');
     const classType: ClassType | null = category === 'Trademark'
-      ? (requestedClassType == null || ['Single', 'Multi'].includes(requestedClassType) ? 'Per mark per class' : requestedClassType)
+      ? (usesLegacyClassType ? 'Per mark per class' : requestedClassType)
       : null;
-    if (classType && !classTypes.includes(classType)) throw Error('Select a valid type of class.');
+    if (category === 'Trademark' && !classTypes.includes(classType as ClassType)) throw Error('Select a valid type of class.');
     const classCount = category === 'Trademark' ? Number(classTypes.includes(requestedClassType) ? item.class_count : item.class_count || classNumbers.length || 1) : 0;
     if (classNumbers.length && classNumbers.length !== classCount) throw Error('Optional trademark class numbers must match the number of classes.');
     const breakdown = classType ? calculateClassPricing(pricing, countryId, classType, classCount, classRates) : null;
@@ -198,8 +192,8 @@ async function resolveItems(db: any, items: any[], expectedVersion?: string) {
     const claimingPriority = category === 'Trademark' && item.claiming_priority === true;
     let claimingPriorityFee = 0;
     if (claimingPriority) {
-      const { data: priority, error: priorityError } = await db.from('fee_claiming_priority_values').select('official_fee,attorney_fee,total_fee,currency').eq('dataset_version_id', latest.id).eq('country_id', countryId).maybeSingle();
-      if (priorityError) throw priorityError;
+      const priorityRows = spreadsheetPricing.claiming_priority_fees.filter((row) => row.country_id === countryId);
+      const priority = priorityRows[0];
       if (!priority) throw Error('Claiming Priority is not available for the selected country.');
       claimingPriorityFee = feePricing(priority).total_fee;
     }
@@ -211,10 +205,9 @@ async function resolveItems(db: any, items: any[], expectedVersion?: string) {
       const { data: stateCountries, error: stateCountriesError } = await db.from('countries').select('id,name').in('id', stateCountryIds).is('deleted_at', null);
       if (stateCountriesError) throw stateCountriesError;
       if ((stateCountries ?? []).length !== stateCountryIds.length || (stateCountries ?? []).some((state: any) => !aripoCountries.has(String(state.name).trim().toLowerCase()))) throw Error('States can only be selected from ARIPO countries.');
-      const { data: stateFees, error: stateFeesError } = await db.from('fee_values').select('country_id,total_fee,official_fee,attorney_fee,currency,fee_services!inner(name),fee_categories!inner(name)').eq('dataset_version_id', latest.id).eq('status', 'active').in('country_id', stateCountryIds).eq('fee_categories.name', 'Trademark').ilike('fee_services.name', '%state%');
-      if (stateFeesError) throw stateFeesError;
-      if ((stateFees ?? []).length !== stateCountryIds.length) throw Error('A States fee is not available for every selected ARIPO country.');
-      stateFeeTotal = money((stateFees ?? []).reduce((sum: number, row: any) => sum + feePricing(row).total_fee, 0));
+      const stateFees = spreadsheetPricing.state_fees.filter((row) => stateCountryIds.includes(row.country_id));
+      if (stateFees.length !== stateCountryIds.length) throw Error('A States fee is not available for every selected ARIPO country in the workbook.');
+      stateFeeTotal = money(stateFees.reduce((sum, row) => sum + feePricing(row).total_fee, 0));
     }
     const additional = 0;
     const requirementIds = Array.isArray(item.requirement_ids) ? item.requirement_ids.filter((id: unknown) => typeof id === 'string') : [];
@@ -230,9 +223,9 @@ async function resolveItems(db: any, items: any[], expectedVersion?: string) {
     const official = money(pricing.official_fee * quantity);
     const attorney = money(pricing.attorney_fee * quantity);
     const other = money(Math.max(0, total * quantity - official - attorney));
-    resolved.push({ country_id: countryId, category, procedure_name: procedureName, fee_value_id: fee.id, quantity, class_numbers: classNumbers, class_type: classType, class_count: classCount, class_pricing_rows: breakdown?.rows ?? [], additional_fee_per_class: 0, official_fee: official, attorney_fee: attorney, other_fee: other, vat_rate: vatRate, requirement_ids: requirementIds, claiming_priority: claimingPriority, claiming_priority_fee: money(claimingPriorityFee * quantity * classMultiplier), state_country_ids: stateCountryIds, state_fee_total: money(stateFeeTotal * quantity * classMultiplier), vat: attorney * vatRate / 100 });
+    resolved.push({ country_id: countryId, category, procedure_name: procedureName, fee_value_id: null, quantity, class_numbers: classNumbers, class_type: classType, class_count: classCount, class_pricing_rows: breakdown?.rows ?? [], additional_fee_per_class: 0, official_fee: official, attorney_fee: attorney, other_fee: other, vat_rate: vatRate, requirement_ids: requirementIds, claiming_priority: claimingPriority, claiming_priority_fee: money(claimingPriorityFee * quantity * classMultiplier), state_country_ids: stateCountryIds, state_fee_total: money(stateFeeTotal * quantity * classMultiplier), vat: attorney * vatRate / 100 });
   }
-  return resolved;
+  return { items: resolved, spreadsheetRevision };
 }
 
 function totals(items: any[], discount: number, vatRate: number) {
@@ -340,7 +333,7 @@ Deno.serve(async (request) => {
       const body = await request.json();
       const vatable = body.vatable !== false;
       const discount = money(body.discount);
-      const items = await resolveItems(db, body.items, body.fee_dataset_version_id);
+      const { items, spreadsheetRevision } = await resolveItems(db, body.items, Number(body.spreadsheet_revision));
       if (!vatable) items.forEach((item) => { item.vat_rate = 0; });
       const vatRate = items.length ? items[0].vat_rate : 0;
       const summary = totals(items, discount, vatRate);
@@ -355,7 +348,7 @@ Deno.serve(async (request) => {
         const { data: project } = await db.from('projects').select('id,client_id').eq('id', body.project_id).eq('client_id', clientId).is('deleted_at', null).maybeSingle();
         if (!project) throw Error('The inquiry project does not belong to the selected client.');
       }
-      const payload = { client_id: clientId, project_id: body.project_id || null, primary_category: first.category, primary_country_id: first.country_id, client_matter_ref: typeof body.client_matter_ref === 'string' ? body.client_matter_ref.trim() : null, invoice_date: typeof body.invoice_date === 'string' && body.invoice_date ? body.invoice_date : new Date().toISOString().slice(0, 10), subject: typeof body.subject === 'string' ? body.subject.trim() : '', currency: 'USD', vatable, vat_rate: vatRate, discount, total_official_fee: summary.official, total_attorney_fee: summary.attorney, total_other_fee: summary.other, total_vat: summary.vat, grand_total: summary.grand };
+      const payload = { client_id: clientId, project_id: body.project_id || null, primary_category: first.category, primary_country_id: first.country_id, spreadsheet_revision: spreadsheetRevision, client_matter_ref: typeof body.client_matter_ref === 'string' ? body.client_matter_ref.trim() : null, invoice_date: typeof body.invoice_date === 'string' && body.invoice_date ? body.invoice_date : new Date().toISOString().slice(0, 10), subject: typeof body.subject === 'string' ? body.subject.trim() : '', currency: 'USD', vatable, vat_rate: vatRate, discount, total_official_fee: summary.official, total_attorney_fee: summary.attorney, total_other_fee: summary.other, total_vat: summary.vat, grand_total: summary.grand };
       if (request.method === 'PUT' && profile.role === 'client') {
         if (!id) throw Error('Quotation id is required.');
         const itemRows = items.map(({ vat, ...item }) => item);

@@ -14,18 +14,29 @@ export function validatePrice(price: Price): Price {
   return price;
 }
 
-export function availableClassTypes(countryIds: string[], rates: ClassRate[], perMarkCountryIds: string[]): ClassType[] {
+export function availableClassTypes(countryIds: string[], rates: ClassRate[], perMarkCountryIds: string[], classCount = 2): ClassType[] {
   if (!countryIds.length) return [];
-  return classTypes.filter(type => countryIds.every(id => type === 'Per mark per class'
-    ? perMarkCountryIds.includes(id)
-    : rates.some(rate => rate.country_id === id && rate.class_type === type && rate.class_number >= 2 && rate.available !== false)));
+  const lastRequiredRate = Math.max(2, classCount);
+  return classTypes.filter(type => countryIds.every(id => {
+    if (type === 'Per mark per class') return perMarkCountryIds.includes(id);
+    for (let classNumber = 2; classNumber <= lastRequiredRate; classNumber += 1) {
+      const matches = rates.filter(rate => rate.country_id === id && rate.class_type === type && rate.class_number === classNumber);
+      if (matches.length !== 1) return false;
+      try {
+        validatePrice(matches[0]);
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }));
 }
 
 /** Class numbers identify goods/services; ordinal class positions determine fees. */
 export function calculateClassPricing(base: Price, countryId: string, type: ClassType, count: number, rates: ClassRate[]) {
   validatePrice(base);
   if (!classTypes.includes(type)) throw Error('Select an available type of class.');
-  if (type !== 'Per mark per class' && !availableClassTypes([countryId], rates, []).includes(type)) throw Error('This class type is not available for the selected country.');
+  if (type !== 'Per mark per class' && !availableClassTypes([countryId], rates, [], count).includes(type)) throw Error('This class type is not available for the selected country and class count.');
   if (!Number.isInteger(count) || count < 1 || count > 45) throw Error('Select a whole-number class count from 1 to 45.');
   const rows: PricingRow[] = [];
   const rateAt = (position: number) => {
