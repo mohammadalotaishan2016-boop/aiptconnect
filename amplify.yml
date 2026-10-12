@@ -1,19 +1,24 @@
+
 version: 1
 applications:
   - appRoot: frontend
     frontend:
+      buildPath: /
       phases:
         preBuild:
           commands:
-            - npm ci
+            - npm ci --prefix frontend
         build:
           commands:
-            - npm run build
+            - test -n "$NEXT_PUBLIC_SUPABASE_URL" && test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            - printf 'NEXT_PUBLIC_SUPABASE_URL=%s\n' "$NEXT_PUBLIC_SUPABASE_URL" > frontend/.env.production
+            - printf 'NEXT_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> frontend/.env.production
+            - npm run build --prefix frontend
       artifacts:
-        baseDirectory: .next
+        baseDirectory: frontend/.next
         files:
           - '**/*'
       cache:
         paths:
-          - node_modules/**/*
-          - .next/cache/**/*
+          - frontend/node_modules/**/*
+          - frontend/.next/cache/**/*
