@@ -176,15 +176,16 @@ function classTypeForSheet(value: string) {
 }
 
 function procedureNameForSheet(category: string, name: string, procedures: Map<string, string>): string | undefined {
-  const exact = procedures.get(normalized(name));
-  if (exact) return exact;
-  if (normalized(name) !== 'filing') return undefined;
-  const applicationName = category === 'Patent'
-    ? 'new patent application'
-    : category === 'Design'
-      ? 'new design application'
-      : '';
-  return applicationName ? procedures.get(normalized(applicationName)) : undefined;
+  if (normalized(name) === 'filing') {
+    const applicationName = category === 'Patent'
+      ? 'new patent application'
+      : category === 'Design'
+        ? 'new design application'
+        : '';
+    const applicationProcedure = applicationName ? procedures.get(normalized(applicationName)) : undefined;
+    if (applicationProcedure) return applicationProcedure;
+  }
+  return procedures.get(normalized(name));
 }
 
 function validPrice(official: number | undefined, attorney: number | undefined, total: number | undefined, currency: string | undefined) {

@@ -19,7 +19,7 @@ Deno.test('parseSpreadsheetPricing maps Patent Filing rates to the application p
         D5: '1700',
       },
     }],
-  }, [{ id: 'us', name: 'United States' }], [{ name: 'New Patent Application' }]);
+  }, [{ id: 'us', name: 'United States' }], [{ name: 'Filing' }, { name: 'New Patent Application' }]);
 
   assertEquals(pricing.fees, [{
     id: 'us|Patent|newpatentapplication',
@@ -53,7 +53,7 @@ Deno.test('parseSpreadsheetPricing maps Design Filing rates to the application p
         D5: '400',
       },
     }],
-  }, [{ id: 'us', name: 'United States' }], [{ name: 'New Design Application' }]);
+  }, [{ id: 'us', name: 'United States' }], [{ name: 'Filing' }, { name: 'New Design Application' }]);
 
   assertEquals(pricing.fees.map((fee) => [fee.category, fee.procedure_name, fee.total_fee, fee.available]), [
     ['Design', 'New Design Application', 400, true],
