@@ -3,22 +3,21 @@ version: 1
 applications:
   - appRoot: frontend
     frontend:
-      buildPath: /
       phases:
         preBuild:
           commands:
-            - npm ci --prefix frontend
+            - npm ci
         build:
           commands:
             - test -n "$NEXT_PUBLIC_SUPABASE_URL" && test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY"
-            - printf 'NEXT_PUBLIC_SUPABASE_URL=%s\n' "$NEXT_PUBLIC_SUPABASE_URL" > frontend/.env.production
-            - printf 'NEXT_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> frontend/.env.production
-            - npm run build --prefix frontend
+            - printf 'NEXT_PUBLIC_SUPABASE_URL=%s\n' "$NEXT_PUBLIC_SUPABASE_URL" > .env.production
+            - printf 'NEXT_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> .env.production
+            - npm run build
       artifacts:
-        baseDirectory: frontend/.next
+        baseDirectory: .next
         files:
           - '**/*'
       cache:
         paths:
-          - frontend/node_modules/**/*
-          - frontend/.next/cache/**/*
+          - node_modules/**/*
+          - .next/cache/**/*
