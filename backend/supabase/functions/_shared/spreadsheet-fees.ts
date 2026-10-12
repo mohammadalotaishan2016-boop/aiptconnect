@@ -175,6 +175,18 @@ function classTypeForSheet(value: string) {
   return null;
 }
 
+function procedureNameForSheet(category: string, name: string, procedures: Map<string, string>): string | undefined {
+  const exact = procedures.get(normalized(name));
+  if (exact) return exact;
+  if (normalized(name) !== 'filing') return undefined;
+  const applicationName = category === 'Patent'
+    ? 'new patent application'
+    : category === 'Design'
+      ? 'new design application'
+      : '';
+  return applicationName ? procedures.get(normalized(applicationName)) : undefined;
+}
+
 function validPrice(official: number | undefined, attorney: number | undefined, total: number | undefined, currency: string | undefined) {
   const complete = official !== undefined && attorney !== undefined && total !== undefined &&
     [official, attorney, total].every(value => Number.isFinite(value) && value >= 0) &&
@@ -210,7 +222,7 @@ export function parseSpreadsheetPricing(workbook: unknown, countries: Country[],
       const imported = importSheet(category, rows);
       for (const record of imported.records) {
         const countryId = countryByName.get(normalized(canonicalCountry(record.country)));
-        const procedureName = procedureByName.get(normalized(record.service));
+        const procedureName = procedureNameForSheet(category, record.service, procedureByName);
         if (!countryId || !procedureName) continue;
         const key = `${countryId}|${category}|${normalized(procedureName)}`;
         const price = validPrice(record.official_fee, record.attorney_fee, record.total_fee, record.currency);

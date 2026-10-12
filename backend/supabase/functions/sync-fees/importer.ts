@@ -373,7 +373,93 @@ function buildColumnGroups(rows: string[][], headerRows: number[]): { groups: Co
   return { groups: groups.filter((group) => group.officialIndex >= 0 || group.attorneyIndex >= 0 || group.totalIndex >= 0), countryIndex, regionIndex };
 }
 
+function importProcedureMatrix(sheetName: string, rows: string[][]): SheetImportResult | null {
+  const procedureRow = rows.findIndex((row) => /^(procedure|service)$/i.test(cell(row[0] || '')));
+  if (procedureRow < 0) return null;
+
+  const feeHeaderRow = rows.findIndex((row, index) =>
+    index > procedureRow && index <= procedureRow + 5 &&
+    new Set((row || []).flatMap((value) => {
+      const text = normalized(value);
+      if (text.includes('official') || text.includes('government')) return ['official'];
+      if (text.includes('attorney') || text.includes('atty')) return ['attorney'];
+      if (text.includes('total')) return ['total'];
+      return [];
+    })).size >= 2
+  );
+  if (feeHeaderRow < 0) return null;
+
+  const width = Math.max(rows[procedureRow].length, rows[feeHeaderRow].length);
+  const columns = new Map<string, { officialIndex: number; attorneyIndex: number; totalIndex: number }>();
+  let currentCountry = '';
+  for (let column = 1; column < width; column += 1) {
+    const countryLabel = cell(rows[procedureRow]?.[column]);
+    if (countryLabel) currentCountry = canonicalCountry(countryLabel);
+    const country = currentCountry;
+    const header = normalized(rows[feeHeaderRow]?.[column] || '');
+    if (!country || !header) continue;
+
+    const group = columns.get(country) || { officialIndex: -1, attorneyIndex: -1, totalIndex: -1 };
+    if (header.includes('official') || header.includes('government')) group.officialIndex = column;
+    else if (header.includes('attorney') || header.includes('atty')) group.attorneyIndex = column;
+    else if (header.includes('total')) group.totalIndex = column;
+    columns.set(country, group);
+  }
+
+  const groups = [...columns.entries()].filter(([, group]) =>
+    group.officialIndex >= 0 || group.attorneyIndex >= 0 || group.totalIndex >= 0
+  );
+  if (!groups.length) return null;
+
+  const records: ParsedFeeRecord[] = [];
+  for (let rowIndex = feeHeaderRow + 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex] || [];
+    const service = cell(row[0]);
+    if (!service) continue;
+
+    for (const [country, group] of groups) {
+      const officialText = group.officialIndex >= 0 ? cell(row[group.officialIndex]) : '';
+      const attorneyText = group.attorneyIndex >= 0 ? cell(row[group.attorneyIndex]) : '';
+      const totalText = group.totalIndex >= 0 ? cell(row[group.totalIndex]) : '';
+      const official = parseAmount(officialText);
+      const attorney = parseAmount(attorneyText);
+      const explicitTotal = parseAmount(totalText);
+      if (official === undefined && attorney === undefined && explicitTotal === undefined) continue;
+
+      const currency = detectCurrency(`${officialText} ${attorneyText} ${totalText}`) || 'USD';
+      records.push({
+        category: sheetName,
+        country,
+        service,
+        official_fee: official,
+        attorney_fee: attorney,
+        total_fee: explicitTotal ?? (official !== undefined && attorney !== undefined ? official + attorney : undefined),
+        currency,
+        source_sheet: sheetName,
+        source_row: rowIndex + 1,
+        source_identifier: `${sheetName}:${normalized(country)}:${normalized(service)}`,
+        record_key: `${normalized(sheetName)}|${normalized(country)}|${normalized(service)}`,
+        source_values: row.map((value) => cell(value)),
+      });
+    }
+  }
+
+  return {
+    records,
+    issues: records.length ? [] : [{
+      sheet: sheetName,
+      row: feeHeaderRow + 1,
+      type: 'unrecognized_structure',
+      message: 'The procedure matrix contains no country fee values.',
+    }],
+    header_rows: [procedureRow + 1, feeHeaderRow + 1],
+  };
+}
+
 export function importSheet(sheetName: string, rows: string[][]): SheetImportResult {
+  const procedureMatrix = importProcedureMatrix(sheetName, rows);
+  if (procedureMatrix) return procedureMatrix;
+
   const issues: ImportIssue[] = [];
   const headerRows = findHeaderRows(rows);
   if (headerRows.length === 0) {
