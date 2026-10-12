@@ -41,7 +41,11 @@ export default function QuotationDocument({ invoice, requirements, qrDataUrl, ve
   const requirementRows = quotationRequirementRows(invoice, requirements);
   const showDiscount = Number(invoice.discount || 0) !== 0;
   const showVat = Number(invoice.total_vat || 0) !== 0 || invoice.quotation_items.some(item => invoice.vatable && Number(item.attorney_fee) * Number(item.vat_rate ?? invoice.vat_rate) !== 0);
-  const feeWidths = [19, 8, 9.5, 14.5, 15, ...(showDiscount ? [10.5] : []), ...(showVat ? [10] : []), 13.5];
+  const showClassNumbers = invoice.quotation_items.some(item =>
+    (item.category === 'Trademark' || (!item.category && Boolean(item.class_count))) &&
+    Boolean(item.class_numbers?.length),
+  );
+  const feeWidths = [19, 8, ...(showClassNumbers ? [9.5] : []), 14.5, 15, ...(showDiscount ? [10.5] : []), ...(showVat ? [10] : []), 13.5];
   const totalWidth = feeWidths.reduce((sum, width) => sum + width, 0);
   return <><div className="quotation-footer-frame"><QuotationOfficeFooter /></div><table className="quotation-pagination" role="presentation"><tbody><tr><td><article className="quotation-sheet">
     <header className="quotation-heading" aria-label="Quotation">
@@ -57,11 +61,13 @@ export default function QuotationDocument({ invoice, requirements, qrDataUrl, ve
       {requirementRows.map(row => <tr key={row.key}><td>{row.country}</td><td>{row.procedure}</td><td>{row.description}</td></tr>)}
       {!requirementRows.length && <tr><td colSpan={3}>No applicable requirements are configured for the selected services, countries and procedures.</td></tr>}
     </tbody></table></section>
-    <section className="quotation-fees"><h3 className="quotation-tab">FEE DETAILS</h3><table><colgroup>{feeWidths.map((width, index) => <col key={index} style={{ width: `${width / totalWidth * 100}%` }} />)}</colgroup><thead><tr><th>Procedure<br />(procedure)</th><th>Qty</th><th>Class<br />numbers</th><th>Official Fees<small>line amount</small></th><th>Attorney Fees<small>line amount</small></th>{showDiscount && <th>Discount<small>line amount</small></th>}{showVat && <th>VAT<small>line amount</small></th>}<th>TOTAL ({invoice.currency === 'USD' ? 'US$' : invoice.currency}){showVat && <small>before VAT</small>}</th></tr></thead><tbody>
+    <section className="quotation-fees"><h3 className="quotation-tab">FEE DETAILS</h3><table><colgroup>{feeWidths.map((width, index) => <col key={index} style={{ width: `${width / totalWidth * 100}%` }} />)}</colgroup><thead><tr><th>Procedure<br />(procedure)</th><th>Qty</th>{showClassNumbers && <th>Class<br />numbers</th>}<th>Official Fees<small>line amount</small></th><th>Attorney Fees<small>line amount</small></th>{showDiscount && <th>Discount<small>line amount</small></th>}{showVat && <th>VAT<small>line amount</small></th>}<th>TOTAL ({invoice.currency === 'USD' ? 'US$' : invoice.currency}){showVat && <small>before VAT</small>}</th></tr></thead><tbody>
       {invoice.quotation_items.flatMap((item, index) => quotationDisplayRows(item, invoice.vatable ? item.vat_rate ?? invoice.vat_rate : 0).map((line, lineIndex) => {
         const discount = index === 0 && lineIndex === 0 ? Number(invoice.discount) : 0;
         const total = line.official_fee + line.attorney_fee + line.other_fee - discount;
-        return <tr key={index + '-' + lineIndex}><td>{lineIndex === 0 && <><strong>{item.procedure_name}</strong><br />({item.country?.name || '-'})</>}<small>{line.label}</small>{line.source && <small>Fees: {line.source}</small>}{line.other_fee !== 0 && <small>Other fees: {amount(line.other_fee)}</small>}</td><td>{line.quantity}</td><td>{line.class_numbers.join(', ') || '-'}</td><td>{amount(line.official_fee)}</td><td>{amount(line.attorney_fee)}</td>{showDiscount && <td>{amount(-discount)}</td>}{showVat && <td>{amount(line.vat)}</td>}<td>{amount(total)}</td></tr>;
+        const hasClassNumbers = Boolean(item.class_numbers?.length) &&
+          (item.category === 'Trademark' || (!item.category && Boolean(item.class_count)));
+        return <tr key={index + '-' + lineIndex}><td>{lineIndex === 0 && <><strong>{item.procedure_name}</strong><br />({item.country?.name || '-'})</>}<small>{line.label}</small>{line.source && <small>Fees: {line.source}</small>}{line.other_fee !== 0 && <small>Other fees: {amount(line.other_fee)}</small>}</td><td>{line.quantity}</td>{showClassNumbers && <td>{hasClassNumbers ? line.class_numbers.join(', ') || '-' : ''}</td>}<td>{amount(line.official_fee)}</td><td>{amount(line.attorney_fee)}</td>{showDiscount && <td>{amount(-discount)}</td>}{showVat && <td>{amount(line.vat)}</td>}<td>{amount(total)}</td></tr>;
       }))}
     </tbody></table></section>
     <div className="quotation-ending"><section className="quotation-totals"><div><span>Sub Total</span><strong>{symbol} {amount(Number(invoice.grand_total) - Number(invoice.total_vat))}</strong></div>{showVat && <div><span>Total VAT</span><strong>{symbol} {amount(Number(invoice.total_vat))}</strong></div>}<div className="quotation-due"><span>Total amount due</span><strong>{symbol} {amount(Number(invoice.grand_total))}</strong></div></section>

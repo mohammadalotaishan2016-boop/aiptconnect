@@ -16,6 +16,90 @@ const output = path.resolve(root, '../output/pdf');
 const tmp = path.resolve(root, '../tmp/pdfs');
 fs.mkdirSync(output, { recursive: true });
 fs.mkdirSync(tmp, { recursive: true });
+for (const category of ['Patent', 'Design']) {
+  const markup = renderToStaticMarkup(React.createElement(Document, {
+    invoice: {
+      reference_no: 'TEST',
+      invoice_date: '2026-10-12',
+      grand_total: 300,
+      total_vat: 0,
+      discount: 0,
+      currency: 'USD',
+      vatable: false,
+      vat_rate: 0,
+      quotation_items: [{
+        category,
+        country_id: 'country',
+        procedure_name: 'New ' + category + ' Application',
+        quantity: 1,
+        class_numbers: [],
+        class_count: 0,
+        official_fee: 100,
+        attorney_fee: 200,
+        other_fee: 0,
+        country: { name: 'United States' },
+      }],
+    },
+    requirements: [],
+    qrDataUrl: '',
+  }));
+  assert.doesNotMatch(markup, /Class<br\/>numbers/);
+}
+const trademarkMarkup = renderToStaticMarkup(React.createElement(Document, {
+  invoice: {
+    reference_no: 'TEST',
+    invoice_date: '2026-10-12',
+    grand_total: 300,
+    total_vat: 0,
+    discount: 0,
+    currency: 'USD',
+    vatable: false,
+    vat_rate: 0,
+    quotation_items: [{
+      category: 'Trademark',
+      country_id: 'country',
+      procedure_name: 'Registration',
+      quantity: 1,
+      class_numbers: [1],
+      class_count: 1,
+      official_fee: 100,
+      attorney_fee: 200,
+      other_fee: 0,
+      country: { name: 'United States' },
+    }],
+  },
+  requirements: [],
+  qrDataUrl: '',
+}));
+assert.match(trademarkMarkup, /Class<br\/>numbers/);
+assert.match(trademarkMarkup, />1<\/td>/);
+const trademarkCountOnlyMarkup = renderToStaticMarkup(React.createElement(Document, {
+  invoice: {
+    reference_no: 'TEST',
+    invoice_date: '2026-10-12',
+    grand_total: 300,
+    total_vat: 0,
+    discount: 0,
+    currency: 'USD',
+    vatable: false,
+    vat_rate: 0,
+    quotation_items: [{
+      category: 'Trademark',
+      country_id: 'country',
+      procedure_name: 'Registration',
+      quantity: 1,
+      class_numbers: [],
+      class_count: 3,
+      official_fee: 100,
+      attorney_fee: 200,
+      other_fee: 0,
+      country: { name: 'United States' },
+    }],
+  },
+  requirements: [],
+  qrDataUrl: '',
+}));
+assert.doesNotMatch(trademarkCountOnlyMarkup, /Class<br\/>numbers/);
 const invoice = { reference_no: 'T-2026-6020-AF', invoice_date: '2026-09-12', valid_until: '2026-10-16T09:00:00.000Z', client_matter_ref: '1212', currency: 'USD', grand_total: 2842, total_vat: 72, discount: 50, vatable: true, vat_rate: 10, client: { company_name: 'PDF Layout Test Client', address: 'Example address - layout validation only' }, quotation_items: [{ country_id: 'af', procedure_name: 'Renewal', quantity: 2, class_numbers: [1, 2, 3], official_fee: 2100, attorney_fee: 720, other_fee: 0, vat_rate: 10, requirement_ids: ['r1'], country: { name: 'Afghanistan' } }] };
 const row = quotationRow(invoice.quotation_items[0], invoice, 0);
 assert.equal(row.total, 2770);

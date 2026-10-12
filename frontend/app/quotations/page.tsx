@@ -21,6 +21,7 @@ import "./quotation.css";
 import "./client-quotation.css";
 
 type Category = "Trademark" | "Patent" | "Design" | "Copyright" | "Others";
+type TrademarkClassEntryMode = "specific" | "count";
 type Country = {
   id: string;
   name: string;
@@ -228,6 +229,7 @@ export default function QuotationsPage() {
   const [requirementIds, setRequirementIds] = useState<string[]>([]);
   const [selectedClassNumbers, setSelectedClassNumbers] = useState<number[]>([]);
   const [classCount, setClassCount] = useState(1);
+  const [classEntryMode, setClassEntryMode] = useState<TrademarkClassEntryMode>("count");
   const [classType, setClassType] = useState<ClassType | "">("");
   const [cart, setCart] = useState<QuoteItem[]>([]);
   const [error, setError] = useState("");
@@ -353,6 +355,12 @@ export default function QuotationsPage() {
   const availableProcedures = lookup.procedures.filter(
     (item) => item.category === category,
   );
+  const effectiveClassCount = classCount;
+  const changeClassEntryMode = (mode: TrademarkClassEntryMode) => {
+    if (mode === classEntryMode) return;
+    if (mode === "count") setSelectedClassNumbers([]);
+    setClassEntryMode(mode);
+  };
   const availableRequirements = lookup.requirements.filter(
     (item) =>
       Boolean(selectedService?.id) &&
@@ -384,19 +392,21 @@ export default function QuotationsPage() {
         lookup.fees.some((fee) => fee.country_id === countryId && fee.category === "Trademark" &&
           fee.procedure_name === procedureName && fee.available !== false && fee.currency === "USD"),
       )),
-      classCount,
+      effectiveClassCount,
     )
     : [];
   useEffect(() => {
     if (classType && !classTypeOptions.includes(classType)) setClassType('');
-  }, [countryIds, category, lookup, procedureNames, classCount, serviceSelectionConfirmed, classType]);
+  }, [countryIds, category, lookup, procedureNames, effectiveClassCount, serviceSelectionConfirmed, classType]);
   const validServiceSelection = serviceSelectionConfirmed && serviceOptions.some((service) => service.name === category);
   const validCountrySelection = countryIds.length > 0 && countryIds.every((id) => lookup.countries.some((country) => country.id === id));
   const validProcedureSelection = procedureNames.length > 0 && procedureNames.every((name) => availableProcedures.some((procedure) => procedure.name === name));
   const validClassSelection = category !== "Trademark" || (
     Boolean(classType) && classTypeOptions.includes(classType as ClassType) &&
-    Number.isInteger(classCount) && classCount >= 1 && classCount <= 45 &&
-    (!selectedClassNumbers.length || selectedClassNumbers.length === classCount)
+    Number.isInteger(effectiveClassCount) && effectiveClassCount >= 1 && effectiveClassCount <= 45 &&
+    (classEntryMode === "specific"
+      ? selectedClassNumbers.length === effectiveClassCount
+      : selectedClassNumbers.length === 0)
   );
   const selectionReady = !lookupLoading && Boolean(lookup.spreadsheet_revision) &&
     validServiceSelection && validCountrySelection && validProcedureSelection && validClassSelection;
@@ -407,8 +417,9 @@ export default function QuotationsPage() {
     try {
       if (category === 'Trademark') {
         if (!classType || !classTypeOptions.includes(classType)) throw Error('Select a type of class available for the selected countries.');
-        if (selectedClassNumbers.length && selectedClassNumbers.length !== classCount) throw Error('Optional trademark class numbers must match the number of classes.');
-        const pricing = calculateClassPricing(fee, countryId, classType, classCount, lookup.class_rates ?? []);
+        if (classEntryMode === "specific" && selectedClassNumbers.length !== effectiveClassCount) throw Error('Select one class number for each class being priced.');
+        if (classEntryMode === "count" && selectedClassNumbers.length) throw Error('Class numbers are not used when entering only a class count.');
+        const pricing = calculateClassPricing(fee, countryId, classType, effectiveClassCount, lookup.class_rates ?? []);
         return { countryId, procedureName, fee: { ...fee, ...pricing, class_pricing_rows: pricing.rows }, issue: '' };
       }
       if (fee.available === false || fee.currency !== 'USD' || ![fee.official_fee, fee.attorney_fee, fee.total_fee].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) throw Error(fee.issue || 'No complete saved spreadsheet fee is available for this combination.');
@@ -434,7 +445,7 @@ export default function QuotationsPage() {
     class_numbers: category === "Trademark" ? selectedClassNumbers : [],
     class_type: category === "Trademark" ? classType || null : null,
     class_pricing_rows: fee.class_pricing_rows ?? [],
-    class_count: category === "Trademark" ? classCount : 0,
+    class_count: category === "Trademark" ? effectiveClassCount : 0,
     additional_fee_per_class: 0,
     requirement_ids: (clientView ? availableRequirements.map(requirement => requirement.id) : requirementIds).filter((id) =>
       availableRequirements.some((item) => item.id === id && item.country_id === fee.country_id && availableProcedures.some((procedure) => procedure.id === item.procedure_id && procedure.name === fee.procedure_name)),
@@ -532,6 +543,7 @@ export default function QuotationsPage() {
     setRequirementIds([]);
     setSelectedClassNumbers([]);
     setClassCount(1);
+    setClassEntryMode("count");
     setClassType("");
     setCart([]);
   };
@@ -558,6 +570,7 @@ export default function QuotationsPage() {
     setServiceSelectionConfirmed(false);
     setSelectedClassNumbers([]);
     setClassCount(1);
+    setClassEntryMode("count");
     setClassType("");
     setCountryIds([]);
     setProcedureNames([]);
@@ -583,14 +596,22 @@ export default function QuotationsPage() {
       setError("Select a type of class available for the selected countries.");
       return false;
     }
-    if (category === "Trademark" && (!Number.isInteger(classCount) || classCount < 1 || classCount > 45)) {
+    if (category === "Trademark" && (!Number.isInteger(effectiveClassCount) || effectiveClassCount < 1 || effectiveClassCount > 45)) {
       setError("Trademark class count must be a whole number from 1 to 45.");
+      return false;
+    }
+    if (category === "Trademark" && classEntryMode === "specific" && selectedClassNumbers.length !== effectiveClassCount) {
+      setError(`Select exactly ${effectiveClassCount} class ${effectiveClassCount === 1 ? "number" : "numbers"} from 1 to 45.`);
       return false;
     }
     if (category === "Trademark" && selectedClassNumbers.some((classNumber) =>
       !Number.isInteger(classNumber) || classNumber < 1 || classNumber > 45,
     )) {
       setError("Trademark classes must be whole numbers from 1 to 45.");
+      return false;
+    }
+    if (category === "Trademark" && classEntryMode === "count" && selectedClassNumbers.length) {
+      setError("Clear individual class numbers or choose the total class count option.");
       return false;
     }
     if (countryIds.some((id) => !lookup.countries.some((country) => country.id === id))) {
@@ -642,6 +663,7 @@ export default function QuotationsPage() {
       setRequirementIds([]);
       setSelectedClassNumbers([]);
       setClassCount(1);
+      setClassEntryMode("count");
       setClassType("");
     }
     setFeeModal(false);
@@ -789,12 +811,27 @@ export default function QuotationsPage() {
         {clientView && <section className="client-fee-selection" aria-labelledby="client-fee-title">
           <h2 id="client-fee-title"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M2 3h20l-8 9v8l-4 2V12z" /></svg>Fee Selections</h2>
           <form onSubmit={event => { event.preventDefault(); if (!validateFeeSelection()) return; setSelected(null); setCart([]); setInvoiceDate(today()); setDiscount(0); setError(""); if (generateFees()) setModal("form"); }}>
-            <label>Services / Project *<select aria-label="Services / Project" value={serviceSelectionConfirmed ? category : ""} disabled={lookupLoading} onChange={event => { setCategory(event.target.value as Category); setServiceSelectionConfirmed(true); setCountryIds([]); setProcedureNames([]); setRequirementIds([]); setClassType(""); setClassCount(1); setSelectedClassNumbers([]); setError(""); }}><option value="" disabled>Select Services / Project</option>{serviceOptions.map(service => <option key={service.id} value={service.name}>{service.name}</option>)}</select></label>
-            <label>Country *<select aria-label="Country" value={countryIds[0] ?? ""} disabled={!serviceSelectionConfirmed || lookupLoading} onChange={event => { setCountryIds(event.target.value ? [event.target.value] : []); setRequirementIds([]); setClassType(""); setSelectedClassNumbers([]); setError(""); }}><option value="">Select Country</option>{lookup.countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}</select></label>
+            <label className="client-service-field">Services / Project *<select aria-label="Services / Project" value={serviceSelectionConfirmed ? category : ""} disabled={lookupLoading} onChange={event => { setCategory(event.target.value as Category); setServiceSelectionConfirmed(true); setCountryIds([]); setProcedureNames([]); setRequirementIds([]); setClassType(""); setClassCount(1); setClassEntryMode("count"); setSelectedClassNumbers([]); setError(""); }}><option value="" disabled>Select Services / Project</option>{serviceOptions.map(service => <option key={service.id} value={service.name}>{service.name}</option>)}</select></label>
+            <label className="client-country-field">Country *<select aria-label="Country" value={countryIds[0] ?? ""} disabled={!serviceSelectionConfirmed || lookupLoading} onChange={event => { setCountryIds(event.target.value ? [event.target.value] : []); setRequirementIds([]); setClassType(""); setSelectedClassNumbers([]); setError(""); }}><option value="">Select Country</option>{lookup.countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}</select></label>
             <div className="client-procedure-field"><span>Procedure * <small>(multiple allowed)</small></span><details ref={procedureDropdown}><summary>{!serviceSelectionConfirmed ? "Select service first" : procedureNames.length ? procedureNames.join(", ") : "Select Procedure"}</summary><div>{availableProcedures.map(procedure => <label key={procedure.id}><input type="checkbox" disabled={!serviceSelectionConfirmed} checked={procedureNames.includes(procedure.name)} onChange={event => { const checked = event.target.checked; setProcedureNames(current => checked ? [...current, procedure.name] : current.filter(name => name !== procedure.name)); setError(""); }} />{procedure.name}</label>)}</div></details></div>
-            <label>Type of class *<select aria-label="Type of class" disabled={!serviceSelectionConfirmed || category !== "Trademark" || !countryIds.length || !procedureNames.length || lookupLoading} value={classType} onChange={event => { setClassType(event.target.value as ClassType); setError(""); }}><option value="">{!serviceSelectionConfirmed || !countryIds.length ? "Select service and country first" : !procedureNames.length ? "Select procedure first" : category === "Trademark" ? "Select Type of class" : "Not applicable"}</option>{classTypeOptions.map(type => <option key={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}</select></label>
-            <label>Number of classes *<input aria-label="Number of classes" type="number" min="1" max="45" step="1" disabled={!serviceSelectionConfirmed || category !== "Trademark"} value={classCount} onChange={event => { setClassCount(Number(event.target.value)); setSelectedClassNumbers([]); setError(""); }} /></label>
-            <button type="submit" disabled={lookupLoading || saving || !lookup.current_client_id}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></svg>Submit</button>
+            {category === "Trademark" && <>
+              <label className="client-class-type">Type of class *<select aria-label="Type of class" disabled={!classTypeSelectionReady || lookupLoading} value={classType} onChange={event => { setClassType(event.target.value as ClassType); setError(""); }}><option value="">{!serviceSelectionConfirmed || !countryIds.length ? "Select service and country first" : !procedureNames.length ? "Select procedure first" : "Select Type of class"}</option>{classTypeOptions.map(type => <option key={type} value={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}</select></label>
+              <fieldset className="client-class-entry-method" aria-label="Class input method">
+                <legend>Class input method *</legend>
+                <label><input aria-label="Select class numbers individually" type="radio" name="client-class-entry-mode" value="specific" checked={classEntryMode === "specific"} disabled={!classTypeSelectionReady || lookupLoading} onChange={() => changeClassEntryMode("specific")} /><span><strong>Select individually</strong><small>Choose exact classes 1-45</small></span></label>
+                <label><input aria-label="Enter total class count" type="radio" name="client-class-entry-mode" value="count" checked={classEntryMode === "count"} disabled={!classTypeSelectionReady || lookupLoading} onChange={() => changeClassEntryMode("count")} /><span><strong>Enter total count</strong><small>No class numbers required</small></span></label>
+              </fieldset>
+                {classEntryMode === "specific" && <label className="client-class-count">Number of classes *<select aria-label="Number of classes" value={classCount} disabled={!classTypeSelectionReady || lookupLoading} onChange={event => { const nextCount = Number(event.target.value); setClassCount(nextCount); setSelectedClassNumbers(current => current.slice(0, nextCount)); setError(""); }}>{Array.from({ length: 45 }, (_, index) => index + 1).map(count => <option key={count} value={count}>{count} {count === 1 ? "class" : "classes"}</option>)}</select></label>}
+                {classEntryMode === "count" && <label className="client-class-count">Total number of classes *<input aria-label="Total number of classes" type="number" min="1" max="45" step="1" value={classCount} disabled={!classTypeSelectionReady || lookupLoading} onChange={event => { setClassCount(Number(event.target.value)); setError(""); }} /></label>}
+            </>}
+            {category === "Trademark" && classTypeSelectionReady && classEntryMode === "specific" && <TrademarkClassSelector
+              required
+              selected={selectedClassNumbers}
+              onChange={setSelectedClassNumbers}
+              classType={classType}
+              classCount={effectiveClassCount}
+            />}
+            <button type="submit" disabled={lookupLoading || saving || !lookup.current_client_id}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></svg>Review fees</button>
           </form>
           {lookupError && <p role="alert">{lookupError} <button type="button" onClick={() => void loadLookup()}>Retry fees</button></p>}
         </section>}
@@ -982,6 +1019,7 @@ export default function QuotationsPage() {
               setCountryIds([]);
               setClassType("");
               setClassCount(1);
+              setClassEntryMode("count");
               setSelectedClassNumbers([]);
               setProcedureNames([]);
               setRequirementIds([]);
@@ -999,12 +1037,14 @@ export default function QuotationsPage() {
             selectedClassNumbers={selectedClassNumbers}
             setSelectedClassNumbers={(values: number[]) => {
               setSelectedClassNumbers(values);
-              if (values.length) setClassCount(values.length);
             }}
+            classEntryMode={classEntryMode}
+            setClassEntryMode={setClassEntryMode}
+            changeClassEntryMode={changeClassEntryMode}
             classType={classType}
             setClassType={setClassType}
             classTypeOptions={classTypeOptions}
-            classCount={classCount}
+            classCount={effectiveClassCount}
             setClassCount={setClassCount}
             availableRequirements={availableRequirements}
             selectionFees={selectionFees}
@@ -1276,6 +1316,9 @@ function InvoiceModal(props: any) {
     setRequirementIds,
     selectedClassNumbers,
     setSelectedClassNumbers,
+    classEntryMode,
+    setClassEntryMode,
+    changeClassEntryMode,
     classCount,
     setClassCount,
     classType,
@@ -1303,12 +1346,17 @@ function InvoiceModal(props: any) {
     onClose,
     onSubmit,
   } = props;
+  const effectiveClassCount = classCount;
   const classTypeSelectionReady = serviceSelectionConfirmed && category === "Trademark" && countryIds.length > 0 && procedureNames.length > 0;
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [draftQuantity, setDraftQuantity] = useState("1");
   const validDraft = Number.isInteger(Number(draftQuantity)) && Number(draftQuantity) >= 1 && Number(draftQuantity) <= 1000;
   const previewMultiplier = editingRow === null ? 1 : Number(draftQuantity);
+  const showPreviewClassNumbers = category === "Trademark" && classEntryMode === "specific";
+  const showCartClassNumbers = cart.some((item: QuoteItem) => item.category === "Trademark" && (item.class_numbers?.length ?? 0) > 0);
+  const previewFeeColumnSpan = showPreviewClassNumbers ? 6 : 5;
+  const previewRemainingColumnSpan = showPreviewClassNumbers ? 7 : 6;
   const cartBlocker = loadingFees ? "Loading workbook fees..."
     : !lookup.spreadsheet_revision ? "Saved spreadsheet fees are unavailable. Retry loading the workbook or contact your administrator."
     : !clientId ? "Select a client before adding fees."
@@ -1326,6 +1374,7 @@ function InvoiceModal(props: any) {
     setRequirementIds([]);
     setSelectedClassNumbers([]);
     setClassCount(1);
+    setClassEntryMode("count");
     setClassType("");
   };
   const beginEdit = (item: QuoteItem, index: number) => {
@@ -1335,7 +1384,12 @@ function InvoiceModal(props: any) {
     setCountryIds([item.country_id]);
     setProcedureNames([item.procedure_name]);
     setRequirementIds(item.requirement_ids ?? []);
-    setSelectedClassNumbers(item.class_numbers ?? []);
+    const itemClassNumbers = item.class_numbers ?? [];
+    const hasExactClassSelection = item.category === "Trademark" &&
+      itemClassNumbers.length > 0 &&
+      itemClassNumbers.length === (item.class_count || itemClassNumbers.length);
+    setClassEntryMode(hasExactClassSelection ? "specific" : "count");
+    setSelectedClassNumbers(hasExactClassSelection ? itemClassNumbers : []);
     setClassCount(item.class_count || item.class_numbers?.length || 1);
     setClassType(classTypes.includes(item.class_type as ClassType) ? item.class_type : "Per mark per class");
     document.getElementById('quotation-fee-selection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1427,12 +1481,12 @@ function InvoiceModal(props: any) {
           <div className="quotation-section">
             <div className="invoice-section-heading">
               <span className="invoice-section-icon">⚖</span>
-              <div id="quotation-fee-selection"><h3>Fee Selection{editingRow !== null ? " — Edit cart item" : ""}</h3><p>Choose service, country and method to view applicable fees. Requirements will be automatically filtered.</p></div>
+              <div id="quotation-fee-selection"><h3>Fee Selection{editingRow !== null ? " — Edit cart item" : ""}</h3><p>Select Services / Project, Country, and one or more Procedures. For Trademark, select Type of class and choose individual class numbers or enter a total class count. Patent and Design do not use class numbers. Requirements are filtered automatically.</p></div>
             </div>
             {isClientRole && editingRow !== null && <div className="client-fee-edit-summary" role="status">
               <strong>Editing quotation item {editingRow + 1}</strong>
               <span><b>{category}</b> · {lookup.countries.find((country: Country) => country.id === countryIds[0])?.name ?? "Select country"} · {procedureNames.join(", ") || "Select procedure"}</span>
-              {category === "Trademark" && <span>{classType || "Select type of class"} · {classCount} {classCount === 1 ? "class" : "classes"}</span>}
+              {category === "Trademark" && <span>{classType || "Select type of class"} · {effectiveClassCount} {effectiveClassCount === 1 ? "class" : "classes"} · {classEntryMode === "specific" ? "class numbers selected" : "count entered"}</span>}
               <span>Change the fields below, then choose <b>Update cart item</b> to apply the new configured fees.</span>
             </div>}
             <div className="quotation-grid four">
@@ -1449,6 +1503,7 @@ function InvoiceModal(props: any) {
                       setCountryIds([]);
                       setClassType("");
                       setClassCount(1);
+                      setClassEntryMode("count");
                       setSelectedClassNumbers([]);
                       setProcedureNames([]);
                       setRequirementIds([]);
@@ -1490,24 +1545,36 @@ function InvoiceModal(props: any) {
                 <input className="cart-number" aria-label="Marks / applications" type="number" min="1" max="1000" step="1" value={draftQuantity} onChange={(event) => setDraftQuantity(event.target.value)} />
               </label>}
               {category === "Trademark" && <>
+                <label>Class input method *
+                  <select aria-label="Class input method" value={classEntryMode} onChange={(event) => changeClassEntryMode(event.target.value as TrademarkClassEntryMode)} disabled={!classTypeSelectionReady}>
+                    <option value="specific">Select class numbers individually</option>
+                    <option value="count">Enter total number of classes</option>
+                  </select>
+                </label>
                 <label>Type of class *
                   <select aria-label="Type of class" value={classType} onChange={(event) => setClassType(event.target.value as ClassType)} disabled={!classTypeSelectionReady}>
                     <option value="">{!serviceSelectionConfirmed || !countryIds.length ? 'Select service and country first' : !procedureNames.length ? 'Select procedure first' : 'Select type of class'}</option>
                     {classTypeOptions.map((type: ClassType) => <option key={type} value={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}
                   </select>
                 </label>
-                <label>Number of classes *
-                  <select aria-label="Number of classes" value={classCount} onChange={(event) => { setClassCount(Number(event.target.value)); setSelectedClassNumbers([]); }} disabled={!classType}>
+                {classEntryMode === "specific" && <label>Number of classes *
+                  <select aria-label="Number of classes" value={classCount} onChange={(event) => { const nextCount = Number(event.target.value); setClassCount(nextCount); setSelectedClassNumbers((current: number[]) => current.slice(0, nextCount)); }} disabled={!classTypeSelectionReady}>
                     {Array.from({ length: 45 }, (_, index) => index + 1).map(count => <option key={count} value={count}>{count} {count === 1 ? 'class' : 'classes'}</option>)}
                   </select>
-                </label>
+                </label>}
+                {classEntryMode === "count" && <label>Total number of classes *
+                  <select aria-label="Total number of classes" value={classCount} onChange={(event) => { setClassCount(Number(event.target.value)); setSelectedClassNumbers([]); }} disabled={!classTypeSelectionReady}>
+                    {Array.from({ length: 45 }, (_, index) => index + 1).map(count => <option key={count} value={count}>{count} {count === 1 ? 'class' : 'classes'}</option>)}
+                  </select>
+                </label>}
               </>}
             </div>
-            {category === "Trademark" && <TrademarkClassSelector
+            {category === "Trademark" && classTypeSelectionReady && classEntryMode === "specific" && <TrademarkClassSelector
+              required
               selected={selectedClassNumbers}
               onChange={setSelectedClassNumbers}
               classType={classType}
-              classCount={classCount}
+              classCount={effectiveClassCount}
             />}
             <div className="selection-panels">
               <RequirementTable countries={countries} requirements={availableRequirements} selected={requirementIds} onChange={setRequirementIds} />
@@ -1518,21 +1585,22 @@ function InvoiceModal(props: any) {
               {classTypeSelectionReady && !classTypeOptions.length && <p className="fee-missing">No class pricing types are configured for the selected countries and class count.</p>}
               {classType && classTypeSelectionReady && !selectedProceduresHaveWorkbookFees && <p className="fee-missing">The selected procedure does not have a valid base fee in the saved workbook. Class types are shown from the country rates, but this selection cannot be quoted until the procedure fee is available.</p>}
               {!loadingFees && !lookup.spreadsheet_revision && <p className="fee-missing">Saved workbook fees are unavailable. Retry loading the workbook.</p>}
-              {!selectionReady && lookup.spreadsheet_revision && <p>Select a service, country, procedure, and— for trademarks—class type to display matching workbook fees.</p>}
-              {selectionFees.length ? <table><thead><tr><th>Country</th><th>Procedure</th><th>Qty</th><th>Class numbers</th><th>Official (USD)</th><th>Attorney (USD)</th><th>VAT (USD)</th><th>Total (USD)</th></tr></thead><tbody>
+              {!selectionReady && lookup.spreadsheet_revision && <p>Select Services / Project, Country, and one or more Procedures to display matching workbook fees. Trademark also requires Type of class and either class-number selection or a total class count.</p>}
+              {selectionFees.length ? <table><thead><tr><th>Country</th><th>Procedure</th><th>Qty</th>{showPreviewClassNumbers && <th>Class numbers</th>}<th>Official (USD)</th><th>Attorney (USD)</th><th>VAT (USD)</th><th>Total (USD)</th></tr></thead><tbody>
                 {selectionFees.flatMap((item: { countryId: string; procedureName: string; fee: Fee | null; issue: string }) => {
                   const key = item.countryId + item.procedureName;
                   const country = countries.find((country: Country) => country.id === item.countryId)?.name;
-                  if (!item.fee) return [<tr key={key}><td>{country}</td><td>{item.procedureName}</td><td colSpan={6} className="fee-missing">{item.issue}</td></tr>];
+                  if (!item.fee) return [<tr key={key}><td>{country}</td><td>{item.procedureName}</td><td colSpan={previewFeeColumnSpan} className="fee-missing">{item.issue}</td></tr>];
                   const fee = item.fee;
-                  if (!validDraft) return [<tr key={key}><td>{country}</td><td colSpan={7}>Enter a valid quantity to preview fees.</td></tr>];
+                  if (!validDraft) return [<tr key={key}><td>{country}</td><td colSpan={previewRemainingColumnSpan}>Enter a valid quantity to preview fees.</td></tr>];
                   const vatRate = vatable ? lookup.vat_rates.find((rate: { country_id: string; vat: number }) => rate.country_id === item.countryId)?.vat ?? 0 : 0;
                   const official = Math.round(fee.official_fee * previewMultiplier * 100) / 100;
                   const attorney = Math.round(fee.attorney_fee * previewMultiplier * 100) / 100;
                   const other = Math.round((fee.total_fee * previewMultiplier - official - attorney) * 100) / 100;
-                  const rows = quotationDisplayRows({ quantity: previewMultiplier, class_numbers: category === 'Trademark' ? selectedClassNumbers : [], class_count: classCount, class_pricing_rows: fee.class_pricing_rows, official_fee: official, attorney_fee: attorney, other_fee: other }, vatRate);
-                  return [...rows.map((row, index) => <tr key={key + index}><td>{index === 0 ? country : ''}</td><td>{index === 0 && <strong>{item.procedureName}</strong>}<span className="class-fee-description">{row.label || 'Procedure fee'}</span>{row.source && <small>Fees: {row.source}</small>}</td><td>{row.quantity}</td><td>{category === 'Trademark' ? row.class_numbers.join(', ') || 'Not specified' : '-'}</td><td>{money(row.official_fee)}</td><td>{money(row.attorney_fee)}</td><td>{money(row.vat)}</td><td>{money(row.official_fee + row.attorney_fee + row.other_fee + row.vat)}</td></tr>),
-                    <tr key={key + '-subtotal'} className="class-pricing-subtotal"><td colSpan={4}>{item.procedureName} subtotal{classType ? ' / ' + classType : ''}</td><td>{money(official)}</td><td>{money(attorney)}</td><td>{money(rows.reduce((sum, row) => sum + row.vat, 0))}</td><td>{money(official + attorney + other + rows.reduce((sum, row) => sum + row.vat, 0))}</td></tr>];
+                  const rows = quotationDisplayRows({ quantity: previewMultiplier, class_numbers: category === 'Trademark' && classEntryMode === "specific" ? selectedClassNumbers : [], class_count: classCount, class_pricing_rows: fee.class_pricing_rows, official_fee: official, attorney_fee: attorney, other_fee: other }, vatRate);
+                  const detailRows = rows.map((row, index) => <tr key={key + index}><td>{index === 0 ? country : ''}</td><td>{index === 0 && <strong>{item.procedureName}</strong>}<span className="class-fee-description">{row.label || 'Procedure fee'}</span>{row.source && <small>Fees: {row.source}</small>}</td><td>{row.quantity}</td>{showPreviewClassNumbers && <td>{row.class_numbers.join(', ') || 'Not specified'}</td>}<td>{money(row.official_fee)}</td><td>{money(row.attorney_fee)}</td><td>{money(row.vat)}</td><td>{money(row.official_fee + row.attorney_fee + row.other_fee + row.vat)}</td></tr>);
+                  if (category !== 'Trademark') return detailRows;
+                  return [...detailRows, <tr key={key + '-subtotal'} className="class-pricing-subtotal"><td colSpan={showPreviewClassNumbers ? 4 : 3}>{item.procedureName} subtotal{classType ? ' / ' + classType : ''}</td><td>{money(official)}</td><td>{money(attorney)}</td><td>{money(rows.reduce((sum, row) => sum + row.vat, 0))}</td><td>{money(official + attorney + other + rows.reduce((sum, row) => sum + row.vat, 0))}</td></tr>];
                 })}
               </tbody></table> : <p>{!serviceSelectionConfirmed ? "Select a service to begin." : !countryIds.length ? "Select a country to continue." : !procedureNames.length ? "Select one or more procedures to continue." : category === "Trademark" && !classType ? "Select a type of class to display the matching fees." : "No matching fee selection is ready to display."}</p>}
             </div>
@@ -1560,7 +1628,7 @@ function InvoiceModal(props: any) {
                       <th>Country</th>
                       <th>Procedure</th>
                       <th>Qty</th>
-                      <th>Class numbers</th>
+                      {showCartClassNumbers && <th>Class numbers</th>}
                       <th>Official Fee (USD)</th>
                       <th>Attorney Fee (USD)</th>
                       <th>VAT</th>
@@ -1580,7 +1648,7 @@ function InvoiceModal(props: any) {
                           <td>{lineIndex === 0 && <span className="country-flag-cell">{validFlagUrl(country?.flag_url) ? <img src={validFlagUrl(country?.flag_url)} alt="" /> : null}{country?.name ?? '-'}</span>}</td>
                           <td>{lineIndex === 0 && <strong>{item.procedure_name}</strong>}<span className="class-fee-description">{line.label || item.class_type || 'Procedure fee'}</span>{line.source && <small>Fees: {line.source}</small>}</td>
                           <td>{line.quantity}</td>
-                          <td>{item.category === 'Trademark' ? line.class_numbers.join(', ') || 'Not specified' : '-'}</td>
+                          {showCartClassNumbers && <td>{item.category === 'Trademark' ? line.class_numbers.join(', ') || 'Not specified' : ''}</td>}
                           <td>$ {money(line.official_fee)}</td><td>$ {money(line.attorney_fee)}</td>
                           <td>$ {money(line.vat)} <small>({vatable ? item.vat_rate : 0}%)</small></td>
                           {!isClientRole && <td>$ {money(rowDiscount)}</td>}
@@ -1592,7 +1660,7 @@ function InvoiceModal(props: any) {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <th colSpan={4}>Total ({cart.length} procedure{cart.length === 1 ? "" : "s"})</th>
+                      <th colSpan={showCartClassNumbers ? 4 : 3}>Total ({cart.length} procedure{cart.length === 1 ? "" : "s"})</th>
                       <th>${money(totals.official)}</th>
                       <th>${money(totals.attorney)}</th>
                       <th>${money(totals.vat)}</th>

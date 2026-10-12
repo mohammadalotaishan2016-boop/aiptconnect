@@ -36,7 +36,6 @@ export function availableClassTypes(countryIds: string[], rates: ClassRate[], pe
 export function calculateClassPricing(base: Price, countryId: string, type: ClassType, count: number, rates: ClassRate[]) {
   validatePrice(base);
   if (!classTypes.includes(type)) throw Error('Select an available type of class.');
-  if (type !== 'Per mark per class' && !availableClassTypes([countryId], rates, [], count).includes(type)) throw Error('This class type is not available for the selected country and class count.');
   if (!Number.isInteger(count) || count < 1 || count > 45) throw Error('Select a whole-number class count from 1 to 45.');
   const rows: PricingRow[] = [];
   const rateAt = (position: number) => {
@@ -58,6 +57,7 @@ export function calculateClassPricing(base: Price, countryId: string, type: Clas
     }
     for (let position = groupLimit + 1; position <= count; position++) addRow(rateAt(position), position, position, 'Additional ' + ordinal(position) + ' class', type);
   }
+  if (type !== 'Per mark per class' && !availableClassTypes([countryId], rates, [], count).includes(type)) throw Error('This class type is not available for the selected country and class count.');
   return { rows, official_fee: roundPrice(rows.reduce((sum, row) => sum + row.official_fee, 0)), attorney_fee: roundPrice(rows.reduce((sum, row) => sum + row.attorney_fee, 0)), total_fee: roundPrice(rows.reduce((sum, row) => sum + row.total_fee, 0)) };
 }
 
