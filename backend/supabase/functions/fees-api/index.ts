@@ -94,6 +94,22 @@ function encodeCursor(offset: number, timestamp: number = Date.now()): string {
   return btoa(`${offset}:${timestamp}`);
 }
 
+async function cachedJson(request: Request, body: unknown, version: number) {
+  const query = [...new URL(request.url).searchParams.entries()]
+    .filter(([key]) => key !== 'perf_probe')
+    .sort(([left], [right]) => left.localeCompare(right));
+  const key = JSON.stringify([version, query]);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 24);
+  const etag = `"fees-v${version}-${hash}"`;
+  const headers = {
+    ...cors,
+    'Cache-Control': 'public, max-age=30, s-maxage=60, stale-while-revalidate=60',
+    ETag: etag,
+  };
+  return new Response(JSON.stringify(body), { status: 200, headers });
+}
+
 Deno.serve(async (request: Request) => {
   // CORS - Handle preflight
   if (request.method === 'OPTIONS') {
@@ -124,22 +140,6 @@ Deno.serve(async (request: Request) => {
     const db = createClient(supabaseUrl, serviceRoleKey);
     const query = parseQueryParams(request.url);
     const { offset } = decodeCursor(query.cursor);
-
-    // Ensure default categories exist
-    const defaultCategories = [
-      { name: 'Trademark', is_primary: true, display_order: 1 },
-      { name: 'Patent', is_primary: true, display_order: 2 },
-      { name: 'Design', is_primary: true, display_order: 3 },
-      { name: 'Copyright', is_primary: true, display_order: 4 },
-      { name: 'Others', is_primary: true, display_order: 5 },
-    ];
-
-    for (const cat of defaultCategories) {
-      await db.from('fee_categories').upsert(
-        { name: cat.name, is_primary: cat.is_primary, display_order: cat.display_order },
-        { onConflict: 'name' }
-      );
-    }
 
     // Try to get latest published dataset version
     const { data: latestVersion, error: versionError } = await db
@@ -276,7 +276,7 @@ Deno.serve(async (request: Request) => {
           return row;
         })
         .filter((row) => !search || Object.values(row).some((value) => String(value || '').toLowerCase().includes(search)));
-      return new Response(JSON.stringify({ data: filtered, available_categories: [...(categories || []).map((item) => item.name), 'Classes'], page_info: { page_size: filtered.length, has_next: false, has_prev: false, current_position: 0 }, total_count: filtered.length }), { status: 200, headers: cors });
+      return cachedJson(request, { data: filtered, available_categories: [...(categories || []).map((item) => item.name), 'Classes'], page_info: { page_size: filtered.length, has_next: false, has_prev: false, current_position: 0 }, total_count: filtered.length }, latestVersion.version_number);
     }
 
     const categoryAvailability = await Promise.all(
@@ -346,7 +346,7 @@ Deno.serve(async (request: Request) => {
           return row;
         })
         .filter((row) => !search || Object.values(row).some((value) => String(value || '').toLowerCase().includes(search)));
-      return new Response(JSON.stringify({ data, class_numbers: displayedClassNumbers, available_categories: availableCategories, page_info: { page_size: data.length, has_next: false, has_prev: false, current_position: 0 }, total_count: data.length }), { status: 200, headers: cors });
+      return cachedJson(request, { data, class_numbers: displayedClassNumbers, available_categories: availableCategories, page_info: { page_size: data.length, has_next: false, has_prev: false, current_position: 0 }, total_count: data.length }, latestVersion.version_number);
     }
     // Build base query
     let q = db
@@ -441,14 +441,7 @@ Deno.serve(async (request: Request) => {
       response.prev_cursor = encodeCursor(Math.max(0, offset - query.limit));
     }
 
-    // Cache headers
-    const headers = {
-      ...cors,
-      'Cache-Control': 'public, max-age=300, stale-while-revalidate=600', // 5 min cache, 10 min stale
-      'ETag': `"v${latestVersion.version_number}-${offset}"`,
-    };
-
-    return new Response(JSON.stringify(response), { status: 200, headers });
+    return cachedJson(request, response, latestVersion.version_number);
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
