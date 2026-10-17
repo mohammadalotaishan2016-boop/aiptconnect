@@ -68,6 +68,10 @@ export async function fetchSupabaseFunction(path: string, init: RequestInit & { 
   const headers = new Headers(init.headers);
 
   const supabase = getSupabaseBrowserClient();
+  const apiKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (apiKey && !headers.has('apikey')) {
+    headers.set('apikey', apiKey);
+  }
   if (supabase && !headers.has('Authorization')) {
     const session = await getActiveSession();
     if (session?.access_token) {
@@ -75,9 +79,8 @@ export async function fetchSupabaseFunction(path: string, init: RequestInit & { 
     }
   }
 
-  // Edge functions are authenticated with the current user JWT in Authorization.
-  // Do not inject the anon/publishable key here; that creates an auth mismatch and
-  // triggers incorrect CORS preflight behavior for browser calls to Supabase functions.
+  // Send the public project key in apikey and the signed-in user's JWT in
+  // Authorization. Edge Functions use both headers for project routing and user auth.
   try {
     let response = await fetch(getSupabaseFunctionUrl(path), { ...requestInit, headers, signal: controller.signal, cache: 'no-store' });
     if (response.status === 401 && supabase) {

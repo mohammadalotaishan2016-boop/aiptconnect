@@ -38,19 +38,22 @@ function formatDate(value: string) {
   return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(date) : '—';
 }
 
-function uploadVideo(url: string, file: File, contentType: string, onProgress: (progress: number) => void) {
+function uploadVideo(path: string, token: string, file: File, contentType: string, onProgress: (progress: number) => void) {
   return new Promise<void>((resolve, reject) => {
+    const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, '');
+    if (!supabase) return reject(Error('Supabase URL is not configured.'));
     const upload = new XMLHttpRequest();
-    upload.open('PUT', url);
+    upload.open('PUT', `${supabase}/storage/v1/object/upload/sign/aipt-video-tutorials/${encodeURIComponent(path)}?token=${encodeURIComponent(token)}`);
     upload.setRequestHeader('Content-Type', contentType);
+    upload.setRequestHeader('x-upsert', 'false');
     upload.upload.addEventListener('progress', event => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
     });
     upload.addEventListener('load', () => {
       if (upload.status >= 200 && upload.status < 300) resolve();
-      else reject(Error('S3 upload failed. Check the bucket CORS configuration and try again.'));
+      else reject(Error(upload.responseText || `Supabase Storage upload failed (HTTP ${upload.status}). Check the project Storage file-size limit.`));
     });
-    upload.addEventListener('error', () => reject(Error('S3 upload failed. Check the bucket CORS configuration and try again.')));
+    upload.addEventListener('error', () => reject(Error('Supabase Storage upload failed. Check your connection and the project Storage settings.')));
     upload.addEventListener('abort', () => reject(Error('Video upload was cancelled.')));
     upload.send(file);
   });
@@ -106,18 +109,18 @@ export default function VideoTutorialsPage() {
     try {
       let result: ApiResult<Tutorial>;
       if (file && contentType) {
-        const signed = await request<{ key: string; upload_url: string; content_type: string }>('?action=upload', {
+        const signed = await request<{ path: string; token: string; content_type: string }>('?action=upload', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ card_key: card.key, file_name: file.name, content_type: contentType, file_size: file.size }),
         });
         setUploadStatus('Uploading video...');
         setUploadProgress(0);
-        await uploadVideo(signed.upload_url, file, signed.content_type, setUploadProgress);
+        await uploadVideo(signed.path, signed.token, file, signed.content_type, setUploadProgress);
         setUploadProgress(100);
         setUploadStatus('Video uploaded; saving tutorial...');
         result = await request<ApiResult<Tutorial>>('?action=assign', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ card_key: card.key, title, key: signed.key, file_name: file.name }),
+          body: JSON.stringify({ card_key: card.key, title, path: signed.path, file_name: file.name }),
         });
       } else {
         result = await request<ApiResult<Tutorial>>('', {
@@ -140,7 +143,7 @@ export default function VideoTutorialsPage() {
   };
 
   const remove = async (card: typeof cards[number]) => {
-    if (busyCard || !window.confirm(`Remove the ${card.label} tutorial and delete its video from S3?`)) return;
+    if (busyCard || !window.confirm(`Remove the ${card.label} tutorial and delete its video from storage?`)) return;
     setBusyCard(card.key);
     setError('');
     setNotice('');

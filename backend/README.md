@@ -97,14 +97,16 @@ Add this statement to the existing IAM policy (which already grants
 ## Client dashboard video tutorials
 
 The admin-only `/video-tutorials` page assigns one video to each client
-dashboard card. Videos are stored privately under
-`s3://aiptuploaddocument/aiptvideotutorial/` in `eu-north-1`; clients receive
-one-hour signed playback URLs only for assigned videos. The function uses the
-`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` Edge Function secrets and the
-`VideoTutorialAccess` statement in `aws/admin-documents-policy.json`. Use a
-dedicated IAM identity with that scoped policy, then apply the migration and
-deploy the function to the same project configured by the frontend. Link using
-the project ref at the start of `NEXT_PUBLIC_SUPABASE_URL`:
+dashboard card. New videos use the private `aipt-video-tutorials` Supabase
+Storage bucket, with one-hour signed playback URLs issued only to approved,
+active clients. Existing S3-backed tutorials remain playable and continue to
+use the legacy AWS signing configuration until replaced. The migration creates
+the private bucket with a 1 GB bucket-level upload limit; the project-wide
+Supabase Storage upload limit must also allow the selected file size.
+
+Apply `202610170001_move_video_tutorials_to_supabase_storage.sql` and deploy
+`video-tutorials` to the project configured by the frontend. Link using the
+project ref at the start of `NEXT_PUBLIC_SUPABASE_URL`:
 
 If `backend/.env` contains the same AWS IAM identity used by the Edge Function,
 `node scripts/audit-document-iam.mjs --apply-video-tutorials` applies and reads
