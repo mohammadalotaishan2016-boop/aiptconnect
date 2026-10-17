@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { fetchSupabaseFunction, getSupabaseBrowserClient } from '../lib/supabase/browser';
 import AccountMenu from './AccountMenu';
-import ClientAutoTranslator from './ClientAutoTranslator';
 import ClientDashboardLanguageSelector from './ClientDashboardLanguageSelector';
 import type { DashboardLanguage } from './ClientDashboardLanguageSelector';
+
+const ClientAutoTranslator = dynamic(() => import('./ClientAutoTranslator'), { ssr: false });
 
 const ClientIdentity = createContext({ name: 'Client', email: '' });
 export const useClientIdentity = () => useContext(ClientIdentity);

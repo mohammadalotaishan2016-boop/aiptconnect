@@ -984,7 +984,7 @@ function Image({ path }: { path: string | null }) {
     }
   }, [path]);
 
-  return url ? <img className="project-image" src={url} alt="" /> : <span className="project-image-placeholder">Upload</span>;
+  return url ? <img className="project-image" src={url} alt="" loading="lazy" decoding="async" /> : <span className="project-image-placeholder">Upload</span>;
 }
 
 function Modal({ title, close, children }: { title: string; close: () => void; children: React.ReactNode }) {

@@ -209,7 +209,7 @@ function ClientPoaPage() {
           <tbody>
             {loading && <tr><td colSpan={3} className="poa-empty"><span className="poa-loading-mark" aria-hidden="true" />Loading POA documents...</td></tr>}
             {!loading && !error && visibleDocuments.map((item) => <tr key={item.id} tabIndex={0} onMouseEnter={event => showPreview(item, event.currentTarget)} onMouseLeave={schedulePreviewClose} onFocusCapture={event => showPreview(item, event.currentTarget)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) schedulePreviewClose(); }}>
-              <td><span className="poa-country-list">{item.countries.map(country => <span className="poa-country-cell" key={country.id}>{country.flag_url ? <img src={country.flag_url} alt="" /> : <span className="poa-country-initials">{country.abbreviation}</span>}<span>{country.name}</span></span>)}</span></td>
+              <td><span className="poa-country-list">{item.countries.map(country => <span className="poa-country-cell" key={country.id}>{country.flag_url ? <img src={country.flag_url} alt="" loading="lazy" decoding="async" /> : <span className="poa-country-initials">{country.abbreviation}</span>}<span>{country.name}</span></span>)}</span></td>
               <td><span className="poa-document-cell"><strong className="poa-document-name">{item.document_name}</strong><span className="poa-document-meta">{[
                 item.key.split('.').pop()?.toUpperCase(),
                 formatFileSize(item.aws_metadata?.size_bytes),

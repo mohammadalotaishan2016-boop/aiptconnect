@@ -34,21 +34,15 @@ Deno.serve(async request => {
     }
     if (request.method === 'GET' && url.searchParams.get('clients') === 'true') {
       if (!admin) return json({ error: 'Administrator access is required.' }, 403);
-      const rows = [];
-      for (let offset = 0; ; offset += 500) {
-        const result = await db.from('profiles').select('id,full_name,company_name,client_id,approval_status,account_status,client:clients(company_name,email)').eq('role','client').not('client_id','is',null).order('id').range(offset,offset+499);
-        if (result.error) throw result.error;
-        rows.push(...result.data ?? []);
-        if ((result.data?.length ?? 0) < 500) break;
-      }
-      const emails = new Map<string,string>();
-      for (let page=1;;page++) {
-        const result = await db.auth.admin.listUsers({page,perPage:500});
-        if (result.error) throw result.error;
-        result.data.users.forEach(account => { if (account.email) emails.set(account.id,account.email); });
-        if (result.data.users.length < 500) break;
-      }
-      return json({ clients: rows.map(row => ({...row,email:emails.get(row.id) ?? ''})), pages: permissionPages });
+      const requestedPage = Number(url.searchParams.get('page')) || 1;
+      const page = Math.min(1_000_000, Math.max(1, requestedPage));
+      const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('page_size')) || 50));
+      const search = (url.searchParams.get('search') ?? '').trim().slice(0, 200);
+      const result = await db.rpc('list_client_permission_targets', { p_search: search, p_page: page, p_page_size: pageSize });
+      if (result.error) throw result.error;
+      const rows = result.data ?? [];
+      const total = Number(rows[0]?.total_count ?? 0);
+      return json({ clients: rows.map(({ total_count: _total, ...row }) => row), total, page, page_size: pageSize, pages: permissionPages });
     }
     const userId = admin ? url.searchParams.get('user_id') : user.id;
     if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Select a client account.' }, 400);
@@ -60,7 +54,10 @@ Deno.serve(async request => {
     if (request.method === 'GET') {
       const result = await db.from('client_permission_sets').select('permissions,revision,updated_at').eq('user_id',userId).maybeSingle();
       if (result.error) throw result.error;
-      return json(result.data ?? { permissions: defaultClientPermissions(), revision: 0, updated_at: null });
+      const response = result.data ?? { permissions: defaultClientPermissions(), revision: 0, updated_at: null };
+      const authUser = admin ? await db.auth.admin.getUserById(userId) : null;
+      if (authUser?.error) throw authUser.error;
+      return json({ ...response, email: authUser?.data.user?.email ?? user.email ?? '' });
     }
     if (request.method === 'PUT') {
       if (!admin) return json({ error: 'Only administrators can assign permissions.' }, 403);

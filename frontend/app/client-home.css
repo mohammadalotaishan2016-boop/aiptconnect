@@ -29,7 +29,7 @@
 .client-home-rail-button:disabled:hover{transform:none;box-shadow:none}
 .client-home-rail-logout{margin-top:auto}
 .client-home-rail-logout svg{width:24px;height:24px}
-.client-home-content{display:flex;min-width:0;flex:1;flex-direction:column;background-color:#fff;background-image:linear-gradient(rgba(255,255,255,.47),rgba(255,255,255,.47)),url('/images/client-dashboard-background.png');background-position:center;background-repeat:no-repeat;background-size:cover,100% auto}
+.client-home-content{display:flex;min-width:0;flex:1;flex-direction:column;background-color:#fff;background-image:linear-gradient(rgba(255,255,255,.47),rgba(255,255,255,.47)),url('/images/client-dashboard-background.webp');background-position:center;background-repeat:no-repeat;background-size:cover,100% auto}
 .client-home-footer{display:flex;min-height:54px;align-items:center;justify-content:space-between;gap:16px;margin-top:auto;padding:12px clamp(22px,4vw,64px);border-top:1px solid rgba(255,255,255,.35);background:#3fadbc;color:#fff;font-size:11px;line-height:1.5}
 .client-home{width:min(100%,1500px);max-width:none;margin:0 auto;padding:34px clamp(20px,3vw,48px) 48px}
 .client-home-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;padding:0}
@@ -111,3 +111,4 @@
 .client-support-chat-success a{color:#177e8d;font-size:13px;font-weight:650}
 @media(max-width:650px){.client-support-chat-widget{right:12px;bottom:12px;width:calc(100vw - 24px);height:min(560px,calc(100dvh - 24px))}.client-support-chat-widget.is-positioned{right:auto;bottom:auto}.client-support-chat-widget.is-maximized{width:calc(100vw - 24px);height:calc(100dvh - 24px)}}
 @media(prefers-reduced-motion:reduce){.client-home-card-wrap,.client-home-card,.client-home-rail-button,.client-language-trigger{transition:none}.client-home-card-wrap:hover,.client-home-rail-button:hover{transform:none}}
+.client-page-loading{display:flex;min-height:180px;align-items:center;justify-content:center;gap:12px;color:#496a76}.client-loading-spinner{width:20px;height:20px;border:2px solid #cce8ee;border-top-color:#08a5bd;border-radius:50%;animation:client-loading-spin .8s linear infinite}@keyframes client-loading-spin{to{transform:rotate(360deg)}}

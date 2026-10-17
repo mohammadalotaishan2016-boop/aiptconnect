@@ -37,5 +37,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><AdminAppShell>{children}</AdminAppShell></body></html>;
+  return <html lang="en"><head><link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" /></head><body><AdminAppShell>{children}</AdminAppShell></body></html>;
 }

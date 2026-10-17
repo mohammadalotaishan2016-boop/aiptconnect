@@ -43,7 +43,7 @@ function ProjectImage({ path, name }: { path: string | null; name: string }) {
     void authenticatedRequest<{ url?: string }>(`projects/image-url?path=${encodeURIComponent(path)}`).then((body) => { if (active && body.url) setUrl(body.url); }).catch(() => undefined);
     return () => { active = false; };
   }, [path]);
-  return url ? <img className='client-project-image' src={url} alt={`${name} project`}/> : <span className='client-project-image-placeholder'>{name.slice(0, 2).toUpperCase()}</span>;
+  return url ? <img className='client-project-image' src={url} alt={`${name} project`} loading="lazy" decoding="async"/> : <span className='client-project-image-placeholder'>{name.slice(0, 2).toUpperCase()}</span>;
 }
 
 function ClientProjectsPage() {

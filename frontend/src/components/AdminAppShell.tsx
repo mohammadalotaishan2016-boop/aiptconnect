@@ -5,9 +5,12 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
-import ClientShell from './ClientShell';
-import ClientPermissionProvider, { ClientPageAccess } from './ClientPermissions';
+import dynamic from 'next/dynamic';
 import { getSupabaseBrowserClient, isFeeSyncActive } from '../lib/supabase/browser';
+
+const ClientPortalShell = dynamic(() => import('./ClientPortalShell'), {
+  loading: () => <section className="client-page client-page-loading" aria-busy="true"><span className="client-loading-spinner" aria-hidden="true" />Loading your dashboard…</section>,
+});
 
 const adminRoutes = new Set([
   '/overview',
@@ -118,7 +121,7 @@ export default function AdminAppShell({ children }: { children: ReactNode }) {
 
   const idleNotice = idleWarning ? <div className="idle-timeout-notice" role="alert"><b>You appear to be away.</b><span>You will be logged out in {Math.floor(secondsRemaining / 60)}:{String(secondsRemaining % 60).padStart(2, '0')} for your security.</span><button type="button" onClick={() => window.dispatchEvent(new Event('pointerdown'))}>Stay signed in</button></div> : null;
 
-  if (clientRoutes.has(pathname)) return <><ClientPermissionProvider><ClientShell><ClientPageAccess>{children}</ClientPageAccess></ClientShell></ClientPermissionProvider>{welcomeToast}{idleNotice}</>;
+  if (clientRoutes.has(pathname)) return <><ClientPortalShell>{children}</ClientPortalShell>{welcomeToast}{idleNotice}</>;
 
   if (!adminRoutes.has(pathname)) return <>{children}{welcomeToast}</>;
 

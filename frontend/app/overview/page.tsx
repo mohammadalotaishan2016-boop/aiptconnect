@@ -338,7 +338,7 @@ export default function Overview() {
         {loading && !summary ? <tr><td colSpan={7} className="overview-table-state">Loading client applications…</td></tr> : (recent?.data.length ?? 0) === 0 ? <tr><td colSpan={7} className="overview-table-state">No client applications match this view.</td></tr> : recent?.data.map((project) => <tr key={project.id}>
           <td><b>{project.aipt_ref_no}</b><small>{project.project_name}</small></td>
           <td><span className="overview-client"><i>{initials(project.client.company_name)}</i><span>{project.client.company_name}<small>Client #{project.client.assigned_id}</small></span></span></td>
-          <td><span className="overview-country">{project.country.flag_url ? <img src={project.country.flag_url} alt="" /> : <i>{project.country.abbreviation}</i>}<span>{project.country.name}</span></span></td>
+          <td><span className="overview-country">{project.country.flag_url ? <img src={project.country.flag_url} alt="" loading="lazy" decoding="async" /> : <i>{project.country.abbreviation}</i>}<span>{project.country.name}</span></span></td>
           <td><span className="overview-procedure">{project.procedure.description}<small>{project.service.service}</small></span></td>
           <td><span className={`overview-status overview-status-${statusClass(project.status)}`}>{project.status}</span></td>
           <td>{formatDate(project.filing_date)}</td>

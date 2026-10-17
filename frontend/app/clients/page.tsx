@@ -303,7 +303,7 @@ function CountryFlag({ country, compact = false }: { country: Country | null | u
   const [failed, setFailed] = useState(false);
   if (!country) return <span className={`country-flag-fallback${compact ? " compact" : ""}`}>--</span>;
   if (!failed && country.flag_url) {
-    return <img className={`country-flag${compact ? " compact" : ""}`} src={country.flag_url} alt="" onError={() => setFailed(true)} />;
+    return <img className={`country-flag${compact ? " compact" : ""}`} src={country.flag_url} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />;
   }
   return <span className={`country-flag-fallback${compact ? " compact" : ""}`}>{country.abbreviation.slice(0, 2).toUpperCase()}</span>;
 }
@@ -323,7 +323,7 @@ function MatterImage({ path }: { path: string | null }) {
     });
     return () => { active = false; };
   }, [path]);
-  return url ? <img className="project-image" src={url} alt="" /> : <span className="project-image-placeholder">-</span>;
+  return url ? <img className="project-image" src={url} alt="" loading="lazy" decoding="async" /> : <span className="project-image-placeholder">-</span>;
 }
 
 export default function ClientsPage() {
