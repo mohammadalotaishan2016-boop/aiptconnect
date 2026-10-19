@@ -342,8 +342,17 @@
   font-size: 11px;
 }
 .reference-statements .reference-table-card {
+  width: 100%;
+  box-sizing: border-box;
   margin-top: 0;
   padding: 6px;
+}
+.reference-statements,
+.reference-statements .client-toolbar,
+.reference-statements .reference-table-scroll {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .reference-statements .statement-tabs {
   display: flex;

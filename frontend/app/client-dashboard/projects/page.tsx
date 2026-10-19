@@ -19,6 +19,7 @@ type Project = {
 type TimelineDocument = { id: string; document_name: string; document_size: number; document_type: string; created_at: string };
 type TimelineEntry = { id: string; timeline_date: string; description: string; procedure?: { description: string; color_indication?: string } | null; documents: TimelineDocument[] };
 type ProjectResponse = { data: Project[]; total: number; page: number; page_size: number };
+const projectsCache = new Map<string, { projects: Project[]; total: number; expires: number }>();
 
 const date = (value: string | null) => value ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${value}T00:00:00`)) : 'Not set';
 const statusClass = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -63,24 +64,37 @@ function ClientProjectsPage() {
   const [documentId, setDocumentId] = useState<string | null>(null);
 
   useEffect(() => { const timer = window.setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 300); return () => window.clearTimeout(timer); }, [search]);
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (force = false) => {
+    const supabase = getSupabaseBrowserClient();
+    const session = (await supabase?.auth.getSession())?.data.session;
+    if (!session) { setError('Please sign in.'); setLoading(false); return; }
+    const cacheKey = `${session.user.id}:${debouncedSearch}:${type}`;
+    const cached = projectsCache.get(cacheKey);
+    if (!force && cached && cached.expires > Date.now()) { setProjects(cached.projects); setTotal(cached.total); setLoading(false); setError(''); return; }
     setLoading(true); setError('');
     try {
-      const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
-      if (debouncedSearch) params.set('search', debouncedSearch);
-      if (type !== 'all') params.set('matter_type', type);
-      const body = await authenticatedRequest<ProjectResponse>(`projects?${params}`);
-      setProjects(body.data); setTotal(body.total);
+      const all: Project[] = []; let total = 0;
+      for (let nextPage = 1; ; nextPage++) {
+        const params = new URLSearchParams({ page: String(nextPage), page_size: '100' });
+        if (debouncedSearch) params.set('search', debouncedSearch);
+        if (type !== 'all') params.set('matter_type', type);
+        const body = await authenticatedRequest<ProjectResponse>(`projects?${params}`);
+        all.push(...body.data); total = body.total;
+        if (all.length >= total || body.data.length < 100) break;
+      }
+      setProjects(all); setTotal(total);
+      projectsCache.set(cacheKey, { projects: all, total, expires: Date.now() + 60000 });
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load projects.'); }
     finally { setLoading(false); }
-  }, [page, pageSize, debouncedSearch, type]);
+  }, [debouncedSearch, type]);
   useEffect(() => { void loadProjects(); }, [loadProjects]);
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const channel = supabase.channel('client-project-refresh').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => void loadProjects()).subscribe();
-    window.addEventListener('focus', loadProjects);
-    return () => { window.removeEventListener('focus', loadProjects); void supabase.removeChannel(channel); };
+    const channel = supabase.channel('client-project-refresh').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => { projectsCache.clear(); void loadProjects(true); }).subscribe();
+    const onFocus = () => void loadProjects(true);
+    window.addEventListener('focus', onFocus);
+    return () => { window.removeEventListener('focus', onFocus); void supabase.removeChannel(channel); };
   }, [loadProjects]);
 
   const openTimeline = async (projectId: string) => {
@@ -98,6 +112,7 @@ function ClientProjectsPage() {
   };
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const firstResult = total ? (page - 1) * pageSize + 1 : 0;
+  const visibleProjects = projects.slice((page - 1) * pageSize, page * pageSize);
   const lastResult = Math.min(page * pageSize, total);
 
   return <section className='client-page client-projects-page'>
@@ -116,7 +131,7 @@ function ClientProjectsPage() {
     <div className='client-project-toolbar'><label><svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='11' cy='11' r='7'/><path d='m20 20-4-4'/></svg><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder='Search by project, reference, filing number, or applicant...'/></label><select value={type} onChange={(event) => { setType(event.target.value); setPage(1); }}><option value='all'>All project types</option>{['trademark','patent','design','copyright','other'].map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select></div>
     <section className='client-project-card'><header><div><h2>Project portfolio</h2><p>Client-scoped applications and live procedure history</p></div><span>{total} {total === 1 ? 'project' : 'projects'}</span></header>
       <div className='client-project-table-wrap'><table className='client-project-table'><thead><tr><th>Project</th><th>References & numbers</th><th>Type & procedure</th><th>Country</th><th>Status</th><th>Project dates</th><th>Timeline</th></tr></thead><tbody>
-        {loading ? <tr><td colSpan={7} className='client-project-state'>Loading your projects...</td></tr> : projects.length ? projects.map((project) => <Fragment key={project.id}><tr className={timelineProject === project.id ? 'is-expanded' : ''}><td><div className='project-identity'><ProjectImage path={project.image_path} name={project.project_name}/><span><strong>{project.project_name}</strong><small>{project.applicant || 'Applicant not set'}</small></span></div></td><td><b>{project.client_ref_no || 'No client reference'}</b><small>AIP&amp;T reference: {project.aipt_ref_no || 'Not set'}</small><small>Filing no.: {project.filing_number || 'Not set'}</small><small>Register no.: {project.register_number || 'Not set'}</small></td><td><span className='project-type-badge'>{project.matter_type || 'Not set'}</span><small>{project.procedure?.description || project.service?.service || 'Procedure not assigned'}</small><small>Class: {project.class_number ?? 'Not set'}</small></td><td><b>{project.country?.name || 'Not set'}</b><small>{project.country?.abbreviation || ''}</small></td><td><span className={`status-tag ${statusClass(project.status)}`}>{project.status || 'Not set'}</span></td><td><span className='project-date'><small>Matter date · {date(project.matter_date)}</small></span><span className='project-date'><small>Filing date · {date(project.filing_date)}</small></span><span className='project-date'><small>Registered · {date(project.registered_date)}</small></span><span className='project-date'><small>Renewal · {date(project.renewal_date)}</small></span></td><td><button type='button' className={`timeline-toggle${timelineProject === project.id ? ' active' : ''}`} onClick={() => void openTimeline(project.id)} data-action="view" data-icon-only="true" title="View timeline"><ActionIcon name="view" /><span className="aipt-action-label"><span>{timelineProject === project.id ? 'Hide timeline' : 'View timeline'}</span><i>⌄</i></span></button></td></tr>
+        {loading ? <tr><td colSpan={7} className='client-project-state'>Loading your projects...</td></tr> : visibleProjects.length ? visibleProjects.map((project) => <Fragment key={project.id}><tr className={timelineProject === project.id ? 'is-expanded' : ''}><td><div className='project-identity'><ProjectImage path={project.image_path} name={project.project_name}/><span><strong>{project.project_name}</strong><small>{project.applicant || 'Applicant not set'}</small></span></div></td><td><b>{project.client_ref_no || 'No client reference'}</b><small>AIP&amp;T reference: {project.aipt_ref_no || 'Not set'}</small><small>Filing no.: {project.filing_number || 'Not set'}</small><small>Register no.: {project.register_number || 'Not set'}</small></td><td><span className='project-type-badge'>{project.matter_type || 'Not set'}</span><small>{project.procedure?.description || project.service?.service || 'Procedure not assigned'}</small><small>Class: {project.class_number ?? 'Not set'}</small></td><td><b>{project.country?.name || 'Not set'}</b><small>{project.country?.abbreviation || ''}</small></td><td><span className={`status-tag ${statusClass(project.status)}`}>{project.status || 'Not set'}</span></td><td><span className='project-date'><small>Matter date · {date(project.matter_date)}</small></span><span className='project-date'><small>Filing date · {date(project.filing_date)}</small></span><span className='project-date'><small>Registered · {date(project.registered_date)}</small></span><span className='project-date'><small>Renewal · {date(project.renewal_date)}</small></span></td><td><button type='button' className={`timeline-toggle${timelineProject === project.id ? ' active' : ''}`} onClick={() => void openTimeline(project.id)} data-action="view" data-icon-only="true" title="View timeline"><ActionIcon name="view" /><span className="aipt-action-label"><span>{timelineProject === project.id ? 'Hide timeline' : 'View timeline'}</span><i>⌄</i></span></button></td></tr>
           {timelineProject === project.id && <tr className='timeline-detail-row'><td colSpan={7}><div className='professional-timeline'><header><div><h3>Application timeline</h3><p>{project.project_name} · {project.aipt_ref_no}</p></div><span>{timelineEntries.length} milestones</span></header>{loadingTimeline ? <p className='timeline-state'>Loading timeline...</p> : timelineError ? <p className='timeline-state error'>{timelineError}</p> : timelineEntries.length ? <div className='timeline-track'>{timelineEntries.map((entry, index) => <article className={`timeline-milestone ${colorClass(entry.procedure?.color_indication)}`} key={entry.id}><div className='timeline-marker'><span>{index + 1}</span></div><div className='timeline-content'><header><div><strong>{entry.procedure?.description || 'Procedure update'}</strong><time>{date(entry.timeline_date)}</time></div><span className={`timeline-color-label ${colorClass(entry.procedure?.color_indication)}`}>{entry.procedure?.color_indication || 'Milestone'}</span></header><p>{entry.description}</p>{entry.documents.length > 0 && <div className='timeline-documents'>{entry.documents.map((document) => <button type='button' key={document.id} onClick={() => void downloadDocument(entry, document)} disabled={documentId === document.id}><span>↓</span><b>{documentId === document.id ? 'Opening...' : document.document_name}</b><small>{Math.ceil(document.document_size / 1024)} KB</small></button>)}</div>}</div></article>)}</div> : <p className='timeline-state'>No timeline entries have been published for this project.</p>}</div></td></tr>}
         </Fragment>) : <tr><td colSpan={7} className='client-project-state'>No projects match your search and filters.</td></tr>}
       </tbody></table></div>
@@ -126,3 +141,6 @@ function ClientProjectsPage() {
 }
 
 export default function ManagedPage() { return <ClientManagement manager={<ProjectsPage />}><ClientProjectsPage /></ClientManagement>; }
+
+
+

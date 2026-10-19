@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAdministratorAccess, requestDocument, formatDocumentDate as formatDate, downloadDocumentUrl as downloadUrl } from '../../src/lib/admin-documents';
+import { getSupabaseBrowserClient } from '../../src/lib/supabase/browser';
 import '../client-dashboard/poa/poa.css';
 import '../poa/admin-poa.css';
 import './schedule-of-fees.css';
@@ -11,6 +12,7 @@ type ScheduleDocument = { key: string; document_name: string; last_modified: str
 type ScheduleResponse = { data: ScheduleDocument[] };
 
 const PAGE_SIZE = 12;
+const scheduleCache = new Map<string, { data: ScheduleDocument[]; expires: number }>();
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = new Set(['pdf', 'xls', 'xlsx', 'doc', 'docx']);
 
@@ -36,13 +38,19 @@ export default function ScheduleOfFeesPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    const userId = (await getSupabaseBrowserClient()?.auth.getUser())?.data.user?.id;
+    if (!userId) { setError('Please sign in.'); setLoading(false); return; }
+    const cacheKey = `${userId}:schedule-of-fees`;
+    const cached = scheduleCache.get(cacheKey);
+    if (!force && cached && cached.expires > Date.now()) { setDocuments(cached.data); setLoading(false); setError(''); return; }
     setLoading(true);
     setError('');
     try {
       const body = await request<ScheduleResponse>();
       if (!Array.isArray(body.data)) throw Error('The Schedule of Fees service returned invalid data.');
       setDocuments(body.data);
+      scheduleCache.set(cacheKey, { data: body.data, expires: Date.now() + 60_000 });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load Schedule of Fees documents.');
     } finally {
@@ -97,7 +105,7 @@ export default function ScheduleOfFeesPage() {
       await request(selected ? `?key=${encodeURIComponent(selected.key)}` : '', { method: selected ? 'PUT' : 'POST', body: form });
       setModal(false);
       setNotice(selected ? 'Schedule of Fees document updated.' : 'Schedule of Fees document uploaded.');
-      await load();
+      await load(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to save this document.');
     } finally {
@@ -126,6 +134,8 @@ export default function ScheduleOfFeesPage() {
     setNotice('');
     try {
       await request(`?key=${encodeURIComponent(item.key)}`, { method: 'DELETE' });
+      const userId = (await getSupabaseBrowserClient()?.auth.getUser())?.data.user?.id;
+      if (userId) scheduleCache.delete(`${userId}:schedule-of-fees`);
       setDocuments(current => current.filter(document => document.key !== item.key));
       setNotice('Schedule of Fees document deleted.');
     } catch (cause) {
@@ -211,3 +221,4 @@ export default function ScheduleOfFeesPage() {
     </div>}
   </main>;
 }
+

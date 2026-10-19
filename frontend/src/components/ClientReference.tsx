@@ -5,12 +5,21 @@ import ClientDashboardIcon from './ClientDashboardIcon';
 import TablePagination from './TablePagination';
 
 export type ReferenceCountry = { id?: string; name: string; abbreviation?: string; flag_url?: string };
+const referenceCache = new Map<string, { value: unknown; expires: number }>();
+export function invalidateClientReferenceCache(pathPrefix: string) {
+  for (const key of referenceCache.keys()) if (key.startsWith(pathPrefix)) referenceCache.delete(key);
+}
 export async function clientReferenceRequest<T>(path: string): Promise<T> {
-  const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
+  const supabase = getSupabaseBrowserClient();
+  const session = (await supabase?.auth.getSession())?.data.session;
   if (!session) throw Error('Please sign in.');
+  const cacheKey = `${session.user.id}:${path}`;
+  const cached = referenceCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return cached.value as T;
   const response = await fetchSupabaseFunction(path, { headers: { Authorization: `Bearer ${session.access_token}` } });
   const body = await response.json();
   if (!response.ok) throw Error(body.error || 'Unable to load client data.');
+  referenceCache.set(cacheKey, { value: body, expires: Date.now() + 60_000 });
   return body as T;
 }
 
