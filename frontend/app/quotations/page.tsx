@@ -3,9 +3,10 @@ import { availableClassTypes, calculateClassPricing, quotationDisplayRows, class
 import { toPlainText } from '../../src/lib/plain-text';
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import QuotationDocument from '../../src/components/QuotationDocument';
+import type { PrintableQuotation, QuotationRequirement } from '../../src/components/QuotationDocument';
 import '../invoice/quotation-document.css';
 const DataTransfer = dynamic(() => import('../../src/components/DataTransfer'));
+const QuotationDocument = dynamic(() => import('../../src/components/QuotationDocument'));
 import TablePagination from '../../src/components/TablePagination';
 import ActionIcon from '../../src/components/ActionIcon';
 import TrademarkClassSelector from '../../src/components/TrademarkClassSelector';
@@ -831,7 +832,7 @@ export default function QuotationsPage() {
               classType={classType}
               classCount={effectiveClassCount}
             />}
-            <button type="submit" disabled={lookupLoading || saving || !lookup.current_client_id}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></svg>Review fees</button>
+            <button type="submit" disabled={lookupLoading || saving || !lookup.current_client_id}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 3h12l4 4v14H3V3h2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" /></svg>Review Quotation</button>
           </form>
           {lookupError && <p role="alert">{lookupError} <button type="button" onClick={() => void loadLookup()}>Retry fees</button></p>}
         </section>}
@@ -1931,11 +1932,11 @@ function ViewModal({
   );
 }
 
-function ClientQuotationPreview({ invoice, requirements, saving, error, onClose, onSubmit }: { invoice: import('../../src/components/QuotationDocument').PrintableQuotation; requirements: import('../../src/components/QuotationDocument').QuotationRequirement[]; saving: boolean; error: string; onClose: () => void; onSubmit: (event: FormEvent) => void }) {
-  return <div className="quotation-backdrop client-quotation-backdrop"><section className="client-quotation-preview" role="dialog" aria-modal="true" aria-label="Submit quotation">
+function ClientQuotationPreview({ invoice, requirements, saving, error, onClose, onSubmit }: { invoice: PrintableQuotation; requirements: QuotationRequirement[]; saving: boolean; error: string; onClose: () => void; onSubmit: (event: FormEvent) => void }) {
+  return <div className="quotation-backdrop client-quotation-backdrop"><section className="client-quotation-preview" role="dialog" aria-modal="true" aria-label="Review and save quotation">
     <button type="button" className="client-preview-close" aria-label="Close quotation preview" onClick={onClose} disabled={saving}>×</button>
-    <QuotationDocument invoice={invoice} requirements={requirements} qrDataUrl="" qrPlaceholder="Verification available after approval" />
+    <div className="client-preview-document"><QuotationDocument invoice={invoice} requirements={requirements} qrDataUrl="" qrPlaceholder="Verification available after approval" clientPreview /></div>
     {error && <p className="country-page-error" role="alert">{error}</p>}
-    <form onSubmit={onSubmit}><footer><button type="button" onClick={onClose} disabled={saving}>Cancel</button><button data-action="add" type="submit" disabled={saving}>{saving ? "Submitting…" : "Submit"}</button></footer></form>
+    <form onSubmit={onSubmit}><footer><button type="button" onClick={onClose} disabled={saving}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>Cancel</button><button data-action="add" type="submit" disabled={saving}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 3h12l4 4v14H3V3h2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" /></svg>{saving ? "Saving..." : "Save Quotation"}</button></footer></form>
   </section></div>;
 }

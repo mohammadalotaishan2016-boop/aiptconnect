@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { fetchSupabaseFunction, getSupabaseBrowserClient } from '../lib/supabase/browser';
 import ClientDashboardIcon from './ClientDashboardIcon';
 import TablePagination from './TablePagination';
+import { BoundedTtlCache } from '../lib/bounded-ttl-cache';
 
 export type ReferenceCountry = { id?: string; name: string; abbreviation?: string; flag_url?: string };
-const referenceCache = new Map<string, { value: unknown; expires: number }>();
+const referenceCache = new BoundedTtlCache<string, unknown>(32, 2_000);
 export function invalidateClientReferenceCache(pathPrefix: string) {
-  for (const key of referenceCache.keys()) if (key.startsWith(pathPrefix)) referenceCache.delete(key);
+  referenceCache.deleteWhere(key => key.slice(key.indexOf(':') + 1).startsWith(pathPrefix));
 }
 export async function clientReferenceRequest<T>(path: string): Promise<T> {
   const supabase = getSupabaseBrowserClient();
@@ -15,11 +16,12 @@ export async function clientReferenceRequest<T>(path: string): Promise<T> {
   if (!session) throw Error('Please sign in.');
   const cacheKey = `${session.user.id}:${path}`;
   const cached = referenceCache.get(cacheKey);
-  if (cached && cached.expires > Date.now()) return cached.value as T;
+  if (cached !== undefined) return cached as T;
   const response = await fetchSupabaseFunction(path, { headers: { Authorization: `Bearer ${session.access_token}` } });
   const body = await response.json();
   if (!response.ok) throw Error(body.error || 'Unable to load client data.');
-  referenceCache.set(cacheKey, { value: body, expires: Date.now() + 60_000 });
+  const recordCount = Array.isArray(body) ? body.length : Array.isArray(body?.data) ? body.data.length : 1;
+  referenceCache.set(cacheKey, body, 60_000, recordCount);
   return body as T;
 }
 

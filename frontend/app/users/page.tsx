@@ -367,7 +367,7 @@ export default function UsersPage() {
                   <th>Account</th>
                   <th>Security</th>
                   <th>{heading('Last login', 'last')}</th>
-                  <th>Actions</th>
+                  <th aria-label="Actions"><ActionIcon name="more" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -426,7 +426,8 @@ export default function UsersPage() {
                       </td>
                       <td>{formatDate(user.last_login_at)}</td>
                       <td>
-                        <details className="user-action-menu"><summary>Manage <span aria-hidden="true">⌄</span></summary><fieldset disabled={Boolean(busy)}>                        <div className="user-actions">
+                        <details className="user-action-menu"><summary>Manage <span aria-hidden="true">⌄</span></summary><fieldset disabled={Boolean(busy)}>
+                          <div className="user-actions">
                           <button type="button" onClick={() => setReviewUser(user)}>Review</button>
                           {user.role !== 'administrator' && <button type="button" disabled={Boolean(busy) || !user.deletion_supported || user.deletion_policy !== 'non_admin_only' || !currentUserId || user.id === currentUserId} onClick={() => { setDeleteUser(user); setForceDelete(true); setConfirmEmail(''); setDeleteError(''); }}><ActionIcon name="delete" />Force Delete</button>}
                           {user.approval_status !== 'approved' && (
@@ -488,7 +489,8 @@ export default function UsersPage() {
                             </button>
                           )}
                         </div></fieldset></details>
-                        {user.role === 'administrator' ? <small className="admin-delete-protected">Administrator protected</small> : <button type="button" className="user-delete-button" disabled={Boolean(busy) || !user.deletion_supported || user.deletion_policy !== 'non_admin_only' || !currentUserId || user.id === currentUserId} title={user.deletion_policy !== 'non_admin_only' ? 'Deploy the updated Users service to enable protected deletion' : 'Delete ' + user.email} onClick={() => { setDeleteUser(user); setForceDelete(false); setConfirmEmail(''); setDeleteError(''); }}><ActionIcon name="delete" /><span>Delete</span></button>}
+                        {user.role === 'administrator' ? <small className="admin-delete-protected">Administrator protected</small> :
+                         <button type="button" className="user-delete-button" disabled={Boolean(busy) || !user.deletion_supported || user.deletion_policy !== 'non_admin_only' || !currentUserId || user.id === currentUserId} title={user.deletion_policy !== 'non_admin_only' ? 'Deploy the updated Users service to enable protected deletion' : 'Delete ' + user.email} onClick={() => { setDeleteUser(user); setForceDelete(false); setConfirmEmail(''); setDeleteError(''); }}><ActionIcon name="delete" /><span>Delete</span></button>}
                       </td>
                     </tr>
                   ))

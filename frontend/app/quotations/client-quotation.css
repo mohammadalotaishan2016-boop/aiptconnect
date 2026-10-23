@@ -515,8 +515,8 @@
   background: #809ca5;
 }
 .client-quotation-backdrop {
-  background: #244b61a6;
-  backdrop-filter: none;
+  background: #0b668299;
+  backdrop-filter: blur(1px);
   padding: 16px;
   display: flex;
   align-items: center;
@@ -524,27 +524,35 @@
 }
 .client-quotation-preview {
   position: relative;
-  width: min(510px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  width: min(524px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
   overflow: auto;
   border: 1px solid #67d7ef;
   border-radius: 6px;
   background: #fbfeff;
   color: #0083a6;
   font-family: Arial, Helvetica, sans-serif;
-  padding: 25px 14px 12px;
-  box-shadow: 0 15px 50px #193e5733;
+  padding: 26px 17px 12px;
+  box-shadow: 0 18px 48px #102c3c40;
 }
 .client-preview-close {
   position: absolute;
+  z-index: 3;
+  top: 6px;
   right: 8px;
-  top: 4px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0;
   border: 0;
   background: transparent;
   color: #0083a6;
-  font-size: 20px;
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
 }
+.client-preview-document { min-width: 0; }
 .client-quotation-preview .quotation-footer-frame {
   display: none;
 }
@@ -598,8 +606,22 @@
 }
 .client-quotation-preview .quotation-qr {
   width: 65px;
+  height: 55px;
+  padding: 4px;
+  border-radius: 4px;
+  background: #dff8fd;
   font-size: 8px;
   color: #0083a6;
+}
+.client-quotation-preview .client-preview-reference span {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  font-size: 6px;
+  line-height: 1.25;
+}
+.client-quotation-preview .client-preview-reference b {
+  font-weight: 700;
 }
 .client-quotation-preview .quotation-qr small {
   display: none;
@@ -722,6 +744,32 @@
   background: #00a6be;
   color: white;
   border-color: #00a6be;
+}
+.client-quotation-preview form > footer {
+  position: sticky;
+  bottom: -12px;
+  z-index: 2;
+  background: #fbfeff;
+}
+.client-quotation-preview form > footer button:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 0 0 82px;
+  height: 36px;
+  font-size: 12px;
+}
+.client-quotation-preview footer button[type="submit"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 0 0 130px;
+  min-width: 130px;
+  height: 36px;
+  font-size: 12px;
+  font-weight: 700;
 }
 .client-quotation-preview button:disabled {
   opacity: 0.5;

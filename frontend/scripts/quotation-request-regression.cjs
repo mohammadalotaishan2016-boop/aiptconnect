@@ -18,11 +18,13 @@ async function check(mode) {
   const caller = new AbortController();
   const sandbox = {
     exports: {},
+    process: { env: {} },
     AbortController,
     Headers,
     DOMException,
     Error,
     window: {
+      location: { pathname: '/' },
       setTimeout(callback) {
         fireTimeout = callback;
         return 1;
@@ -33,6 +35,7 @@ async function check(mode) {
     },
     getSupabaseBrowserClient: () => null,
     getSupabaseFunctionUrl: () => "https://fixture.invalid",
+    getSupabaseFunctionCacheMode: () => "no-store",
     fetch: async (url, init) => {
       fetchSignal = init.signal;
       return new Promise((resolve, reject) => {

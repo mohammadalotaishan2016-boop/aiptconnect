@@ -8,6 +8,7 @@ import ActionIcon from '../../../src/components/ActionIcon';
 
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { fetchSupabaseFunction, getSupabaseBrowserClient } from '../../../src/lib/supabase/browser';
+import { BoundedTtlCache } from '../../../src/lib/bounded-ttl-cache';
 
 type Project = {
   id: string; aipt_ref_no: string; client_ref_no: string; project_name: string; matter_type: string; matter_date: string | null;
@@ -19,7 +20,7 @@ type Project = {
 type TimelineDocument = { id: string; document_name: string; document_size: number; document_type: string; created_at: string };
 type TimelineEntry = { id: string; timeline_date: string; description: string; procedure?: { description: string; color_indication?: string } | null; documents: TimelineDocument[] };
 type ProjectResponse = { data: Project[]; total: number; page: number; page_size: number };
-const projectsCache = new Map<string, { projects: Project[]; total: number; expires: number }>();
+const projectsCache = new BoundedTtlCache<string, { projects: Project[]; total: number }>(4, 1_000);
 
 const date = (value: string | null) => value ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${value}T00:00:00`)) : 'Not set';
 const statusClass = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -69,8 +70,8 @@ function ClientProjectsPage() {
     const session = (await supabase?.auth.getSession())?.data.session;
     if (!session) { setError('Please sign in.'); setLoading(false); return; }
     const cacheKey = `${session.user.id}:${debouncedSearch}:${type}`;
-    const cached = projectsCache.get(cacheKey);
-    if (!force && cached && cached.expires > Date.now()) { setProjects(cached.projects); setTotal(cached.total); setLoading(false); setError(''); return; }
+    const cached = force ? undefined : projectsCache.get(cacheKey);
+    if (cached) { setProjects(cached.projects); setTotal(cached.total); setLoading(false); setError(''); return; }
     setLoading(true); setError('');
     try {
       const all: Project[] = []; let total = 0;
@@ -83,7 +84,7 @@ function ClientProjectsPage() {
         if (all.length >= total || body.data.length < 100) break;
       }
       setProjects(all); setTotal(total);
-      projectsCache.set(cacheKey, { projects: all, total, expires: Date.now() + 60000 });
+      projectsCache.set(cacheKey, { projects: all, total }, 60_000, all.length);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load projects.'); }
     finally { setLoading(false); }
   }, [debouncedSearch, type]);

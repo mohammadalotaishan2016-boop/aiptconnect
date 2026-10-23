@@ -31,12 +31,12 @@ export function quotationRequirementRows(invoice: PrintableQuotation, requiremen
       if (seen.has(key)) return [];
       seen.add(key);
       const requirement = requirements.find(entry => entry.id === id && matches(entry));
-      return [{ key, country: item.country?.name || '-', procedure: item.procedure_name, description: requirement ? toPlainText(requirement.description) : 'The selected requirement is no longer available for this country and procedure.' }];
+      return [{ key, category: item.category || '-', country: item.country?.name || '-', procedure: item.procedure_name, description: requirement ? toPlainText(requirement.description) : 'The selected requirement is no longer available for this country and procedure.' }];
     });
   });
 }
 
-export default function QuotationDocument({ invoice, requirements, qrDataUrl, verificationUrl, qrPlaceholder = "Preparing QR code..." }: { invoice: PrintableQuotation; requirements: QuotationRequirement[]; qrDataUrl: string; verificationUrl?: string; qrPlaceholder?: string }) {
+export default function QuotationDocument({ invoice, requirements, qrDataUrl, verificationUrl, qrPlaceholder = "Preparing QR code...", clientPreview = false }: { invoice: PrintableQuotation; requirements: QuotationRequirement[]; qrDataUrl: string; verificationUrl?: string; qrPlaceholder?: string; clientPreview?: boolean }) {
   const symbol = invoice.currency === 'USD' ? '$' : invoice.currency;
   const requirementRows = quotationRequirementRows(invoice, requirements);
   const showDiscount = Number(invoice.discount || 0) !== 0;
@@ -47,21 +47,24 @@ export default function QuotationDocument({ invoice, requirements, qrDataUrl, ve
   );
   const feeWidths = [19, 8, ...(showClassNumbers ? [9.5] : []), 14.5, 15, ...(showDiscount ? [10.5] : []), ...(showVat ? [10] : []), 13.5];
   const totalWidth = feeWidths.reduce((sum, width) => sum + width, 0);
-  return <><div className="quotation-footer-frame"><QuotationOfficeFooter /></div><table className="quotation-pagination" role="presentation"><tbody><tr><td><article className="quotation-sheet">
+  const classCount = invoice.quotation_items.reduce((sum, item) => sum + Math.max(0, Number(item.class_numbers?.length || item.class_count || 0)), 0);
+  const effectiveVatRate = Number(invoice.quotation_items[0]?.vat_rate ?? invoice.vat_rate);
+  const previewDate = new Date(`${invoice.invoice_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return <><div className="quotation-footer-frame"><QuotationOfficeFooter /></div><table className="quotation-pagination" role="presentation"><tbody><tr><td><article className={`quotation-sheet${clientPreview ? ' client-preview-sheet' : ''}`}>
     <header className="quotation-heading" aria-label="Quotation">
       <img className="quotation-logo" src="/images/aipt-quotation-logo.svg" alt="AIP&T" />
       <div className="quotation-sender"><h2>AIPT for Trademark Registration Agents</h2><p>Building No.58<br />Salah Aldin Street, Office 3, Plot 6 - Jibla Kuwait<br />Email: Info@aiptlaw.com</p></div>
-      <a className="quotation-qr" href={verificationUrl} aria-label="Verify this quotation">{qrDataUrl ? <img src={qrDataUrl} alt="Quotation verification QR code" /> : <span>{qrPlaceholder}</span>}<small>Scan to verify</small></a>
+      {clientPreview ? <div className="quotation-qr client-preview-reference" aria-label="Quotation reference and date"><span><b>Quotation No.</b><br />{invoice.reference_no}<br /><b>Date</b><br />{previewDate}</span></div> : <a className="quotation-qr" href={verificationUrl} aria-label="Verify this quotation">{qrDataUrl ? <img src={qrDataUrl} alt="Quotation verification QR code" /> : <span>{qrPlaceholder}</span>}<small>Scan to verify</small></a>}
     </header>
     <section className="quotation-parties">
       <div className="quotation-recipient" aria-label="Quotation recipient"><p>{toPlainText(invoice.client?.company_name) || '-'}</p><p>{toPlainText(invoice.client?.address) || '-'}</p></div>
-      <dl className="quotation-meta"><div><dt>Date:</dt><dd>{date(invoice.invoice_date)}</dd></div><div><dt>Ref# Number:</dt><dd>{invoice.reference_no}</dd></div><div><dt>Client Reference:</dt><dd>{invoice.client_matter_ref || '-'}</dd></div><div><dt>Valid Until:</dt><dd>{invoice.valid_until ? new Date(invoice.valid_until).toLocaleDateString('en-US', { timeZone: 'Asia/Kuwait' }) : 'Not yet available'}</dd></div></dl>
+      <dl className="quotation-meta">{clientPreview ? <><div><dt>VAT:</dt><dd>{invoice.vatable ? `${effectiveVatRate}%` : 'Not applicable'}</dd></div><div><dt>Client Reference:</dt><dd>{invoice.client_matter_ref || '-'}</dd></div><div><dt>Total Number of Classes:</dt><dd>{classCount || '-'}</dd></div><div><dt>Valid Until:</dt><dd>After approval</dd></div></> : <><div><dt>Date:</dt><dd>{date(invoice.invoice_date)}</dd></div><div><dt>Ref# Number:</dt><dd>{invoice.reference_no}</dd></div><div><dt>Client Reference:</dt><dd>{invoice.client_matter_ref || '-'}</dd></div><div><dt>Valid Until:</dt><dd>{invoice.valid_until ? new Date(invoice.valid_until).toLocaleDateString('en-US', { timeZone: 'Asia/Kuwait' }) : 'Not yet available'}</dd></div></>}</dl>
     </section>
-    <section className="quotation-requirements"><h3 className="quotation-tab">REQUIREMENTS</h3><table><colgroup><col style={{ width: '22%' }} /><col style={{ width: '25%' }} /><col /></colgroup><thead><tr><th>Country</th><th>Procedure</th><th>Description</th></tr></thead><tbody>
-      {requirementRows.map(row => <tr key={row.key}><td>{row.country}</td><td>{row.procedure}</td><td>{row.description}</td></tr>)}
+    <section className="quotation-requirements"><h3 className="quotation-tab">{clientPreview ? 'FEE BREAKDOWN (USD)' : 'REQUIREMENTS'}</h3><table><colgroup><col style={{ width: '22%' }} /><col style={{ width: '25%' }} /><col /></colgroup><thead><tr>{clientPreview ? <><th>Category</th><th>Procedure</th><th>Description</th></> : <><th>Country</th><th>Procedure</th><th>Description</th></>}</tr></thead><tbody>
+      {requirementRows.map(row => <tr key={row.key}><td>{clientPreview ? row.category : row.country}</td><td>{row.procedure}</td><td>{row.description}</td></tr>)}
       {!requirementRows.length && <tr><td colSpan={3}>No applicable requirements are configured for the selected services, countries and procedures.</td></tr>}
     </tbody></table></section>
-    <section className="quotation-fees"><h3 className="quotation-tab">FEE DETAILS</h3><table><colgroup>{feeWidths.map((width, index) => <col key={index} style={{ width: `${width / totalWidth * 100}%` }} />)}</colgroup><thead><tr><th>Procedure<br />(procedure)</th><th>Qty</th>{showClassNumbers && <th>Class<br />numbers</th>}<th>Official Fees<small>line amount</small></th><th>Attorney Fees<small>line amount</small></th>{showDiscount && <th>Discount<small>line amount</small></th>}{showVat && <th>VAT<small>line amount</small></th>}<th>TOTAL ({invoice.currency === 'USD' ? 'US$' : invoice.currency}){showVat && <small>before VAT</small>}</th></tr></thead><tbody>
+    <section className="quotation-fees"><h3 className="quotation-tab">FEE DETAILS</h3><table><colgroup>{feeWidths.map((width, index) => <col key={index} style={{ width: `${width / totalWidth * 100}%` }} />)}</colgroup><thead><tr><th>{clientPreview ? 'Description' : <>Procedure<br />(procedure)</>}</th><th>QTY</th>{showClassNumbers && <th>Class<br />numbers</th>}<th>{clientPreview ? <>Official Fee<small>(USD)</small></> : <>Official Fees<small>line amount</small></>}</th><th>{clientPreview ? <>Attorney Fee<small>(USD)</small></> : <>Attorney Fees<small>line amount</small></>}</th>{showDiscount && <th>Discount<small>line amount</small></th>}{showVat && <th>VAT<small>{clientPreview ? '(USD)' : 'line amount'}</small></th>}<th>{clientPreview ? <>TOTAL<small>(USD)</small></> : <>TOTAL ({invoice.currency === 'USD' ? 'US$' : invoice.currency}){showVat && <small>before VAT</small>}</>}</th></tr></thead><tbody>
       {invoice.quotation_items.flatMap((item, index) => quotationDisplayRows(item, invoice.vatable ? item.vat_rate ?? invoice.vat_rate : 0).map((line, lineIndex) => {
         const discount = index === 0 && lineIndex === 0 ? Number(invoice.discount) : 0;
         const total = line.official_fee + line.attorney_fee + line.other_fee - discount;

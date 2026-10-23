@@ -7,12 +7,13 @@ import { getSupabaseBrowserClient } from '../../src/lib/supabase/browser';
 import '../client-dashboard/poa/poa.css';
 import '../poa/admin-poa.css';
 import './schedule-of-fees.css';
+import { BoundedTtlCache } from '../../src/lib/bounded-ttl-cache';
 
 type ScheduleDocument = { key: string; document_name: string; last_modified: string | null; size: number };
 type ScheduleResponse = { data: ScheduleDocument[] };
 
 const PAGE_SIZE = 12;
-const scheduleCache = new Map<string, { data: ScheduleDocument[]; expires: number }>();
+const scheduleCache = new BoundedTtlCache<string, ScheduleDocument[]>(8, 500);
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = new Set(['pdf', 'xls', 'xlsx', 'doc', 'docx']);
 
@@ -42,15 +43,15 @@ export default function ScheduleOfFeesPage() {
     const userId = (await getSupabaseBrowserClient()?.auth.getUser())?.data.user?.id;
     if (!userId) { setError('Please sign in.'); setLoading(false); return; }
     const cacheKey = `${userId}:schedule-of-fees`;
-    const cached = scheduleCache.get(cacheKey);
-    if (!force && cached && cached.expires > Date.now()) { setDocuments(cached.data); setLoading(false); setError(''); return; }
+    const cached = force ? undefined : scheduleCache.get(cacheKey);
+    if (cached) { setDocuments(cached); setLoading(false); setError(''); return; }
     setLoading(true);
     setError('');
     try {
       const body = await request<ScheduleResponse>();
       if (!Array.isArray(body.data)) throw Error('The Schedule of Fees service returned invalid data.');
       setDocuments(body.data);
-      scheduleCache.set(cacheKey, { data: body.data, expires: Date.now() + 60_000 });
+      scheduleCache.set(cacheKey, body.data, 60_000, body.data.length);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load Schedule of Fees documents.');
     } finally {

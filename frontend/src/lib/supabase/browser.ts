@@ -32,6 +32,12 @@ export function getSupabaseFunctionUrl(path: string) {
   return `${url}/functions/v1/${path.replace(/^\//, '')}`;
 }
 
+export function getSupabaseFunctionCacheMode(path: string, method = 'GET', requested?: RequestCache): RequestCache {
+  if (requested) return requested;
+  const endpoint = path.split(/[/?]/, 1)[0];
+  return method.toUpperCase() === 'GET' && endpoint === 'fees-api' ? 'default' : 'no-store';
+}
+
 export async function getActiveSession() {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
@@ -58,6 +64,7 @@ export async function fetchSupabaseFunction(path: string, init: RequestInit & { 
     }
   }
   const { timeoutMs = 15000, ...requestInit } = init;
+  const cacheMode = getSupabaseFunctionCacheMode(path, requestInit.method, requestInit.cache);
   const controller = new AbortController();
   // Preserve the service timeout when a caller also cancels obsolete requests.
   const externalSignal = init.signal;
@@ -82,12 +89,12 @@ export async function fetchSupabaseFunction(path: string, init: RequestInit & { 
   // Send the public project key in apikey and the signed-in user's JWT in
   // Authorization. Edge Functions use both headers for project routing and user auth.
   try {
-    let response = await fetch(getSupabaseFunctionUrl(path), { ...requestInit, headers, signal: controller.signal, cache: 'no-store' });
+    let response = await fetch(getSupabaseFunctionUrl(path), { ...requestInit, headers, signal: controller.signal, cache: cacheMode });
     if (response.status === 401 && supabase) {
       const { data, error } = await supabase.auth.refreshSession();
       if (!error && data.session?.access_token) {
         headers.set('Authorization', `Bearer ${data.session.access_token}`);
-        response = await fetch(getSupabaseFunctionUrl(path), { ...requestInit, headers, signal: controller.signal, cache: 'no-store' });
+        response = await fetch(getSupabaseFunctionUrl(path), { ...requestInit, headers, signal: controller.signal, cache: cacheMode });
       }
     }
     // A 403 is a valid authorization decision (for example, a client opening

@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { fetchSupabaseFunction, getSupabaseBrowserClient } from '../lib/supabase/browser';
 import type { DashboardLanguage } from './ClientDashboardLanguageSelector';
+import { BoundedTtlCache } from '../lib/bounded-ttl-cache';
 
 type TranslationState = { original: string; translated: string; language: DashboardLanguage };
 type TranslationTarget = { source: string; apply: (value: string) => void };
 
 const textStates = new WeakMap<Text, TranslationState>();
 const attributeStates = new WeakMap<Element, Map<string, TranslationState>>();
-const translationCache = new Map<string, string>();
+const translationCache = new BoundedTtlCache<string, string>(5_000, 2_000_000);
 const ignoredContent = 'script,style,noscript,svg,canvas,code,pre,iframe,video,audio,[data-no-translate]';
 
 function readTextState(node: Text): TranslationState {
@@ -172,8 +173,7 @@ export default function ClientAutoTranslator({ rootRef, language }: { rootRef: R
         }
         body.translations.forEach((value: string, index: number) => {
           const key = `${language}\u0000${texts[index]}`;
-          if (translationCache.size >= 5000) translationCache.clear();
-          translationCache.set(key, value);
+          translationCache.set(key, value, Number.POSITIVE_INFINITY, key.length + value.length);
           translatedValues.set(texts[index], value);
         });
       }
