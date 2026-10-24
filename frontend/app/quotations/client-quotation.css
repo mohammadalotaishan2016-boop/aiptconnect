@@ -515,25 +515,25 @@
   background: #809ca5;
 }
 .client-quotation-backdrop {
-  background: #0b668299;
-  backdrop-filter: blur(1px);
-  padding: 16px;
+  background: rgba(8, 31, 55, .62);
+  backdrop-filter: blur(4px);
+  padding: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .client-quotation-preview {
   position: relative;
-  width: min(524px, calc(100vw - 32px));
-  max-height: calc(100dvh - 48px);
+  width: min(1600px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
   overflow: auto;
-  border: 1px solid #67d7ef;
-  border-radius: 6px;
-  background: #fbfeff;
-  color: #0083a6;
+  border: 1px solid #6bdcf2;
+  border-radius: 16px;
+  background: #fff;
+  color: #12235b;
   font-family: Arial, Helvetica, sans-serif;
-  padding: 26px 17px 12px;
-  box-shadow: 0 18px 48px #102c3c40;
+  padding: 18px 24px 16px;
+  box-shadow: 0 28px 90px rgba(4, 24, 48, .3);
 }
 .client-preview-close {
   position: absolute;
@@ -577,105 +577,126 @@
   padding: 0;
   background: transparent;
   box-shadow: none;
-  font: 10px/1.3 Arial;
-  color: #111;
+  font: 15px/1.42 Arial, Helvetica, sans-serif;
+  color: #12235b;
 }
 .client-quotation-preview .quotation-heading {
   display: grid;
-  grid-template-columns: 98px minmax(0, 1fr) 65px;
-  gap: 12px;
+  grid-template-columns: 150px minmax(0, 1fr) 250px;
+  gap: 20px;
   align-items: center;
-  border-bottom: 1px solid #00afd0;
-  padding: 0 0 8px;
-  margin-bottom: 8px;
+  border: 0;
+  padding: 0 0 0 8px;
+  margin: 0 -16px 14px -8px;
+  min-height: 106px;
+  background: #fff;
 }
 .client-quotation-preview .quotation-logo {
-  width: 98px;
-  height: 72px;
-  background: #1b9fb3;
+  width: 150px;
+  height: 88px;
+  background: #08a3b4 !important;
+  object-fit: fill;
+  padding: 5px;
+  border: 1px solid #8feeff;
+  outline: 0;
 }
 .client-quotation-preview .quotation-sender h2 {
-  font: 700 10px/1.3 Arial;
+  font: 700 21px/1.2 Arial;
   letter-spacing: 0;
   margin: 0 0 4px;
-  color: #111;
+  color: #10245f;
 }
 .client-quotation-preview .quotation-sender p {
-  font: 9px/1.45 Arial;
+  font: 13px/1.35 Arial;
   margin: 0;
-  color: #111;
+  color: #12235b;
 }
+.client-quotation-preview .quotation-sender p span { display: block; }
 .client-quotation-preview .quotation-qr {
-  width: 65px;
-  height: 55px;
-  padding: 4px;
-  border-radius: 4px;
+  width: 96px;
+  height: 96px;
+  padding: 8px;
+  border-radius: 8px;
   background: #dff8fd;
-  font-size: 8px;
+  font-size: 11px;
   color: #0083a6;
 }
 .client-quotation-preview .quotation-reference-card {
-  display: block;
-  width: 65px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
   min-width: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: 4px;
-  background: #dff8fd;
-  color: #111;
-  font-size: 6px;
-  line-height: 1.25;
+  min-height: 98px;
+  padding: 7px 7px 7px 10px;
+  border: 1.5px solid #19c4f2;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #f7fdff, #e2f8ff);
+  color: #12235b;
+  font-size: 14px;
+  line-height: 1.4;
 }
 .client-quotation-preview .quotation-reference-card > div {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1px;
+  gap: 2px;
   overflow-wrap: anywhere;
 }
 .client-quotation-preview .quotation-reference-card b {
-  font-size: 6px;
+  font-size: 11px;
+  color: #075789;
 }
 .client-quotation-preview .quotation-reference-card span {
   display: block;
   width: 100%;
   max-width: 100%;
-  font-size: 6px;
-  line-height: 1.25;
+  font-size: 13px;
+  line-height: 1.35;
 }
+.client-quotation-preview .quotation-reference-card b:nth-of-type(2) { border-top: 1px solid #9ae6f7; margin-top: 7px; padding-top: 7px; }
 .client-quotation-preview .client-preview-reference b {
   font-weight: 700;
 }
 .client-quotation-preview .quotation-qr small {
-  display: none;
+  display: block;
 }
+.client-quotation-preview .quotation-qr { display: grid; place-items: center; width: 84px; height: 84px; padding: 3px; border: 0; border-radius: 6px; box-shadow: none; background: #fff; }
+.client-quotation-preview .quotation-qr img { display: block; width: 66px; height: 66px; }
+.client-quotation-preview .quotation-qr small { font-size: 8px; line-height: 10px; color: #10204b; }
 .client-quotation-preview .quotation-parties {
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin: 0 0 8px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr);
+  gap: 16px;
+  margin: 0 0 14px;
 }
 .client-quotation-preview .quotation-recipient p {
-  font: 10px/1.4 Arial;
+  font: 21px/1.28 Arial;
   margin: 0 0 3px;
 }
+.client-quotation-preview .quotation-recipient { min-height: 148px; padding: 15px 20px 12px 28px; border-left: 8px solid #1096c5; border-radius: 10px 14px 14px 10px; background: linear-gradient(110deg, #eaf8fd, #e4f5fc); }
+.client-quotation-preview .quotation-recipient h3 { margin: 0 0 5px; color: #075789; font-size: 18px; }
+.client-quotation-preview .quotation-recipient p:first-of-type { font-size: 23px; }
 .client-quotation-preview .quotation-meta {
-  padding: 7px 9px;
-  font-size: 8px;
+  padding: 10px 18px;
+  font-size: 15px;
   min-height: 0;
-  background: #dff8fd;
-  border-radius: 4px;
+  background: linear-gradient(110deg, #e8f8fd, #e4f5fc);
+  border: 0;
+  border-radius: 13px;
   width: auto !important;
   min-width: 0 !important;
 }
 .client-quotation-preview .quotation-meta > div {
-  grid-template-columns: 85px 1fr;
-  gap: 4px;
-  padding: 2px 0;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, .8fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #b6e7f3;
 }
 .client-quotation-preview .quotation-tab {
-  font: 700 11px/1.2 Arial;
-  padding: 3px 22px 3px 5px;
-  border-radius: 5px 8px 0 4px;
-  background: #00abc4;
+  font: 700 18px/1.2 Arial;
+  padding: 6px 28px 6px 14px;
+  border-radius: 10px 18px 0 4px;
+  background: linear-gradient(105deg, #087a91, #11a8bd);
   margin: 0;
   color: white;
 }
@@ -689,14 +710,14 @@
   table-layout: fixed !important;
 }
 .client-quotation-preview .quotation-sheet :is(th, td) {
-  font: 8px/1.3 Arial;
+  font: 15px/1.42 Arial;
   border-color: #83e5f5;
-  background: #e0f8fd;
-  color: #111;
+  background: #effbfe;
+  color: #12235b;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 8px !important;
-  padding: 5px 7px !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
   height: auto !important;
   min-width: 0 !important;
   border-right: 1px solid #83e5f5 !important;
@@ -710,10 +731,10 @@
   color: #0083a6;
 }
 .client-quotation-preview .quotation-fees {
-  margin-top: 7px;
+  margin-top: 17px;
 }
 .client-quotation-preview .quotation-fees th {
-  height: 28px;
+  height: 48px;
   text-align: center;
 }
 .client-quotation-preview .quotation-fees td {
@@ -723,44 +744,48 @@
   text-align: left;
 }
 .client-quotation-preview .quotation-fees small {
-  font-size: 7px;
+  font-size: 12px;
   line-height: 1.2;
   margin-top: 2px;
 }
 .client-quotation-preview .quotation-totals {
-  width: 200px;
+  width: 320px;
   max-width: 100%;
-  margin: 6px 0 8px auto;
-  font-size: 9px;
+  margin: 8px 0 8px auto;
+  font-size: 17px;
   min-width: 0 !important;
 }
+.client-quotation-preview .quotation-signature {
+  display: none;
+}
+.client-quotation-preview .quotation-ending { grid-template-columns: minmax(0, 1fr) 320px; align-items: end; gap: 18px; margin-top: 2px; }
 .client-quotation-preview .quotation-totals > div {
-  padding: 4px 5px;
+  padding: 9px 14px;
 }
 .client-quotation-preview .quotation-totals strong {
-  font-size: 10px;
+  font-size: 22px;
 }
 .client-quotation-preview .quotation-totals .quotation-due {
-  font-size: 11px;
-  padding: 5px;
-  border-radius: 5px;
+  font-size: 20px;
+  padding: 11px 14px;
+  border-radius: 10px;
   letter-spacing: 0;
 }
 .client-quotation-preview footer {
   display: flex;
   justify-content: flex-end;
   gap: 9px;
-  padding-top: 10px;
+  padding-top: 16px;
   border-top: 1px solid #d7f4fb;
 }
 .client-quotation-preview footer button {
-  min-width: 70px;
-  height: 29px;
+  min-width: 112px;
+  height: 42px;
   border: 1px solid #a1e5f8;
-  border-radius: 5px;
+  border-radius: 8px;
   background: #f6fdff;
   color: #008eac;
-  font-size: 10px;
+  font-size: 14px;
   cursor: pointer;
 }
 .client-quotation-preview footer button[type="submit"] {
@@ -770,33 +795,67 @@
 }
 .client-quotation-preview form > footer {
   position: sticky;
-  bottom: -12px;
+  bottom: -20px;
   z-index: 2;
-  background: #fbfeff;
+  background: #fff;
 }
 .client-quotation-preview form > footer button:first-child {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  flex: 0 0 82px;
-  height: 36px;
-  font-size: 12px;
+  flex: 0 0 112px;
+  height: 42px;
+  font-size: 14px;
 }
 .client-quotation-preview footer button[type="submit"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  flex: 0 0 130px;
-  min-width: 130px;
-  height: 36px;
-  font-size: 12px;
+  flex: 0 0 180px;
+  min-width: 180px;
+  height: 42px;
+  font-size: 14px;
   font-weight: 700;
 }
 .client-quotation-preview button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+@media (max-width: 900px) {
+  .client-quotation-backdrop { padding: 14px; }
+  .client-quotation-preview { width: min(100%, calc(100vw - 28px)); padding: 34px 20px 18px; }
+  .client-quotation-preview .quotation-heading { grid-template-columns: 120px minmax(0, 1fr); gap: 14px; }
+  .client-quotation-preview .quotation-logo { width: 120px; height: 82px; }
+  .client-quotation-preview .quotation-reference-card { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) 88px; }
+  .client-quotation-preview .quotation-parties { grid-template-columns: 1fr; }
+  .client-quotation-preview .quotation-meta { width: 100% !important; }
+  .client-quotation-preview .quotation-ending { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .client-quotation-preview { width: 100%; max-height: calc(100dvh - 16px); padding: 38px 12px 14px; }
+  .client-quotation-preview .quotation-heading { grid-template-columns: 82px minmax(0, 1fr); gap: 10px; }
+  .client-quotation-preview .quotation-logo { width: 82px; height: 62px; }
+  .client-quotation-preview .quotation-sender h2 { font-size: 17px; }
+  .client-quotation-preview .quotation-sender p { font-size: 12px; }
+  .client-quotation-preview .quotation-reference-card { grid-template-columns: minmax(0, 1fr) 76px; gap: 8px; padding: 9px; }
+  .client-quotation-preview .quotation-qr { width: 76px; height: 88px; }
+  .client-quotation-preview .quotation-qr img { width: 62px; height: 62px; }
+  .client-quotation-preview .quotation-recipient p { font-size: 15px; }
+  .client-quotation-preview .quotation-meta > div { grid-template-columns: 1fr auto; }
+  .client-quotation-preview .quotation-tab { font-size: 17px; }
+  .client-quotation-preview .quotation-sheet :is(th, td) { font-size: 11px !important; padding: 7px 6px !important; }
+  .client-quotation-preview .quotation-totals { width: 100%; }
+  .client-quotation-preview form > footer { bottom: -14px; }
+}
+@media (min-width: 901px) {
+  .client-quotation-preview .quotation-recipient { min-height: 108px; padding: 12px 16px 10px 22px; }
+  .client-quotation-preview .quotation-recipient p { font-size: 16px; }
+  .client-quotation-preview .quotation-recipient p:first-of-type { font-size: 18px; }
+  .client-quotation-preview .quotation-recipient h3 { font-size: 15px; }
+  .client-quotation-preview .quotation-meta { padding: 8px 14px; }
+  .client-quotation-preview .quotation-meta > div { padding: 5px 0; }
 }
 .client-quotation-page :is(button, input, select, summary):focus-visible,
 .client-quotation-preview button:focus-visible {
@@ -922,7 +981,205 @@
 }
 .client-quotation-preview .quotation-sheet .quotation-heading {
   min-width: 0;
-  padding: 0 0 8px !important;
+  grid-template-columns: 150px minmax(0, 1fr) 250px;
+  padding: 0 0 0 8px !important;
+  min-height: 106px;
+  margin: 0 -16px 14px -8px;
+  background: #fff;
+  border: 0;
+}
+.client-quotation-preview .quotation-sheet .quotation-logo {
+  width: 150px;
+  height: 88px;
+  padding: 5px;
+  border: 1px solid #8feeff;
+  outline: 0;
+  background: #08a3b4 !important;
+  object-fit: fill;
+}
+.client-quotation-preview .quotation-sheet .quotation-qr {
+  display: grid;
+  width: 84px;
+  height: 84px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #b4e9f4;
+}
+.client-quotation-preview .quotation-sheet .quotation-qr img {
+  display: block;
+  width: 66px;
+  height: 66px;
+}
+.client-quotation-preview .quotation-sheet .quotation-reference-card {
+  grid-template-columns: minmax(0, 1fr) 84px;
+  min-height: 98px;
+  padding: 7px 7px 7px 10px;
+  border: 1.5px solid #19c4f2;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #f7fdff, #e2f8ff);
+}
+.client-quotation-preview .quotation-sheet .quotation-recipient {
+  min-height: 108px;
+  padding: 12px 16px 10px 22px;
+  border-left: 8px solid #1096c5;
+  border-radius: 10px 14px 14px 10px;
+  background: linear-gradient(110deg, #eaf8fd, #e4f5fc);
+}
+/* Match the supplied fee table, totals and review controls. */
+.client-quotation-preview .quotation-fees {
+  margin-top: 12px;
+}
+.client-quotation-preview .quotation-fees .quotation-tab {
+  min-height: 50px;
+  padding: 8px 44px 8px 18px;
+  border-radius: 14px 24px 0 12px;
+  font-size: 22px;
+  clip-path: polygon(0 0, 87% 0, 100% 100%, 0 100%);
+}
+.client-quotation-preview .quotation-fees .quotation-tab::before {
+  content: "";
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-right: 14px;
+  border-radius: 9px;
+  background:
+    linear-gradient(#13b9c3, #13b9c3) 10px 8px / 22px 26px no-repeat,
+    repeating-linear-gradient(to bottom, #fff 0 3px, transparent 3px 7px) 14px 13px / 14px 17px no-repeat,
+    #13b9c3;
+  box-shadow: inset 0 0 0 1px #6ee1ec;
+}
+.client-quotation-preview .quotation-fees table {
+  border-radius: 12px;
+}
+.client-quotation-preview .quotation-sheet .quotation-fees th {
+  height: 62px !important;
+  background: linear-gradient(110deg, #138ca2, #20b8c4) !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  text-align: center;
+}
+.client-quotation-preview .quotation-sheet .quotation-fees th:first-child {
+  text-align: left;
+}
+.client-quotation-preview .quotation-sheet .quotation-fees td {
+  padding: 18px 14px !important;
+  background: linear-gradient(110deg, #f4fbfd, #eef9fc) !important;
+  color: #10245f !important;
+  font-size: 16px !important;
+}
+.client-quotation-preview .quotation-sheet .quotation-fees td:first-child {
+  font-size: 15px !important;
+}
+.client-quotation-preview .quotation-sheet .quotation-fees td:first-child strong {
+  font-size: 17px;
+}
+.client-quotation-preview .quotation-sheet .quotation-fees td small {
+  color: #547d92;
+  font-size: 14px;
+}
+.client-quotation-preview .quotation-ending {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+  align-items: end;
+}
+.client-quotation-preview .quotation-totals {
+  width: 100%;
+  grid-column: 2;
+  justify-self: stretch;
+  margin: 8px 0 8px;
+  padding: 8px;
+  border: 1px solid #76e4f5;
+  border-radius: 14px;
+  background: linear-gradient(110deg, #f3fbfd, #eaf8fb);
+  font-size: 18px;
+}
+.client-quotation-preview .quotation-totals > div {
+  padding: 9px 14px;
+  border-bottom: 1px solid #9de7f2;
+}
+.client-quotation-preview .quotation-totals strong {
+  font-size: 21px;
+}
+.client-quotation-preview .quotation-totals .quotation-due {
+  gap: 12px;
+  min-height: 58px;
+  margin-top: 6px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 15px;
+  background: linear-gradient(105deg, #078da4, #14b9b9);
+  color: #fff;
+  font-size: 20px;
+}
+.client-quotation-preview .quotation-due span::before {
+  content: "";
+  display: inline-block;
+  width: 38px;
+  height: 34px;
+  margin-right: 14px;
+  vertical-align: middle;
+  background:
+    radial-gradient(ellipse at center, #fff 0 43%, transparent 46%) 6px 1px / 27px 12px no-repeat,
+    linear-gradient(#fff, #fff) 7px 8px / 25px 5px no-repeat,
+    radial-gradient(ellipse at center, #fff 0 43%, transparent 46%) 5px 10px / 29px 12px no-repeat,
+    linear-gradient(#fff, #fff) 8px 17px / 23px 5px no-repeat,
+    radial-gradient(ellipse at center, #fff 0 43%, transparent 46%) 4px 19px / 31px 13px no-repeat;
+}
+.client-quotation-preview .quotation-totals .quotation-due strong {
+  font-size: 27px;
+  color: #fff;
+}
+.client-quotation-preview form > footer {
+  bottom: -16px;
+  gap: 18px;
+  padding: 18px 0 0;
+  border-top: 1px solid #16bddb;
+}
+.client-quotation-preview form > footer button:first-child,
+.client-quotation-preview footer button[type="submit"] {
+  height: 58px;
+  border-radius: 12px;
+  font-size: 17px;
+}
+.client-quotation-preview form > footer button:first-child {
+  flex-basis: 190px;
+  border: 1px solid #00afd0;
+  background: #fff;
+  color: #078da4;
+}
+.client-quotation-preview footer button[type="submit"] {
+  flex-basis: 260px;
+  min-width: 260px;
+  background: linear-gradient(105deg, #078da4, #14aeb8);
+  border-color: #0ba8bc;
+  box-shadow: 0 7px 16px #078da433;
+}
+@media (max-width: 900px) {
+  .client-quotation-preview .quotation-ending { grid-template-columns: 1fr; }
+  .client-quotation-preview .quotation-totals { max-width: 100%; }
+}
+@media (max-width: 600px) {
+  .client-quotation-preview .quotation-fees .quotation-tab { font-size: 17px; }
+  .client-quotation-preview .quotation-fees th { font-size: 11px !important; }
+  .client-quotation-preview .quotation-fees td { font-size: 11px !important; }
+  .client-quotation-preview form > footer { gap: 8px; }
+  .client-quotation-preview form > footer button:first-child { flex: 1 1 auto; min-width: 0; }
+  .client-quotation-preview footer button[type="submit"] { flex: 1.4 1 auto; min-width: 0; }
+}
+@media (max-width: 900px) {
+  .client-quotation-preview .quotation-sheet .quotation-logo { width: 120px; height: 82px; }
+  .client-quotation-preview .quotation-sheet .quotation-reference-card { grid-template-columns: minmax(0, 1fr) 88px; }
+}
+@media (max-width: 600px) {
+  .client-quotation-preview .quotation-sheet .quotation-logo { width: 82px; height: 62px; }
+  .client-quotation-preview .quotation-sheet .quotation-qr { width: 76px; height: 88px; }
+  .client-quotation-preview .quotation-sheet .quotation-qr img { width: 62px; height: 62px; }
+  .client-quotation-preview .quotation-sheet .quotation-reference-card { grid-template-columns: minmax(0, 1fr) 76px; }
 }
 .client-quotation-page .quotation-status.pending-approval {
   background: #fff4dc;
