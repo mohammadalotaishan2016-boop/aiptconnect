@@ -8,9 +8,10 @@ type Props = {
   onPageSizeChange: (size: number) => void;
   loading?: boolean;
   allowAll?: boolean;
+  pageSizeOptions?: number[];
 };
 
-export default function TablePagination({ page, pageSize, total, onPageChange, onPageSizeChange, loading = false, allowAll = false }: Props) {
+export default function TablePagination({ page, pageSize, total, onPageChange, onPageSizeChange, loading = false, allowAll = false, pageSizeOptions = [10, 20, 50, 100] }: Props) {
   const resolvedPageSize = pageSize === 0 ? Math.max(total, 1) : pageSize;
   const pages = Math.max(1, Math.ceil(total / resolvedPageSize));
   const current = Math.min(Math.max(1, page), pages);
@@ -20,7 +21,7 @@ export default function TablePagination({ page, pageSize, total, onPageChange, o
     <footer className="aipt-pagination">
       <span>Showing {firstRow}–{lastRow} of {total}</span>
       <label>Rows per page <select aria-label="Rows per page" value={pageSize} disabled={loading} onChange={event => { onPageSizeChange(Number(event.target.value)); onPageChange(1); }}>
-        {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+        {pageSizeOptions.map(size => <option key={size} value={size}>{size}</option>)}
         {allowAll && <option value={0}>All</option>}
       </select></label>
       <nav aria-label="Table pagination">

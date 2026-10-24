@@ -206,7 +206,7 @@ export default function QuotationsPage() {
   const [lookup, setLookup] = useState<Lookup>(emptyLookup);
   const [rows, setRows] = useState<Quotation[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize,setPageSize]=useState(10);
+  const [pageSize,setPageSize]=useState(5);
   const [ascending,setAscending]=useState(false);
   const [quoteSort, setQuoteSort] = useState('created_at');
   const [quoteCountry, setQuoteCountry] = useState('');
@@ -984,7 +984,7 @@ export default function QuotationsPage() {
               </tbody>
             </table>
           </div>
-          <TablePagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} loading={loading} />
+          <TablePagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} loading={loading} pageSizeOptions={[5]} />
           {clientView && <div className="client-status-legend"><b>Status Colors:</b>{["Pending", "Approved", "Rejected", "Cancelled"].map(label => <span key={label} className={label.toLowerCase()}><i aria-hidden="true" />{label}<small>(View / PDF)</small></span>)}</div>}
         </section>
         {modal === "form" && clientView && !selected && <ClientQuotationPreview invoice={{ reference_no: "Assigned on submission", invoice_date: invoiceDate, client_matter_ref: clientMatterRef, client, currency: "USD", vatable, vat_rate: 0, total_vat: vatTotal, discount, grand_total: grandTotal, quotation_items: cart.map(item => ({ ...item, country: lookup.countries.find(country => country.id === item.country_id) })) }} requirements={lookup.requirements.map(requirement => ({ ...requirement, category: lookup.services.find(service => service.id === requirement.service_id)?.name }))} saving={saving} error={error} onClose={() => setModal(null)} onSubmit={save} />}
@@ -1079,12 +1079,13 @@ export default function QuotationsPage() {
         {createdReference !== null && (
           <div className="quotation-backdrop">
             <section className="quotation-dialog compact quotation-success" role="dialog" aria-modal="true" aria-labelledby="quotation-success-title">
+              <span className="quotation-success-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.2 4.2L19 7" /></svg></span>
               <h2 id="quotation-success-title">Quotation successfully created</h2>
-              <p>Reference: <strong>{createdReference}</strong></p>
-              <p>Status: Pending Approval</p>
+              <p className="quotation-success-reference">Reference: <strong>{createdReference}</strong></p>
+              <p className="quotation-success-status"><span>Status</span><strong>Pending Approval</strong></p>
               <footer className="modal-actions">
-                <button type="button" autoFocus onClick={openNew}>Create another quotation</button>
-                <button type="button" onClick={() => setCreatedReference(null)}>Done</button>
+                <button type="button" onClick={openNew}>Create another quotation</button>
+                <button type="button" className="primary" autoFocus onClick={() => setCreatedReference(null)}>Done</button>
               </footer>
             </section>
           </div>

@@ -4,13 +4,8 @@ import { toPlainText } from '../lib/plain-text';
 
 export type QuotationRequirement = { id: string; country_id: string; procedure: string | null; description: string; category?: string | null };
 export type QuotationItem = { category?: string; requirement_ids?: string[]; class_numbers?: number[]; class_count?: number; class_type?: string | null; class_pricing_rows?: PricingRow[]; country_id: string; procedure_name: string; quantity?: number; official_fee: number; attorney_fee: number; other_fee: number; claiming_priority_fee?: number; state_fee_total?: number; vat_rate?: number; country?: { name: string } };
-export type PrintableQuotation = { valid_until?: string | null; reference_no: string; invoice_date: string; grand_total: number; total_vat: number; discount: number; currency: string; client_matter_ref?: string; vatable: boolean; vat_rate: number; client?: { company_name: string; address: string }; quotation_items: QuotationItem[] };
-const amount = (value: number) => (value === 0 ? 0 : value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const date = (value: string) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return match ? `${Number(match[2])}/${Number(match[3])}/${match[1]}` : value;
-};
-
+export type PrintableQuotation = { status?: string; valid_until?: string | null; reference_no: string; invoice_date: string; grand_total: number; total_vat: number; discount: number; currency: string; client_matter_ref?: string; vatable: boolean; vat_rate: number; client?: { company_name: string; address: string }; quotation_items: QuotationItem[] };
+const amount = (value: number) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 /** Saved fees already include quantity and classes. Never multiply them again. */
 export function quotationRow(item: QuotationItem, invoice: PrintableQuotation, index: number) {
   const multiplier = Math.max(1, Number(item.quantity || 1)) * (item.class_pricing_rows?.length ? 1 : Math.max(1, item.class_numbers?.length || item.class_count || 0));
@@ -50,30 +45,35 @@ export default function QuotationDocument({ invoice, requirements, qrDataUrl, ve
   const classCount = invoice.quotation_items.reduce((sum, item) => sum + Math.max(0, Number(item.class_numbers?.length || item.class_count || 0)), 0);
   const effectiveVatRate = Number(invoice.quotation_items[0]?.vat_rate ?? invoice.vat_rate);
   const previewDate = new Date(`${invoice.invoice_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  return <><div className="quotation-footer-frame"><QuotationOfficeFooter /></div><table className="quotation-pagination" role="presentation"><tbody><tr><td><article className={`quotation-sheet${clientPreview ? ' client-preview-sheet' : ''}`}>
+  const feeRows = invoice.quotation_items.flatMap((item, index) => quotationDisplayRows(item, invoice.vatable ? item.vat_rate ?? invoice.vat_rate : 0).map((line, lineIndex) => ({ item, index, line, lineIndex })));
+  return <><div className="quotation-footer-frame"><QuotationOfficeFooter /></div><table className="quotation-pagination" role="presentation"><tbody><tr><td><article className={`quotation-sheet${clientPreview ? ' client-preview-sheet' : ''}${invoice.status === 'Approved' && !clientPreview ? ' is-approved' : ''}`}>
+    {invoice.status === 'Approved' && !clientPreview && <div className="quotation-approved-stamp" aria-label="Approved"><span>APPROVED</span></div>}
     <header className="quotation-heading" aria-label="Quotation">
       <img className="quotation-logo" src="/images/aipt-quotation-logo.svg" alt="AIP&T" />
-      <div className="quotation-sender"><h2>AIPT for Trademark Registration Agents</h2><p>Building No.58<br />Salah Aldin Street, Office 3, Plot 6 - Jibla Kuwait<br />Email: Info@aiptlaw.com</p></div>
-      {clientPreview ? <div className="quotation-qr client-preview-reference" aria-label="Quotation reference and date"><span><b>Quotation No.</b><br />{invoice.reference_no}<br /><b>Date</b><br />{previewDate}</span></div> : <a className="quotation-qr" href={verificationUrl} aria-label="Verify this quotation">{qrDataUrl ? <img src={qrDataUrl} alt="Quotation verification QR code" /> : <span>{qrPlaceholder}</span>}<small>Scan to verify</small></a>}
+      <div className="quotation-sender"><h2>AIPT for Trademark Registration Agents</h2><p><span>Building No.58</span><span>Salah Aldin Street, Office 3, Plot 8 - Jibla Kuwait</span><span><b>Email:</b> Info@aiptlaw.com</span></p></div>
+      <div className={`quotation-reference-card${clientPreview ? ' client-preview-reference' : ''}`} aria-label="Quotation reference and date">
+        <div><b>Quotation No.</b><span>{clientPreview ? 'Assigned on submission' : invoice.reference_no}</span><b>Date</b><span>{previewDate}</span></div>
+        {!clientPreview && <a className="quotation-qr" href={verificationUrl} aria-label="Verify this quotation">{qrDataUrl ? <img src={qrDataUrl} alt="Quotation verification QR code" /> : <span>{qrPlaceholder}</span>}<small>Scan to verify</small></a>}
+      </div>
     </header>
     <section className="quotation-parties">
-      <div className="quotation-recipient" aria-label="Quotation recipient"><p>{toPlainText(invoice.client?.company_name) || '-'}</p><p>{toPlainText(invoice.client?.address) || '-'}</p></div>
-      <dl className="quotation-meta">{clientPreview ? <><div><dt>VAT:</dt><dd>{invoice.vatable ? `${effectiveVatRate}%` : 'Not applicable'}</dd></div><div><dt>Client Reference:</dt><dd>{invoice.client_matter_ref || '-'}</dd></div><div><dt>Total Number of Classes:</dt><dd>{classCount || '-'}</dd></div><div><dt>Valid Until:</dt><dd>After approval</dd></div></> : <><div><dt>Date:</dt><dd>{date(invoice.invoice_date)}</dd></div><div><dt>Ref# Number:</dt><dd>{invoice.reference_no}</dd></div><div><dt>Client Reference:</dt><dd>{invoice.client_matter_ref || '-'}</dd></div><div><dt>Valid Until:</dt><dd>{invoice.valid_until ? new Date(invoice.valid_until).toLocaleDateString('en-US', { timeZone: 'Asia/Kuwait' }) : 'Not yet available'}</dd></div></>}</dl>
+      <div className="quotation-recipient" aria-label="Quotation recipient"><h3>Client / Company</h3><p><strong>{toPlainText(invoice.client?.company_name) || '-'}</strong></p><p>{toPlainText(invoice.client?.address) || '-'}</p></div>
+      <dl className="quotation-meta"><div><dt>VAT:</dt><dd>{invoice.vatable ? `${effectiveVatRate}%` : 'Not applicable'}</dd></div><div><dt>Client Reference:</dt><dd>{invoice.client_matter_ref || '-'}</dd></div><div><dt>Total Number of Classes:</dt><dd>{classCount || '-'}</dd></div><div><dt>Valid Until:</dt><dd>{invoice.valid_until ? new Date(invoice.valid_until).toLocaleDateString('en-US', { timeZone: 'Asia/Riyadh' }) : clientPreview ? '90 days after admin approval' : 'Pending admin approval'}</dd></div></dl>
     </section>
-    <section className="quotation-requirements"><h3 className="quotation-tab">{clientPreview ? 'FEE BREAKDOWN (USD)' : 'REQUIREMENTS'}</h3><table><colgroup><col style={{ width: '22%' }} /><col style={{ width: '25%' }} /><col /></colgroup><thead><tr>{clientPreview ? <><th>Category</th><th>Procedure</th><th>Description</th></> : <><th>Country</th><th>Procedure</th><th>Description</th></>}</tr></thead><tbody>
-      {requirementRows.map(row => <tr key={row.key}><td>{clientPreview ? row.category : row.country}</td><td>{row.procedure}</td><td>{row.description}</td></tr>)}
+    <section className="quotation-requirements"><h3 className="quotation-tab">FEE BREAKDOWN (USD)</h3><table><colgroup><col style={{ width: '22%' }} /><col style={{ width: '25%' }} /><col /></colgroup><thead><tr><th>Category</th><th>Procedure</th><th>Description</th></tr></thead><tbody>
+      {requirementRows.map(row => <tr key={row.key}><td>{row.category}</td><td>{row.procedure}</td><td>{row.description}</td></tr>)}
       {!requirementRows.length && <tr><td colSpan={3}>No applicable requirements are configured for the selected services, countries and procedures.</td></tr>}
     </tbody></table></section>
-    <section className="quotation-fees"><h3 className="quotation-tab">FEE DETAILS</h3><table><colgroup>{feeWidths.map((width, index) => <col key={index} style={{ width: `${width / totalWidth * 100}%` }} />)}</colgroup><thead><tr><th>{clientPreview ? 'Description' : <>Procedure<br />(procedure)</>}</th><th>QTY</th>{showClassNumbers && <th>Class<br />numbers</th>}<th>{clientPreview ? <>Official Fee<small>(USD)</small></> : <>Official Fees<small>line amount</small></>}</th><th>{clientPreview ? <>Attorney Fee<small>(USD)</small></> : <>Attorney Fees<small>line amount</small></>}</th>{showDiscount && <th>Discount<small>line amount</small></th>}{showVat && <th>VAT<small>{clientPreview ? '(USD)' : 'line amount'}</small></th>}<th>{clientPreview ? <>TOTAL<small>(USD)</small></> : <>TOTAL ({invoice.currency === 'USD' ? 'US$' : invoice.currency}){showVat && <small>before VAT</small>}</>}</th></tr></thead><tbody>
-      {invoice.quotation_items.flatMap((item, index) => quotationDisplayRows(item, invoice.vatable ? item.vat_rate ?? invoice.vat_rate : 0).map((line, lineIndex) => {
+    <section className="quotation-fees"><h3 className="quotation-tab">FEE DETAILS</h3><table><colgroup>{feeWidths.map((width, index) => <col key={index} style={{ width: `${width / totalWidth * 100}%` }} />)}</colgroup><thead><tr><th>Description</th><th>QTY</th>{showClassNumbers && <th>Class<br />numbers</th>}<th>Official Fee<small>(USD)</small></th><th>Attorney Fee<small>(USD)</small></th>{showDiscount && <th>Discount<small>(USD)</small></th>}{showVat && <th>VAT<small>(USD)</small></th>}<th>TOTAL<small>({invoice.currency === 'USD' ? 'USD' : invoice.currency})</small></th></tr></thead><tbody>
+      {feeRows.map(({ item, index, line, lineIndex }, rowIndex) => {
         const discount = index === 0 && lineIndex === 0 ? Number(invoice.discount) : 0;
         const total = line.official_fee + line.attorney_fee + line.other_fee - discount;
         const hasClassNumbers = Boolean(item.class_numbers?.length) &&
           (item.category === 'Trademark' || (!item.category && Boolean(item.class_count)));
-        return <tr key={index + '-' + lineIndex}><td>{lineIndex === 0 && <><strong>{item.procedure_name}</strong><br />({item.country?.name || '-'})</>}<small>{line.label}</small>{line.source && <small>Fees: {line.source}</small>}{line.other_fee !== 0 && <small>Other fees: {amount(line.other_fee)}</small>}</td><td>{line.quantity}</td>{showClassNumbers && <td>{hasClassNumbers ? line.class_numbers.join(', ') || '-' : ''}</td>}<td>{amount(line.official_fee)}</td><td>{amount(line.attorney_fee)}</td>{showDiscount && <td>{amount(-discount)}</td>}{showVat && <td>{amount(line.vat)}</td>}<td>{amount(total)}</td></tr>;
-      }))}
+        return <tr className={rowIndex > 0 && rowIndex % 5 === 0 ? 'quotation-fee-page-break' : undefined} key={index + '-' + lineIndex}><td>{lineIndex === 0 && <><strong>{item.procedure_name}</strong><br />({item.country?.name || '-'})</>}<small>{line.label}</small>{line.source && <small>Fees: {line.source}</small>}{line.other_fee !== 0 && <small>Other fees: {amount(line.other_fee)}</small>}</td><td>{line.quantity}</td>{showClassNumbers && <td>{hasClassNumbers ? line.class_numbers.join(', ') || '-' : ''}</td>}<td>{amount(line.official_fee)}</td><td>{amount(line.attorney_fee)}</td>{showDiscount && <td>{amount(-discount)}</td>}{showVat && <td>{amount(line.vat)}</td>}<td>{amount(total)}</td></tr>;
+      })}
     </tbody></table></section>
-    <div className="quotation-ending"><section className="quotation-totals"><div><span>Sub Total</span><strong>{symbol} {amount(Number(invoice.grand_total) - Number(invoice.total_vat))}</strong></div>{showVat && <div><span>Total VAT</span><strong>{symbol} {amount(Number(invoice.total_vat))}</strong></div>}<div className="quotation-due"><span>Total amount due</span><strong>{symbol} {amount(Number(invoice.grand_total))}</strong></div></section>
+    <div className="quotation-ending"><div className="quotation-signature" aria-hidden="true"><span>Your Trusted Partner in Trademark Services</span><i /></div><section className="quotation-totals"><div><span>Sub Total</span><strong>{symbol} {amount(Number(invoice.grand_total) - Number(invoice.total_vat))}</strong></div>{showVat && <div><span>Total VAT</span><strong>{symbol} {amount(Number(invoice.total_vat))}</strong></div>}<div className="quotation-due"><span>Total amount due</span><strong>{symbol} {amount(Number(invoice.grand_total))}</strong></div></section>
     </div>
   </article></td></tr></tbody><tfoot aria-hidden="true"><tr><td><div className="quotation-footer-space" /></td></tr></tfoot></table></>;
 }

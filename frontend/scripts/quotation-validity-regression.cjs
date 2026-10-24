@@ -29,13 +29,13 @@ function from(table) {
     async range() { return { data: [{ ...record }], error: null }; },
   };
 }
-const sandbox = { exports: {}, Date, Response, Request, URL, console, createClient: () => ({ auth: { getUser: async () => ({ data: { user } }) }, from }), Deno: { serve(fn) { handler = fn; }, env: { get() { return ''; } } } };
+const sandbox = { exports: {}, Date, Response, Request, URL, console, clientPermissionResponse: async (_db, _userId, _page, _action) => role === 'administrator' ? null : new Response(JSON.stringify({ error: 'Administrator access is required.' }), { status: 403 }), actionForRequest: request => request.method === 'GET' ? 'view' : 'update', createClient: () => ({ auth: { getUser: async () => ({ data: { user } }) }, from }), Deno: { serve(fn) { handler = fn; }, env: { get() { return ''; } } } };
 vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText, sandbox);
 const validity = sandbox.exports.withQuotationValidity;
 for (const [approved_at, expected] of [
-  ['2026-09-16T09:00:00.000Z', '2026-10-16T09:00:00.000Z'],
-  ['2026-12-20T23:30:00.000Z', '2027-01-19T23:30:00.000Z'],
-  ['2028-02-01T00:00:00.000Z', '2028-03-02T00:00:00.000Z'],
+  ['2026-09-16T09:00:00.000Z', '2026-12-15T09:00:00.000Z'],
+  ['2026-12-20T23:30:00.000Z', '2027-03-20T23:30:00.000Z'],
+  ['2028-02-01T00:00:00.000Z', '2028-05-01T00:00:00.000Z'],
 ]) assert.equal(validity({ status: 'Approved', approved_at }).valid_until, expected);
 for (const item of [
   { status: 'Pending Approval', approved_at: '2026-09-16T09:00:00Z' },
@@ -48,7 +48,7 @@ const approve = () => handler(new Request('https://example.invalid/functions/v1/
   role = 'administrator'; record = { id: 'q-test', status: 'Pending Approval', approved_at: null };
   const result = await approve(); assert.equal(result.status, 200);
   const body = await result.json();
-  assert.equal(Date.parse(body.valid_until) - Date.parse(body.approved_at), 30 * 86400000);
+  assert.equal(Date.parse(body.valid_until) - Date.parse(body.approved_at), 90 * 86400000);
   const original = record.approved_at;
   const second = await approve(); assert.notEqual(second.status, 200); assert.equal(record.approved_at, original);
   const list = await handler(new Request('https://example.invalid/functions/v1/quotations', { headers: { Authorization: 'Bearer test-token' } }));
@@ -58,5 +58,5 @@ const approve = () => handler(new Request('https://example.invalid/functions/v1/
   assert.deepEqual(races.map(r => r.status).sort(), [200, 409]);
   role = 'client'; record = { id: 'q-test', status: 'Pending Approval', approved_at: null };
   assert.equal((await approve()).status, 403); assert.equal(record.approved_at, null);
-  console.log('Passed: 30-day approval validity, calendar boundaries, missing dates, API listing, repeat/concurrent approval and client authorization.');
+  console.log('Passed: 90-day approval validity, calendar boundaries, missing dates, API listing, repeat/concurrent approval and client authorization.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -33,7 +33,7 @@ const publicSelect = `id,reference_no,invoice_verification_token,status,approved
 function withQuotationValidity<T extends { status?: string; approved_at?: string | null }>(quotation: T) {
   const approvedAt = quotation.approved_at ? new Date(quotation.approved_at) : null;
   const validUntil = quotation.status === 'Approved' && approvedAt && Number.isFinite(approvedAt.getTime())
-    ? new Date(approvedAt.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    ? new Date(approvedAt.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString()
     : null;
   return { ...quotation, valid_until: validUntil };
 }

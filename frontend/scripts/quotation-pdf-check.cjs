@@ -73,6 +73,24 @@ const trademarkMarkup = renderToStaticMarkup(React.createElement(Document, {
 }));
 assert.match(trademarkMarkup, /Class<br\/>numbers/);
 assert.match(trademarkMarkup, />1<\/td>/);
+assert.match(trademarkMarkup, /FEE BREAKDOWN \(USD\)/);
+assert.match(trademarkMarkup, />100<\/td>/, 'Whole-dollar fees omit trailing .00');
+assert.doesNotMatch(trademarkMarkup, /100\.00/);
+const approvedMarkup = renderToStaticMarkup(React.createElement(Document, {
+  invoice: { reference_no: 'APPROVED', invoice_date: '2026-10-12', status: 'Approved', valid_until: '2027-01-10T00:00:00.000Z', grand_total: 300, total_vat: 0, discount: 0, currency: 'USD', vatable: false, vat_rate: 0, quotation_items: [] },
+  requirements: [], qrDataUrl: '',
+}));
+assert.match(approvedMarkup, /quotation-sheet[^>]*is-approved/);
+const pendingMarkup = renderToStaticMarkup(React.createElement(Document, {
+  invoice: { reference_no: 'PENDING', invoice_date: '2026-10-12', status: 'Pending Approval', grand_total: 300, total_vat: 0, discount: 0, currency: 'USD', vatable: false, vat_rate: 0, quotation_items: [] },
+  requirements: [], qrDataUrl: '',
+}));
+assert.doesNotMatch(pendingMarkup, /quotation-sheet[^>]*is-approved/);
+const sixLineMarkup = renderToStaticMarkup(React.createElement(Document, {
+  invoice: { reference_no: 'PAGES', invoice_date: '2026-10-12', grand_total: 600, total_vat: 0, discount: 0, currency: 'USD', vatable: false, vat_rate: 0, quotation_items: Array.from({ length: 6 }, (_, index) => ({ category: 'Patent', country_id: 'country', procedure_name: `Procedure ${index + 1}`, quantity: 1, official_fee: 100, attorney_fee: 0, other_fee: 0, country: { name: 'United States' } })) },
+  requirements: [], qrDataUrl: '',
+}));
+assert.equal((sixLineMarkup.match(/quotation-fee-page-break/g) || []).length, 1, 'Fee rows start a new printed page every five rows');
 const trademarkCountOnlyMarkup = renderToStaticMarkup(React.createElement(Document, {
   invoice: {
     reference_no: 'TEST',
@@ -174,9 +192,15 @@ async function main() {
       await page.locator('.quotation-document').screenshot({ path: path.join(tmp, variant + '.png') });
       const pdfBytes = await page.pdf({ path: path.join(variant === 'design' ? output : tmp, `quotation-${variant}-preview.pdf`), printBackground: true, preferCSSPageSize: true });
       const pdf = await require('pdf-lib').PDFDocument.load(pdfBytes);
-      if (variant !== 'long') assert.equal(pdf.getPageCount(), 1, 'Standard quotations fit one A4 page');
+      if (!['long', 'design'].includes(variant)) assert.equal(pdf.getPageCount(), 1, 'Short quotations fit one A4 page');
+      if (variant === 'design') assert.equal(pdf.getPageCount(), 2, 'Seven class rows are split after five rows');
+      if (variant === 'long') assert.ok(pdf.getPageCount() >= 3, 'Twelve rows are split into five-row groups');
       console.log(`${variant}: ${pdf.getPageCount()} A4 page(s); no overflowing table cells`);
     }
   } finally { await browser.close(); }
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+if (process.env.SKIP_PDF_RENDER === '1') {
+  console.log('Passed: quotation markup, whole-dollar formatting, approved watermark gating, and five-row page-break rules. PDF rendering skipped by request.');
+} else {
+  main().catch(error => { console.error(error); process.exitCode = 1; });
+}

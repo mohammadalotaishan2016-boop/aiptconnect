@@ -1,0 +1,254 @@
+MASTER PROMPT: Complete Web Application Audit, Performance Optimization, Memory and Cache Analysis, and Security Validation
+
+Act as a Senior Software Architect, Full-Stack Engineer, Database Performance Engineer, Application Security Specialist, and QA Automation Engineer.
+
+I have an existing web application that is very slow, and I want you to audit, validate, optimize, and secure the entire system.
+
+Your task is to inspect the actual codebase, identify root causes, implement safe improvements, and verify the results. Do not make assumptions about my technology stack or blindly rewrite the application.
+
+1. Inspect the Entire System
+
+First, discover and document the actual architecture:
+
+Frontend framework, components, routing, and state management.
+Backend framework, APIs, services, controllers, and middleware.
+Database, ORM, query builders, schemas, and indexes.
+Query caches, application caches, Redis, Memcached, and in-memory storage.
+Authentication, authorization, sessions, roles, and permissions.
+File uploads, downloads, integrations, background jobs, and scheduled tasks.
+Dependencies, configuration, environment variables, containers, and deployment setup.
+Logging, error handling, automated tests, and monitoring.
+
+Trace important data flows from the browser through the API and backend to the database and cache. Identify which parts can be inspected, executed, tested, and measured.
+
+2. Complete Performance Audit
+
+Find and fix the actual causes of slow application performance.
+
+Frontend
+Slow initial loading and page navigation.
+Large JavaScript and CSS bundles.
+Unnecessary component re-renders and expensive computations.
+Blocking scripts, oversized images, and excessive network requests.
+Duplicate API calls and unnecessary sequential requests.
+Inefficient state management, rendering, and DOM operations.
+Missing code splitting, lazy loading, and appropriate browser caching.
+Backend and APIs
+Slow endpoints and excessive response times.
+Inefficient business logic and redundant processing.
+Blocking operations and poor concurrency handling.
+Excessive middleware and repeated service calls.
+Large API responses and unnecessary data serialization.
+CPU, memory, and connection pool bottlenecks.
+Missing timeouts, resource limits, and appropriate caching.
+Database
+Slow SQL queries and expensive ORM operations.
+N+1 queries and duplicate database calls.
+Missing or ineffective indexes.
+Full-table scans, unnecessary joins, and oversized result sets.
+Missing pagination and fetching unused columns.
+Connection pool exhaustion, lock contention, and long transactions.
+Inefficient filtering, sorting, searching, and aggregation.
+
+Use profiling, query plans, logs, and metrics to establish root causes before optimizing.
+
+3. Full Query Cache and Memory Audit
+
+Inspect every caching implementation and memory-intensive component across the application.
+
+Identify:
+
+Repeated queries that should reuse valid cached results.
+Cache misses, incorrect cache keys, and unnecessary cache bypasses.
+Missing TTLs, eviction policies, and cache size limits.
+Unbounded caches and excessive memory consumption.
+Cache stampedes and duplicate concurrent computations.
+Incorrect invalidation after create, update, and delete operations.
+Stale data and inconsistent cache behavior across instances.
+Sensitive data shared across users, roles, sessions, or tenants.
+Memory leaks, retained objects, excessive allocations, and garbage collection pressure.
+Large query results held in memory.
+Unclosed connections, streams, cursors, and other resources.
+Duplicate workers, excessive background jobs, and memory exhaustion risks.
+
+For each cache, document its purpose, location, storage mechanism, TTL, size limits, eviction behavior, invalidation rules, and measured effectiveness.
+
+Do not assume that enabling more caching is always beneficial. Choose caching strategies based on workload, consistency requirements, and measured results.
+
+4. Complete Security Audit
+
+Inspect the entire system for vulnerabilities, misconfigurations, and insecure data handling.
+
+Authentication and authorization
+Weak password handling and insecure password-reset flows.
+Session fixation, token validation errors, and insecure cookies.
+Missing authentication rate limits.
+Broken access control and privilege escalation.
+IDOR/BOLA vulnerabilities and missing record ownership checks.
+Cross-user and cross-tenant data exposure.
+Frontend-only permission checks and mass assignment.
+API and input security
+SQL and NoSQL injection.
+Cross-site scripting (XSS) and cross-site request forgery (CSRF).
+Server-side request forgery (SSRF).
+Command injection, path traversal, and unsafe redirects.
+Missing input validation and request-size limits.
+Insecure file uploads, downloads, and archive extraction.
+Weak webhook validation and replay protection.
+Data, caching, and infrastructure
+Exposed secrets and credentials.
+Excessive database privileges.
+Sensitive data in logs, caches, browser storage, or API responses.
+Cache poisoning and incorrect cache isolation.
+Unsafe CORS and security-header configurations.
+Insecure session storage and token revocation.
+Vulnerable dependencies and unsupported software versions.
+Debug endpoints, excessive service permissions, and insecure deployment configuration.
+Missing abuse protection and resource-exhaustion safeguards.
+
+Use relevant OWASP guidance and security scanning tools. Test with authorized accounts and synthetic data. Do not perform destructive production testing.
+
+5. Validate the Entire Application
+
+Check the correctness and reliability of the system, not just its speed.
+
+Verify:
+
+Application startup and production build.
+API requests, response codes, and error handling.
+Authentication, roles, permissions, and session expiration.
+Database connectivity, transactions, and data integrity.
+Create, read, update, and delete workflows.
+Forms, validation, search, filtering, sorting, and pagination.
+File handling, exports, and imports.
+Cache hits, misses, expiration, invalidation, and concurrent updates.
+User and tenant data isolation.
+Error states, loading states, and empty states.
+Concurrent requests, duplicate submissions, and background jobs.
+Existing business rules and compatibility.
+
+Run existing unit, integration, regression, lint, type-check, and build tests where available. Add targeted tests for confirmed defects and security fixes.
+
+6. Measure Before and After
+
+Establish a baseline before implementing significant changes whenever possible.
+
+Measure:
+
+Initial page load and navigation times.
+Largest Contentful Paint (LCP).
+Interaction to Next Paint (INP), where measurable.
+Cumulative Layout Shift (CLS).
+JavaScript bundle size.
+API latency, including p50, p95, and p99 where sufficient samples exist.
+Database query count and execution duration.
+Cache hit rate, miss rate, eviction rate, and memory usage.
+Application RAM, heap growth, CPU usage, and garbage collection behavior.
+Database connection pool utilization.
+Error rates and throughput.
+
+Use the following Core Web Vitals targets as reference goals:
+
+LCP: 2.5 seconds or less.
+INP: 200 milliseconds or less.
+CLS: 0.1 or less.
+
+Compare before-and-after results under comparable conditions. Never invent measurements or claim a performance improvement without evidence.
+
+If metrics or execution access are unavailable, state the limitations and provide exact instructions to collect the missing evidence.
+
+7. Implement Safe, High-Impact Improvements
+
+After the audit:
+
+Rank findings by severity, performance impact, confidence, and implementation risk.
+Fix critical security vulnerabilities and serious data-integrity risks first.
+Address the highest-impact performance bottlenecks next.
+Optimize database queries, caching, memory usage, API behavior, and frontend rendering.
+Introduce cache limits, appropriate TTLs, and correct invalidation where justified.
+Correct resource leaks and inefficient database access.
+Add appropriate validation, authorization checks, rate limits, and secure configuration.
+Preserve existing features, interfaces, business logic, and data integrity.
+Keep code changes minimal, maintainable, and reversible.
+Add tests to prevent the same problems from returning.
+
+Do not rewrite the entire application, introduce unnecessary dependencies, or make speculative changes.
+
+Never disable security controls to improve performance. Do not perform destructive database changes, clear production caches, rotate credentials, or deploy changes without the necessary authorization.
+
+8. Verify Every Fix
+
+After implementing changes:
+
+Run relevant tests, builds, linting, and type checks.
+Verify affected workflows and API endpoints.
+Reproduce and retest confirmed vulnerabilities.
+Verify cache invalidation and data isolation.
+Compare database behavior, memory consumption, and performance metrics.
+Check for regressions, increased errors, and unexpected database load.
+Document failed tests and unresolved issues.
+
+Use local development or staging for intrusive tests and load testing. Obtain authorization before production changes.
+
+9. Final Deliverables
+
+Produce a structured report with the following sections.
+
+A. Executive Summary
+
+Explain the system's condition, major bottlenecks, and most important risks.
+
+B. Architecture Inventory
+
+Document the actual frontend, backend, database, cache, authentication, infrastructure, and deployment architecture.
+
+C. Performance Findings
+
+List confirmed bottlenecks, affected files or endpoints, evidence, severity, and recommended fixes.
+
+D. Cache and Memory Findings
+
+Document cache implementations, query inefficiencies, invalidation issues, memory leaks, and resource limits.
+
+E. Security Findings
+
+List vulnerabilities, severity, confidence, affected components, safe reproduction steps, impact, and remediation.
+
+F. System Validation
+
+Report which features, APIs, workflows, builds, and tests passed or failed.
+
+G. Changes Implemented
+
+List each modified file, the reason for the change, and the corresponding tests.
+
+H. Before-and-After Results
+
+Provide actual measurements for page loading, API latency, database queries, cache effectiveness, memory, CPU, and error rates where available.
+
+I. Remaining Risks
+
+Clearly identify unresolved vulnerabilities, performance problems, missing access, and untested areas.
+
+J. Deployment Plan
+
+Provide staging verification, backup requirements, deployment steps, monitoring recommendations, and rollback instructions.
+
+Mandatory Working Rules
+Inspect the actual codebase before drawing conclusions.
+Work systematically across the entire application.
+Diagnose root causes before changing code.
+Distinguish confirmed issues from potential risks.
+Never fabricate test results, metrics, or fixes.
+Never expose secrets or sensitive user data.
+Preserve existing business rules, functionality, and security controls.
+Do not modify production data or deploy changes without authorization.
+Keep a record of completed and remaining audit areas.
+If the project is too large, audit it in manageable subsystems without losing track of coverage.
+Start Immediately
+
+Begin by inspecting the project structure, identifying the technology stack, understanding how the application runs, and discovering the available tests and performance metrics.
+
+Then create a prioritized audit plan, investigate the highest-risk security issues and largest performance bottlenecks, implement safe fixes, and validate each change.
+
+Final objective: deliver an application that is measurably faster, memory-efficient, secure, reliable, and functionally correct, with evidence supporting every major conclusion and claimed improvement. Do not declare the audit complete until you have documented what was actually inspected, tested, fixed, and left unresolved.
