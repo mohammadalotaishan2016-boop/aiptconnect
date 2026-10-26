@@ -1,9 +1,9 @@
 import { clientPermissionResponse, actionForRequest } from '../_shared/client-permissions.ts';
 import { toPlainText } from '../_shared/plain-text.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS' };
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
-const select = 'id,country_id,procedure_id,description,created_at,updated_at,country:countries(id,name,abbreviation,flag_url),procedure:procedures!requirements_procedure_id_fkey(id,description,detail_text,color_indication,service_id,service:services!procedures_service_id_fkey(id,service))';
+const select = 'id,country_id,procedure_id,description,client_visible,created_at,updated_at,country:countries(id,name,abbreviation,flag_url),procedure:procedures!requirements_procedure_id_fkey(id,description,detail_text,color_indication,service_id,service:services!procedures_service_id_fkey(id,service))';
 
 const normalize = (row: any) => ({
   ...row,
@@ -28,14 +28,32 @@ Deno.serve(async (request) => {
   try {
     const denied = await clientPermissionResponse(db, user.id, 'requirements', actionForRequest(request), cors); if (denied) return denied;
     if (request.method === 'GET' && id) {
-      const result = await db.from('requirements').select(select).eq('id', id).is('deleted_at', null).maybeSingle();
+      let query = db.from('requirements').select(select).eq('id', id).is('deleted_at', null);
+      if (role === 'client') query = query.eq('client_visible', true);
+      if (role === 'client') {
+        const { data: procedures, error } = await db.from('procedures').select('id').eq('client_visible', true).is('deleted_at', null);
+        if (error) throw error;
+        const procedureIds = (procedures ?? []).map((procedure: { id: string }) => procedure.id);
+        if (!procedureIds.length) return json({ error: 'Requirement not found.' }, 404);
+        query = query.in('procedure_id', procedureIds);
+      }
+      const result = await query.maybeSingle();
       if (result.error) throw result.error;
       return result.data ? json(normalize(result.data)) : json({ error: 'Requirement not found.' }, 404);
     }
     if (request.method === 'GET') {
       // The client filter catalogue is loaded once, instead of sequentially loading pages.
       if (url.searchParams.get('catalog') === 'true') {
-        const result = await db.from('requirements').select(select).is('deleted_at', null).order('created_at', { ascending: false }).limit(1000);
+        let query = db.from('requirements').select(select).is('deleted_at', null);
+        if (role === 'client') query = query.eq('client_visible', true);
+        if (role === 'client') {
+          const { data: procedures, error } = await db.from('procedures').select('id').eq('client_visible', true).is('deleted_at', null);
+          if (error) throw error;
+          const procedureIds = (procedures ?? []).map((procedure: { id: string }) => procedure.id);
+          if (!procedureIds.length) return json({ data: [] });
+          query = query.in('procedure_id', procedureIds);
+        }
+        const result = await query.order('created_at', { ascending: false }).limit(1000);
         if (result.error) throw result.error;
         return json({ data: (result.data ?? []).map(normalize) });
       }
@@ -45,8 +63,18 @@ Deno.serve(async (request) => {
       const sort = url.searchParams.get('sort') ?? 'created';
       const ascending = url.searchParams.get('direction') === 'asc';
       const data: any[] = [];
+      let clientProcedureIds: string[] | null = null;
+      if (role === 'client') {
+        const { data: procedures, error } = await db.from('procedures').select('id').eq('client_visible', true).is('deleted_at', null);
+        if (error) throw error;
+        clientProcedureIds = (procedures ?? []).map((procedure: { id: string }) => procedure.id);
+        if (!clientProcedureIds.length) return json({ data: [], total: 0, page, page_size: size });
+      }
       for (let offset = 0; ; offset += 500) {
-        const batch = await db.from('requirements').select(select).is('deleted_at', null).order('id').range(offset, offset + 499);
+        let query = db.from('requirements').select(select).is('deleted_at', null);
+        if (role === 'client') query = query.eq('client_visible', true);
+        if (clientProcedureIds) query = query.in('procedure_id', clientProcedureIds);
+        const batch = await query.order('id').range(offset, offset + 499);
         if (batch.error) throw batch.error;
         data.push(...(batch.data ?? []));
         if ((batch.data ?? []).length < 500) break;
@@ -56,6 +84,15 @@ Deno.serve(async (request) => {
       const filtered = (result.data ?? []).filter((item) => !term || `${item.procedure?.description ?? ''} ${item.procedure?.detail_text ?? ''} ${item.description} ${item.country?.name ?? ''} ${item.country?.abbreviation ?? ''}`.toLowerCase().includes(term));
       filtered.sort((left, right) => { const a = sort === 'country' ? left.country?.name ?? '' : sort === 'procedure' ? left.procedure?.description ?? left.description : left.created_at; const b = sort === 'country' ? right.country?.name ?? '' : sort === 'procedure' ? right.procedure?.description ?? right.description : right.created_at; return (a > b ? 1 : a < b ? -1 : 0) * (ascending ? 1 : -1); });
       return json({ data: filtered.slice((page - 1) * size, page * size).map(normalize), total: filtered.length, page, page_size: size });
+    }
+    if (request.method === 'PATCH') {
+      if (role !== 'administrator') return json({ error: 'Only administrators can change client visibility.' }, 403);
+      if (!id) return json({ error: 'Requirement id is required.' }, 400);
+      const body = await request.json();
+      if (typeof body.client_visible !== 'boolean') return json({ error: 'client_visible must be a boolean.' }, 400);
+      const result = await db.from('requirements').update({ client_visible: body.client_visible }).eq('id', id).is('deleted_at', null).select(select).single();
+      if (result.error) throw result.error;
+      return json(normalize(result.data));
     }
     const body = request.method === 'DELETE' ? null : await request.json();
     let payload: { country_id: string; procedure_id: string; description: string } | null = null;

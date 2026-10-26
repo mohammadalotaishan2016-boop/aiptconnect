@@ -14,6 +14,7 @@ type Procedure = {
   detail_text: string;
   color_indication: ColorName;
   service_id: string;
+  client_visible: boolean;
   service: { id: string; service: string } | null;
 };
 type Modal = 'add' | 'edit' | 'delete' | null;
@@ -174,6 +175,20 @@ export default function ProcedurePage() {
     }
   };
 
+  const toggleClientVisibility = async (procedure: Procedure) => {
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await request('procedures', `/${procedure.id}`, { method: 'PATCH', body: JSON.stringify({ client_visible: !procedure.client_visible }) }) as Procedure;
+      setProcedures((current) => current.map((item) => item.id === procedure.id ? { ...item, client_visible: updated.client_visible } : item));
+      setNotice(updated.client_visible ? 'Procedure shown to clients.' : 'Procedure hidden from clients.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update client visibility.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const download = (content: string, type: string, extension: string) => {
     const url = URL.createObjectURL(new Blob([content], { type }));
     const anchor = document.createElement('a');
@@ -253,7 +268,7 @@ export default function ProcedurePage() {
         <div className="country-table-wrap"><table><thead><tr><th><button className="aipt-sort" onClick={()=>{setSort("description");setAscending(!ascending);setPage(1)}}>Description {sort==="description"?(ascending?"?":"?"):"?"}</button></th><th><button className="aipt-sort" onClick={()=>{setSort("color_indication");setAscending(!ascending);setPage(1)}}>Color indicator {sort==="color_indication"?(ascending?"?":"?"):"?"}</button></th><th>Service action <span>⌃</span></th></tr></thead><tbody>
           {loading ? <tr><td colSpan={3} className="country-state">Loading procedures…</td></tr> : visible.length ? visible.map((procedure) => {
             const hex = colorHex(procedure.color_indication);
-            return <tr key={procedure.id}><td><i className="procedure-dot" style={{ background: hex }}/><b>{procedure.description}</b>{procedure.detail_text !== procedure.description && <small className="procedure-detail">{procedure.detail_text}</small>}</td><td><span className="procedure-pill" style={{ color: hex, background: `${hex}16` }}><i style={{ background: hex }}/>{procedure.color_indication}</span></td><td><button className="country-icon" aria-label={`View ${procedure.description}`}>⊙</button><button className="country-icon" aria-label={`Edit ${procedure.description}`} onClick={() => open('edit', procedure)} data-action="edit" data-icon-only="true" title="Edit"><ActionIcon name="edit" /><span className="aipt-action-label">Edit</span></button><button className="country-icon delete" aria-label={`Delete ${procedure.description}`} onClick={() => open('delete', procedure)} data-action="delete" data-icon-only="true" title="Delete"><ActionIcon name="delete" /><span className="aipt-action-label">Delete</span></button></td></tr>;
+            return <tr key={procedure.id}><td><i className="procedure-dot" style={{ background: hex }}/><b>{procedure.description}</b>{procedure.detail_text !== procedure.description && <small className="procedure-detail">{procedure.detail_text}</small>}</td><td><span className="procedure-pill" style={{ color: hex, background: `${hex}16` }}><i style={{ background: hex }}/>{procedure.color_indication}</span></td><td><button className="country-icon" aria-label={`View ${procedure.description}`}>⊙</button><button className="country-icon" aria-label={`Edit ${procedure.description}`} onClick={() => open('edit', procedure)} data-action="edit" data-icon-only="true" title="Edit"><ActionIcon name="edit" /><span className="aipt-action-label">Edit</span></button><button className="country-icon" onClick={() => void toggleClientVisibility(procedure)} disabled={saving} data-action={procedure.client_visible ? 'hide-from-clients' : 'show-to-clients'} data-icon-only="true" title={procedure.client_visible ? 'Hide from clients' : 'Show to clients'} aria-label={procedure.client_visible ? `Hide ${procedure.description} from clients` : `Show ${procedure.description} to clients`}><ActionIcon name={procedure.client_visible ? 'hide' : 'show'} /><span className="aipt-action-label">{procedure.client_visible ? 'Hide from clients' : 'Show to clients'}</span></button><button className="country-icon delete" aria-label={`Delete ${procedure.description}`} onClick={() => open('delete', procedure)} data-action="delete" data-icon-only="true" title="Delete"><ActionIcon name="delete" /><span className="aipt-action-label">Delete</span></button></td></tr>;
           }) : <tr><td colSpan={3} className="country-state">No procedures found.</td></tr>}
         </tbody></table></div>
         <TablePagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} loading={loading} />

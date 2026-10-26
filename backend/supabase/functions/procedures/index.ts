@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const cors = {
   'Access-Control-Allow-Origin': '*',
 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 const colors = new Set(['purple', 'blue', 'green', 'orange', 'red', 'teal', 'yellow', 'gray', 'pink', 'indigo']);
@@ -31,7 +31,7 @@ Deno.serve(async (request) => {
   if (profile?.role !== 'administrator') return json({ error: 'Administrator access is required.' }, 403);
   const url = new URL(request.url), last = url.pathname.split('/').filter(Boolean).at(-1);
   const id = last === 'procedures' ? null : last;
-  const select = 'id,description,detail_text,color_indication,service_id,created_at,updated_at,service:services(id,service)';
+  const select = 'id,description,detail_text,color_indication,service_id,client_visible,created_at,updated_at,service:services(id,service)';
   try {
     if (request.method === 'GET' && id) {
       const { data, error } = await db.from('procedures').select(select).eq('id', id).is('deleted_at', null).single();
@@ -61,6 +61,14 @@ Deno.serve(async (request) => {
     if (!id) return json({ error: 'Procedure id is required.' }, 400);
     const { data: before } = await db.from('procedures').select('*').eq('id', id).is('deleted_at', null).maybeSingle();
     if (!before) return json({ error: 'Procedure not found.' }, 404);
+    if (request.method === 'PATCH') {
+      const body = await request.json();
+      if (typeof body.client_visible !== 'boolean') return json({ error: 'client_visible must be a boolean.' }, 400);
+      const { data, error } = await db.from('procedures').update({ client_visible: body.client_visible }).eq('id', id).is('deleted_at', null).select(select).single();
+      if (error) throw error;
+      await db.from('audit_logs').insert({ actor_id: user.id, entity_type: 'procedure', entity_id: id, action: 'visibility', before_data: before, after_data: data });
+      return json(data);
+    }
     if (request.method === 'PUT') {
       const payload = validate(await request.json());
       const { data: service } = await db.from('services').select('id').eq('id', payload.service_id).is('deleted_at', null).maybeSingle();

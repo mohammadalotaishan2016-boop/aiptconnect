@@ -21,6 +21,7 @@ type Requirement = {
   service_id?: string | null;
   procedure_id: string | null;
   description: string;
+  client_visible: boolean;
   created_at: string;
   country?: Country;
   procedure?: Procedure;
@@ -199,6 +200,16 @@ export default function RequirementsPage() {
       setSaving(false);
     }
   };
+  const toggleClientVisibility = async (item: Requirement) => {
+    setSaving(true);
+    try {
+      const updated = await request(`requirements/${item.id}`, { method: 'PATCH', body: JSON.stringify({ client_visible: !item.client_visible }) }) as Requirement;
+      setAllRows((current) => current.map((row) => row.id === item.id ? { ...row, client_visible: updated.client_visible } : row));
+      setNotice(updated.client_visible ? 'Requirement shown to clients.' : 'Requirement hidden from clients.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update client visibility.');
+    } finally { setSaving(false); }
+  };
   const sortBy = (value: string) => {
     if (sort === value) setDirection(direction === 'asc' ? 'desc' : 'asc');
     else {
@@ -329,6 +340,7 @@ export default function RequirementsPage() {
                           <button onClick={() => open('view', item)} data-action="view" data-icon-only="true" title="View"><ActionIcon name="view" /><span className="aipt-action-label">View</span></button>
                           {!readOnly && <>
                           <button onClick={() => open('edit', item)} data-action="edit" data-icon-only="true" title="Edit"><ActionIcon name="edit" /><span className="aipt-action-label">Edit</span></button>
+                          <button onClick={() => void toggleClientVisibility(item)} disabled={saving} data-action={item.client_visible ? 'hide-from-clients' : 'show-to-clients'} data-icon-only="true" title={item.client_visible ? 'Hide from clients' : 'Show to clients'}><ActionIcon name={item.client_visible ? 'hide' : 'show'} /><span className="aipt-action-label">{item.client_visible ? 'Hide from clients' : 'Show to clients'}</span></button>
                           <button onClick={() => open('delete', item)} data-action="delete" data-icon-only="true" title="Delete"><ActionIcon name="delete" /><span className="aipt-action-label">Delete</span></button>
                           </>}
                         </div>

@@ -53,12 +53,16 @@ async function allRows(query: () => any) {
 }
 
 // Return only requirements belonging to the verified quotation, never the full catalog.
-async function loadQuotationRequirements(db: any, items: any[]) {
+async function loadQuotationRequirements(db: any, items: any[], role: string) {
   const countries = [...new Set(items.map(item => item.country_id))];
   if (!countries.length) return [];
-  const { data } = await allRows(() => db.from('requirements')
-    .select('id,country_id,description,procedures!inner(description,services!inner(service))')
-    .in('country_id', countries).is('deleted_at', null).order('id'));
+  const { data } = await allRows(() => {
+    let query = db.from('requirements')
+      .select('id,country_id,description,client_visible,procedures!inner(description,services!inner(service))')
+      .in('country_id', countries).is('deleted_at', null);
+    if (role === 'client') query = query.eq('client_visible', true).eq('procedures.client_visible', true);
+    return query.order('id');
+  });
   return data.flatMap((row: any) => {
     const procedure = row.procedures?.description;
     const category = row.procedures?.services?.service;
@@ -90,8 +94,8 @@ async function loadLookups(db: any, profile: { role: string; client_id?: string 
     allRows(() => { let query = db.from('projects').select('id,client_id,project_name,aipt_ref_no,country_id,service_id,procedure_id,matter_type').is('deleted_at', null).order('id'); return profile.role === 'client' ? query.eq('client_id', profile.client_id) : query; }),
     allRows(() => db.from('countries').select('id,name,abbreviation,flag_url').is('deleted_at', null).order('name').order('id')),
     allRows(() => db.from('fee_categories').select('id,name').in('name', categories as unknown as string[]).is('deleted_at', null).order('display_order').order('id')),
-    allRows(() => db.from('procedures').select('id,description,service_id,services!inner(service)').is('deleted_at', null).order('description').order('id')),
-    allRows(() => db.from('requirements').select('id,country_id,procedure_id,description').is('deleted_at', null).order('id')),
+    allRows(() => { let query = db.from('procedures').select('id,description,service_id,services!inner(service)').is('deleted_at', null); if (profile.role === 'client') query = query.eq('client_visible', true); return query.order('description').order('id'); }),
+    allRows(() => { let query = db.from('requirements').select('id,country_id,procedure_id,description').is('deleted_at', null); if (profile.role === 'client') query = query.eq('client_visible', true); return query.order('id'); }),
     allRows(() => db.from('services').select('id,service,color').is('deleted_at', null).order('service').order('id')),
     allRows(() => db.from('vat_rates').select('id,country_id,vat').is('deleted_at', null).order('id')),
   ]);
@@ -122,7 +126,7 @@ async function loadLookups(db: any, profile: { role: string; client_id?: string 
     countries: countries ?? [],
     categories: (feeCategories ?? []).filter((item: any) => categories.includes(item.name)),
     procedures: (procedures ?? []).map((item: any) => ({ id: item.id, name: item.description, category: item.services?.service ?? '' })).filter((item: any) => categories.includes(item.category)),
-    requirements: (requirements ?? []).map((item: any) => ({ ...item, description: toPlainText(item.description), procedure_id: item.procedure_id ?? null, procedure: procedureById.get(item.procedure_id)?.description ?? null, service_id: procedureById.get(item.procedure_id)?.service_id ?? null })),
+    requirements: (requirements ?? []).filter((item: any) => profile.role !== 'client' || procedureById.has(item.procedure_id)).map((item: any) => ({ ...item, description: toPlainText(item.description), procedure_id: item.procedure_id ?? null, procedure: procedureById.get(item.procedure_id)?.description ?? null, service_id: procedureById.get(item.procedure_id)?.service_id ?? null })),
     fees: spreadsheetPricing.fees,
     claiming_priority_fees: spreadsheetPricing.claiming_priority_fees,
     state_fees: spreadsheetPricing.state_fees,
@@ -131,7 +135,7 @@ async function loadLookups(db: any, profile: { role: string; client_id?: string 
   };
 }
 
-async function resolveItems(db: any, items: any[], expectedSpreadsheetRevision?: number) {
+async function resolveItems(db: any, items: any[], expectedSpreadsheetRevision?: number, role = 'administrator') {
   if (!Array.isArray(items) || items.length === 0) throw Error('Add at least one service to the quotation.');
   if (!Number.isSafeInteger(expectedSpreadsheetRevision) || (expectedSpreadsheetRevision ?? 0) < 1) throw Error('Refresh quotations to load the saved fee workbook before saving.');
   const { data: sharedWorkbook, error: workbookError } = await db.from('spreadsheet_workbooks')
@@ -140,7 +144,7 @@ async function resolveItems(db: any, items: any[], expectedSpreadsheetRevision?:
   const spreadsheetRevision = Number(sharedWorkbook?.revision);
   if (!Number.isSafeInteger(spreadsheetRevision) || spreadsheetRevision < 1) throw Error('The saved fee workbook revision is invalid.');
   if (spreadsheetRevision !== expectedSpreadsheetRevision) throw Error('The fee workbook changed. Refresh quotations and review the updated fees before saving.');
-  const { data: procedureRows, error: procedureError } = await allRows(() => db.from('procedures').select('id,description,services!inner(service)').is('deleted_at', null).order('id'));
+  const { data: procedureRows, error: procedureError } = await allRows(() => { let query = db.from('procedures').select('id,description,client_visible,services!inner(service)').is('deleted_at', null); if (role === 'client') query = query.eq('client_visible', true); return query.order('id'); });
   if (procedureError) throw procedureError;
   const procedureByKey = new Map((procedureRows ?? []).map((item: any) => [`${item.services?.service}|${item.description}`, item.id]));
   const requestedCategories = [...new Set(items.map((item: any) => categoryOf(item.category)))];
@@ -213,8 +217,12 @@ async function resolveItems(db: any, items: any[], expectedSpreadsheetRevision?:
     const requirementIds = Array.isArray(item.requirement_ids) ? item.requirement_ids.filter((id: unknown) => typeof id === 'string') : [];
     if (requirementIds.length) {
       const procedureId = procedureByKey.get(`${category}|${procedureName}`);
-      const { data: requirements, error: requirementsError } = procedureId
-        ? await db.from('requirements').select('id,procedure_id').in('id', requirementIds).eq('country_id', countryId).eq('procedure_id', procedureId).is('deleted_at', null)
+      let requirementsQuery = procedureId
+        ? db.from('requirements').select('id,procedure_id').in('id', requirementIds).eq('country_id', countryId).eq('procedure_id', procedureId).is('deleted_at', null)
+        : null;
+      if (requirementsQuery && role === 'client') requirementsQuery = requirementsQuery.eq('client_visible', true);
+      const { data: requirements, error: requirementsError } = requirementsQuery
+        ? await requirementsQuery
         : { data: [], error: null };
       if (requirementsError) throw requirementsError;
       if ((requirements ?? []).length !== requirementIds.length) throw Error('A selected requirement does not match the selected procedure and country.');
@@ -250,7 +258,7 @@ Deno.serve(async (request) => {
       const { data, error } = await lookup.eq('status', 'Approved').is('deleted_at', null).maybeSingle();
       if (error) throw error;
       if (!data) return json({ error: 'Invoice verification record not found.' }, 404);
-      return json({ ...withQuotationValidity(data), requirements: await loadQuotationRequirements(db, data.quotation_items ?? []) });
+      return json({ ...withQuotationValidity(data), requirements: await loadQuotationRequirements(db, data.quotation_items ?? [], 'client') });
     }
     const { db, user, profile } = await context(request);
     const denied = await clientPermissionResponse(db, user.id, request.method === 'GET' && new URL(request.url).searchParams.get('lookup') === 'true' && new URL(request.url).searchParams.get('permission_page') === 'fees' ? 'fees' : request.method === 'GET' && new URL(request.url).searchParams.get('status') === 'Approved' ? 'invoices' : 'quotations', new URL(request.url).pathname.endsWith('/cancel') ? 'update' : actionForRequest(request), cors); if (denied) return denied;
@@ -333,7 +341,7 @@ Deno.serve(async (request) => {
       const body = await request.json();
       const vatable = body.vatable !== false;
       const discount = money(body.discount);
-      const { items, spreadsheetRevision } = await resolveItems(db, body.items, Number(body.spreadsheet_revision));
+      const { items, spreadsheetRevision } = await resolveItems(db, body.items, Number(body.spreadsheet_revision), profile.role);
       if (!vatable) items.forEach((item) => { item.vat_rate = 0; });
       const vatRate = items.length ? items[0].vat_rate : 0;
       const summary = totals(items, discount, vatRate);
