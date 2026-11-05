@@ -1,10 +1,5 @@
 {
-  "/login/page": "app/login/page.js",
-  "/login/verify-otp/page": "app/login/verify-otp/page.js",
-  "/client-dashboard/page": "app/client-dashboard/page.js",
-  "/client-dashboard/requirements/page": "app/client-dashboard/requirements/page.js",
+  "/api/poa/translate/route": "app/api/poa/translate/route.js",
   "/client-dashboard/poa/page": "app/client-dashboard/poa/page.js",
-  "/client-dashboard/projects/page": "app/client-dashboard/projects/page.js",
-  "/client-dashboard/statements/page": "app/client-dashboard/statements/page.js",
-  "/client-dashboard/schedule-of-fees/page": "app/client-dashboard/schedule-of-fees/page.js"
+  "/dev/poa-preview/page": "app/dev/poa-preview/page.js"
 }

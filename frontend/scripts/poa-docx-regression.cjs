@@ -119,6 +119,36 @@ function transformXml(root, template, helpers) {
 
 (async () => {
   const helpers = await import(helperUrl);
+  const arabicSource = fs.readFileSync(path.join(__dirname, '../src/lib/poa-arabic-dictionary.ts'), 'utf8');
+  const arabicJs = ts.transpileModule(arabicSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
+  const arabicModulePath = path.join(__dirname, '../src/lib/.poa-arabic-regression.mjs');
+  fs.writeFileSync(arabicModulePath, arabicJs, 'utf8');
+  const arabicHelpers = await import(require('node:url').pathToFileURL(arabicModulePath).href);
+  assert.equal(arabicHelpers.servicesToArabic(['Concessions', 'Renewal', 'Renewal']), 'تجديد،الإمتيازات', 'Arabic services are unique and checklist ordered');
+  assert.equal(arabicHelpers.countriesToArabic(['AX', 'AL', 'SA']), 'جزر آلاند،ألبانيا،المملكة العربية السعودية', 'Arabic country names use locale display names and overrides');
+  assert.equal(arabicHelpers.countryToArabic(' bnx '), 'بنلوكس', 'BNX uses the explicit reviewed placeholder override');
+  assert.throws(() => arabicHelpers.countryToArabic('ZZZ'), /Invalid|unsupported|not supported/i, 'unknown code fails');
+  assert.throws(() => arabicHelpers.countryToArabic('   '), /empty/i, 'empty code fails');
+  assert.equal(arabicHelpers.countriesToArabic(['SA', 'SA']), arabicHelpers.countryToArabic('SA'), 'country duplicates are removed');
+  const iso3 = require('i18n-iso-countries').getAlpha3Codes();
+  const regionalEntries = [
+    { name: 'ARIPO', abbreviation: 'ARI' }, { name: 'OAPI', abbreviation: 'OAP' },
+    { name: 'European Union', abbreviation: 'EUR' }, { name: 'Benelux', abbreviation: 'BNX' },
+    { name: 'Northern Cyprus', abbreviation: 'NCY' },
+  ];
+  const countryFailures = [];
+  for (const code of [...Object.keys(iso3), ...regionalEntries.map((entry) => entry.abbreviation)]) {
+    try {
+      const value = arabicHelpers.countryToArabic(code);
+      if (!value || /[A-Za-z]/.test(value)) countryFailures.push({ code, reason: `invalid Arabic result: ${value}` });
+    } catch (error) { countryFailures.push({ code, reason: error.message }); }
+  }
+  console.log(`Country-code sweep: ${Object.keys(iso3).length + regionalEntries.length} entries checked; non-translatable regional entries: ${JSON.stringify(countryFailures)}`);
+  assert.deepEqual(countryFailures.map(({ code }) => code), ['ARI', 'OAP', 'EUR', 'NCY'], 'all ISO alpha-3 codes translate; unresolved regional codes remain explicitly blocked');
+  const sampleCountriesArabic = arabicHelpers.countriesToArabic(['AX', 'AL', 'DZ', 'AD', 'AO', 'AI']);
+  assert.equal(sampleCountriesArabic, 'جزر آلاند،ألبانيا،الجزائر،أندورا،أنغولا،أنغويلا');
+  console.log(`SAMPLE_COUNTRIES_ARABIC ${sampleCountriesArabic}`);
+  assert.throws(() => arabicHelpers.servicesToArabic(['Unknown service']), /No Arabic POA service wording/, 'missing service labels fail loudly');
   const { assertSignatureOrder, enforceNoLeadingPunctuation, findUnresolvedPoaPlaceholder, paragraphAlignment, replaceTextRuns, isolateArabicValues, getPoaReplacements } = helpers;
   assert.equal(helpers.replaceTextRuns(['Applicant: $application ', 'address and $services', ' in $countries'], { ...P_EN, '$application address': 'Example Address', '$services': 'Registration, Renewal', '$countries': 'Saudi Arabia, Bahrain' }).join(''), 'Applicant: Example Address and Registration, Renewal in Saudi Arabia, Bahrain');
   assert.throws(() => getPoaReplacements({ ...AR_VALUES, name: '' }, 'arabic'), /arabic value.*missing/i, 'generation rejects missing Arabic values');
@@ -226,5 +256,5 @@ function transformXml(root, template, helpers) {
     assert.equal(await original.file('word/document.xml').async('text'), await JSZip.loadAsync(fs.readFileSync(path.join(__dirname, '../public/templates', filename))).then(z => z.file('word/document.xml').async('text')), 'Template must not be modified');
     console.log(`${filename}: PASS XML direction, alignment, placeholder, punctuation, and Arabic-order assertions (${(await output.generateAsync({ type: 'nodebuffer' })).length} bytes)`);
   }
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { try { fs.unlinkSync(path.join(__dirname, '../src/lib/.poa-arabic-regression.mjs')); } catch {} });
 

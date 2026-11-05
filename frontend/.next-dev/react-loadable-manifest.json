@@ -1,28 +1,4 @@
 {
-  "app\\client-dashboard\\projects\\page.tsx -> ../../projects/page": {
-    "id": "app\\client-dashboard\\projects\\page.tsx -> ../../projects/page",
-    "files": [
-      "static/chunks/_app-pages-browser_app_projects_page_tsx.js"
-    ]
-  },
-  "app\\client-dashboard\\requirements\\page.tsx -> ../../../src/lib/table-files": {
-    "id": "app\\client-dashboard\\requirements\\page.tsx -> ../../../src/lib/table-files",
-    "files": [
-      "static/chunks/_app-pages-browser_src_lib_table-files_ts.js"
-    ]
-  },
-  "app\\client-dashboard\\requirements\\page.tsx -> ../../requirements/page": {
-    "id": "app\\client-dashboard\\requirements\\page.tsx -> ../../requirements/page",
-    "files": [
-      "static/chunks/_app-pages-browser_app_requirements_page_tsx.js"
-    ]
-  },
-  "app\\client-dashboard\\statements\\page.tsx -> ../../../src/components/AdminStatementsPage": {
-    "id": "app\\client-dashboard\\statements\\page.tsx -> ../../../src/components/AdminStatementsPage",
-    "files": [
-      "static/chunks/_app-pages-browser_src_components_AdminStatementsPage_tsx.js"
-    ]
-  },
   "node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts": {
     "id": "node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts",
     "files": [
@@ -53,22 +29,8 @@
       "static/chunks/_app-pages-browser_src_components_ClientAutoTranslator_tsx.js"
     ]
   },
-  "src\\lib\\project-files.ts -> docx": {
-    "id": "src\\lib\\project-files.ts -> docx",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_docx_dist_index_mjs.js"
-    ]
-  },
-  "src\\lib\\project-files.ts -> exceljs": {
-    "id": "src\\lib\\project-files.ts -> exceljs",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_exceljs_dist_exceljs_min_js.js"
-    ]
-  },
-  "src\\lib\\table-files.ts -> exceljs": {
-    "id": "src\\lib\\table-files.ts -> exceljs",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_exceljs_dist_exceljs_min_js.js"
-    ]
+  "src\\lib\\poa-docx.ts -> jszip": {
+    "id": "src\\lib\\poa-docx.ts -> jszip",
+    "files": []
   }
 }

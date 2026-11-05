@@ -6,6 +6,40 @@ const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
 export type PoaValues = { name: string; address: string; services: string; countries: string };
 
+export async function generatePoaDocx(type: PoaTemplateId, english: PoaValues, arabic: PoaValues, template: ArrayBuffer): Promise<Blob> {
+  for (const [label, values] of [['English', english], ['Arabic', arabic]] as const) {
+    for (const [key, value] of Object.entries(values)) if (!value.trim()) throw new Error(`Generation stopped: ${label} ${key} is missing.`);
+  }
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(template);
+  const replacements = {
+    english: { '$application name': english.name, '$application address': english.address, '$services': english.services, '$countries': english.countries },
+    arabic: { '$application name': arabic.name, '$application address': arabic.address, '$services': arabic.services, '$countries': arabic.countries },
+  };
+  for (const path of Object.keys(zip.files).filter((name) => /^word\/.*\.xml$/.test(name))) {
+    const file = zip.file(path);
+    if (!file) continue;
+    const xml = new DOMParser().parseFromString(await file.async('text'), 'application/xml');
+    if (xml.getElementsByTagName('parsererror').length) throw new Error(`Invalid template XML: ${path}`);
+    normalizeA4PageSize(xml);
+    preparePoaDirection(xml, type);
+    for (const paragraph of Array.from(xml.getElementsByTagNameNS(WORD_NS, 'p'))) {
+      const text = Array.from(paragraph.getElementsByTagNameNS(WORD_NS, 't')).map((node) => node.textContent || '').join('');
+      let cell: Element | null = paragraph;
+      while (cell && !(cell.namespaceURI === WORD_NS && cell.localName === 'tc')) cell = cell.parentElement;
+      const cellText = cell ? Array.from(cell.getElementsByTagNameNS(WORD_NS, 't')).map((node) => node.textContent || '').join('') : text;
+      const column = /[\u0600-\u06ff]/.test(cellText) ? 'arabic' : 'english';
+      replaceDocumentText(paragraph, replacements[column]);
+    }
+    normalizePoaTextDirection(xml);
+    normalizePoaFonts(xml);
+    const output = new XMLSerializer().serializeToString(xml);
+    if (findUnresolvedPoaPlaceholder(output)) throw new Error(`A required template field remains unresolved in ${path}.`);
+    zip.file(path, output);
+  }
+  return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
 export function getPoaReplacements(values: PoaValues, column: 'english' | 'arabic') {
   const selected = {
     '$application name': values.name,
@@ -217,6 +251,49 @@ export function normalizeA4PageSize(document: Document) {
     const pageSize = getOrCreate(section, 'pgSz');
     pageSize.setAttributeNS(WORD_NS, 'w:w', '11906');
     pageSize.setAttributeNS(WORD_NS, 'w:h', '16838');
+  }
+}
+
+export function normalizePoaFonts(document: Document) {
+  const runs = Array.from(document.getElementsByTagNameNS(WORD_NS, 'r'));
+  for (const run of runs) {
+    let paragraph: Element | null = run;
+    while (paragraph && !(paragraph.namespaceURI === WORD_NS && paragraph.localName === 'p')) paragraph = paragraph.parentElement;
+    const hasArabic = /[\u0600-\u06ff]/.test(paragraph?.textContent || '');
+    const properties = getOrCreate(run, 'rPr', run.firstElementChild?.localName === 'rPr' ? run.firstElementChild : null);
+    const fonts = getOrCreate(properties, 'rFonts');
+    const font = hasArabic ? 'Times New Roman' : 'Calibri';
+    for (const attribute of ['ascii', 'hAnsi', 'cs', 'eastAsia']) fonts.setAttributeNS(WORD_NS, `w:${attribute}`, font);
+  }
+  const defaults = document.getElementsByTagNameNS(WORD_NS, 'docDefaults')[0];
+  if (defaults) {
+    const runDefault = getOrCreate(defaults, 'rPrDefault');
+    const defaultRun = getOrCreate(runDefault, 'rPr');
+    const fonts = getOrCreate(defaultRun, 'rFonts');
+    for (const attribute of ['ascii', 'hAnsi', 'cs', 'eastAsia']) fonts.setAttributeNS(WORD_NS, `w:${attribute}`, 'Calibri');
+    for (const sizeName of ['sz', 'szCs']) getOrCreate(defaultRun, sizeName).setAttributeNS(WORD_NS, 'w:val', '22');
+    const paragraphDefault = getOrCreate(defaults, 'pPrDefault');
+    const defaultParagraph = getOrCreate(paragraphDefault, 'pPr');
+    const spacing = getOrCreate(defaultParagraph, 'spacing');
+    spacing.setAttributeNS(WORD_NS, 'w:after', '200');
+    spacing.setAttributeNS(WORD_NS, 'w:line', '276');
+    spacing.setAttributeNS(WORD_NS, 'w:lineRule', 'auto');
+  }
+}
+
+export function normalizePoaTextDirection(document: Document) {
+  for (const paragraph of Array.from(document.getElementsByTagNameNS(WORD_NS, 'p'))) {
+    const rtl = /[\u0600-\u06ff]/.test(paragraph.textContent || '');
+    const properties = getOrCreate(paragraph, 'pPr', paragraph.firstElementChild?.localName === 'pPr' ? paragraph.firstElementChild : null);
+    getOrCreate(properties, 'bidi').setAttributeNS(WORD_NS, 'w:val', rtl ? '1' : '0');
+    for (const run of Array.from(paragraph.getElementsByTagNameNS(WORD_NS, 'r'))) {
+      const runProperties = getOrCreate(run, 'rPr', run.firstElementChild?.localName === 'rPr' ? run.firstElementChild : null);
+      if (rtl) getOrCreate(runProperties, 'rtl').setAttributeNS(WORD_NS, 'w:val', '1');
+      else {
+        const rtlElement = Array.from(runProperties.children).find((child) => child.namespaceURI === WORD_NS && child.localName === 'rtl');
+        rtlElement?.parentNode?.removeChild(rtlElement);
+      }
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -15,10 +15,10 @@ const ClientIdentity = createContext({ name: 'Client', email: '' });
 export const useClientIdentity = () => useContext(ClientIdentity);
 type ClientShellText = { welcome: string; back: string; controls: string; checking: string; denied: string; rights: string; service: string; logout: string; update: string; password: string };
 const shellTranslations: Record<DashboardLanguage, ClientShellText> = {
-  en: { welcome: 'Welcome,', back: 'Back to dashboard', controls: 'Dashboard controls', checking: 'Checking client access...', denied: 'Client access is required.', rights: '© AIP&T. All rights reserved.', service: 'Intellectual Property Services', logout: 'Logout', update: 'Update client information', password: 'Update password' },
-  ar: { welcome: 'مرحباً،', back: 'العودة إلى لوحة التحكم', controls: 'عناصر التحكم في لوحة المعلومات', checking: 'جارٍ التحقق من وصول العميل...', denied: 'يلزم الوصول كعميل.', rights: '© AIP&T. جميع الحقوق محفوظة.', service: 'خدمات الملكية الفكرية', logout: 'تسجيل الخروج', update: 'تحديث معلومات العميل', password: 'تحديث كلمة المرور' },
-  fil: { welcome: 'Maligayang pagdating,', back: 'Bumalik sa dashboard', controls: 'Mga kontrol ng dashboard', checking: 'Sinusuri ang access ng kliyente...', denied: 'Kinakailangan ang access ng kliyente.', rights: '© AIP&T. Nakalaan ang lahat ng karapatan.', service: 'Mga Serbisyo sa Intelektuwal na Ari-arian', logout: 'Mag-log out', update: 'I-update ang impormasyon ng kliyente', password: 'I-update ang password' },
-  zh: { welcome: '欢迎，', back: '返回仪表板', controls: '仪表板控制', checking: '正在检查客户访问权限...', denied: '需要客户访问权限。', rights: '© AIP&T. 保留所有权利。', service: '知识产权服务', logout: '退出登录', update: '更新客户信息', password: '更新密码' },
+  en: { welcome: 'Welcome,', back: 'Back to dashboard', controls: 'Dashboard controls', checking: 'Checking client access...', denied: 'Client access is required.', rights: 'Â© AIP&T. All rights reserved.', service: 'Intellectual Property Services', logout: 'Logout', update: 'Update client information', password: 'Update password' },
+  ar: { welcome: 'Ù…Ø±Ø­Ø¨Ø§Ù‹ØŒ', back: 'Ø§Ù„Ø¹ÙˆØ¯Ø© Ø¥Ù„Ù‰ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…', controls: 'Ø¹Ù†Ø§ØµØ± Ø§Ù„ØªØ­ÙƒÙ… ÙÙŠ Ù„ÙˆØ­Ø© Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª', checking: 'Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† ÙˆØµÙˆÙ„ Ø§Ù„Ø¹Ù…ÙŠÙ„...', denied: 'ÙŠÙ„Ø²Ù… Ø§Ù„ÙˆØµÙˆÙ„ ÙƒØ¹Ù…ÙŠÙ„.', rights: 'Â© AIP&T. Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø­Ù‚ÙˆÙ‚ Ù…Ø­ÙÙˆØ¸Ø©.', service: 'Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ù…Ù„ÙƒÙŠØ© Ø§Ù„ÙÙƒØ±ÙŠØ©', logout: 'ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬', update: 'ØªØ­Ø¯ÙŠØ« Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„', password: 'ØªØ­Ø¯ÙŠØ« ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±' },
+  fil: { welcome: 'Maligayang pagdating,', back: 'Bumalik sa dashboard', controls: 'Mga kontrol ng dashboard', checking: 'Sinusuri ang access ng kliyente...', denied: 'Kinakailangan ang access ng kliyente.', rights: 'Â© AIP&T. Nakalaan ang lahat ng karapatan.', service: 'Mga Serbisyo sa Intelektuwal na Ari-arian', logout: 'Mag-log out', update: 'I-update ang impormasyon ng kliyente', password: 'I-update ang password' },
+  zh: { welcome: 'æ¬¢è¿Žï¼Œ', back: 'è¿”å›žä»ªè¡¨æ¿', controls: 'ä»ªè¡¨æ¿æŽ§åˆ¶', checking: 'æ­£åœ¨æ£€æŸ¥å®¢æˆ·è®¿é—®æƒé™...', denied: 'éœ€è¦å®¢æˆ·è®¿é—®æƒé™ã€‚', rights: 'Â© AIP&T. ä¿ç•™æ‰€æœ‰æƒåˆ©ã€‚', service: 'çŸ¥è¯†äº§æƒæœåŠ¡', logout: 'é€€å‡ºç™»å½•', update: 'æ›´æ–°å®¢æˆ·ä¿¡æ¯', password: 'æ›´æ–°å¯†ç ' },
 };
 const readableDashboardRoutes: Record<string, string> = {
   '/client-dashboard/schedule-of-fees': 'schedule-of-fees',
@@ -158,3 +158,4 @@ export default function ClientShell({ children }: { children: React.ReactNode })
     </div>
   </ClientIdentity.Provider>;
 }
+

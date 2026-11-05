@@ -6,32 +6,11 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
+    "/dev/poa-preview/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
-    "/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/login/page.css",
-      "static/chunks/app/login/page.js"
-    ],
-    "/login/verify-otp/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/login/verify-otp/page.js"
-    ],
-    "/client-dashboard/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/client-dashboard/page.js"
-    ],
-    "/client-dashboard/statements/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/client-dashboard/statements/page.css",
-      "static/chunks/app/client-dashboard/statements/page.js"
+      "static/css/app/dev/poa-preview/page.css",
+      "static/chunks/app/dev/poa-preview/page.js"
     ],
     "/client-dashboard/poa/page": [
       "static/chunks/webpack.js",
@@ -43,23 +22,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/poa/translate/route.js"
-    ],
-    "/client-dashboard/requirements/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/client-dashboard/requirements/page.css",
-      "static/chunks/app/client-dashboard/requirements/page.js"
-    ],
-    "/client-dashboard/projects/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/client-dashboard/projects/page.js"
-    ],
-    "/client-dashboard/schedule-of-fees/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/client-dashboard/schedule-of-fees/page.css",
-      "static/chunks/app/client-dashboard/schedule-of-fees/page.js"
     ]
   }
 }
