@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/customer-service/layout,_N_T_/customer-service/page,_N_T_/customer-service"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/0204efa6f11fd441c9183dd75ae54d16897b5bb059e66356072d372d109b237c/$/customer-service",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/customer-service/page"
+    },
+    "isFallback": false
+  }
+}

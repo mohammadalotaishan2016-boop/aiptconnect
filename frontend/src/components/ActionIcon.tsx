@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type ActionName = 'add' | 'edit' | 'update' | 'delete' | 'view' | 'hide' | 'show' | 'pdf' | 'import' | 'export' | 'cancel' | 'download' | 'print' | 'refresh' | 'approve' | 'more';
+export type ActionName = 'add' | 'edit' | 'update' | 'delete' | 'view' | 'hide' | 'show' | 'pdf' | 'import' | 'export' | 'cancel' | 'download' | 'print' | 'refresh' | 'approve' | 'more' | 'search' | 'users';
 
 const paths: Record<ActionName, ReactNode> = {
   add: <path d="M12 5v14M5 12h14" />,
@@ -19,6 +19,8 @@ const paths: Record<ActionName, ReactNode> = {
   refresh: <><path d="M20 7a9 9 0 1 0 1 9M20 3v5h-5" /></>,
   approve: <path d="m4 12 5 5L20 6" />,
   more: <><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>,
+  search: <><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 5 5" /></>,
+  users: <><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M20 8v6m-3-3h6" /></>,
 };
 
 export default function ActionIcon({ name }: { name: ActionName }) {

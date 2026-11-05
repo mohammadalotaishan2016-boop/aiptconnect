@@ -79,6 +79,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   useEffect(() => {
     const category = readableDashboardRoutes[pathname];
     if (accessState !== 'allowed' || !category) return;
+    const warnedKey = 'aipt-client-updates-warning';
     const markRead = async () => {
       try {
         const supabase = getSupabaseBrowserClient();
@@ -93,7 +94,10 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         if (!response.ok) throw new Error(body.error || 'Unable to update read status.');
         window.dispatchEvent(new CustomEvent('aipt-client-dashboard-update-read', { detail: category }));
       } catch (cause) {
-        console.error('Could not save the client dashboard read status:', cause);
+        if (!window.sessionStorage.getItem(warnedKey)) {
+          window.sessionStorage.setItem(warnedKey, '1');
+          console.warn('Could not save the client dashboard read status:', cause);
+        }
       }
     };
     void markRead();

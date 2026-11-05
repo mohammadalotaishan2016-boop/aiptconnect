@@ -1,0 +1,14 @@
+﻿ m aiptconnect
+ M backend/supabase/functions/company-registration/index.ts
+ M frontend/app/clients.css
+ M frontend/app/clients/page.tsx
+ M frontend/app/management-workspace.css
+ M frontend/app/users/page.tsx
+ M frontend/src/components/ActionIcon.tsx
+ M frontend/src/components/AdminSidebar.tsx
+ M frontend/src/components/InviteClientUserModal.tsx
+ M frontend/tsconfig.tsbuildinfo
+ M supabase/.temp/cli-latest
+?? project-tracking/
+?? supabase/config.toml
+?? supabase/functions/

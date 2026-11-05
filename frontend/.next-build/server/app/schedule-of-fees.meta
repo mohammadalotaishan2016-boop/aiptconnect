@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/schedule-of-fees/layout,_N_T_/schedule-of-fees/page,_N_T_/schedule-of-fees"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/f683db9e94728221fca828d238adfebea3688b908ba9810a73e7bd40b653756e/$/schedule-of-fees",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/schedule-of-fees/page"
+    },
+    "isFallback": false
+  }
+}

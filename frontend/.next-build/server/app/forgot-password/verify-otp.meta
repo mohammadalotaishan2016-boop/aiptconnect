@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/forgot-password/layout,_N_T_/forgot-password/verify-otp/layout,_N_T_/forgot-password/verify-otp/page,_N_T_/forgot-password/verify-otp"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/8f0ebd5995b38f75f3c711188a065e42285de3c8bfef1180767fd14d1c9e45b0/$/forgot-password/verify-otp",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/forgot-password/verify-otp/page"
+    },
+    "isFallback": false
+  }
+}

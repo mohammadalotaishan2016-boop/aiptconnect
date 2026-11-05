@@ -1,6 +1,7 @@
 'use client';
 import DataTransfer from '../../src/components/DataTransfer';
 import ActionIcon from '../../src/components/ActionIcon';
+import InviteClientUserModal from '../../src/components/InviteClientUserModal';
 
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,6 +16,7 @@ type User = {
   deletion_policy?: 'non_admin_only';
   profile_import_supported?: boolean;
   client_id?: string | null;
+  client_assigned_id?: string | null;
   email: string;
   full_name: string;
   company_name: string;
@@ -34,7 +36,6 @@ type Tab =
   | 'admins'
   | 'pending'
   | 'approved'
-  | 'rejected'
   | 'suspended'
   | 'active'
   | 'inactive'
@@ -54,7 +55,7 @@ export default function UsersPage() {
     [sort, setSort] = useState<'name' | 'email' | 'status' | 'last' | 'company' | 'registered'>('name'),
     [ascending, setAscending] = useState(true),
     [page, setPage] = useState(1),
-    [pageSize, setPageSize] = useState(10),
+    [pageSize, setPageSize] = useState(50),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
@@ -68,6 +69,7 @@ export default function UsersPage() {
   const [accountFilter, setAccountFilter] = useState('');
   const [securityFilter, setSecurityFilter] = useState('');
   const [reviewUser, setReviewUser] = useState<User | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -111,7 +113,6 @@ export default function UsersPage() {
             (tab === 'admins' && user.role === 'administrator') ||
             (tab === 'pending' && user.approval_status === 'pending') ||
             (tab === 'approved' && user.approval_status === 'approved') ||
-            (tab === 'rejected' && user.approval_status === 'rejected') ||
             (tab === 'suspended' && user.approval_status === 'suspended') ||
             (tab === 'active' && user.account_status === 'active') ||
             (tab === 'inactive' && user.account_status === 'inactive') ||
@@ -266,6 +267,11 @@ export default function UsersPage() {
       {label} ({count})
     </button>
   );
+  const stats = [
+    ['Total users', users.length, 'view'], ['Active', users.filter((user) => user.account_status === 'active').length, 'approve'],
+    ['Deactivated', users.filter((user) => user.account_status === 'inactive').length, 'cancel'], ['Suspended', users.filter((user) => user.approval_status === 'suspended').length, 'hide'],
+    ['Pending approval', users.filter((user) => user.approval_status === 'pending').length, 'view'], ['Approved', users.filter((user) => user.approval_status === 'approved').length, 'approve'], ['Locked', users.filter((user) => user.locked).length, 'hide'],
+  ] as const;
   return (
     <main className="procedure-page users-page">
       <section>
@@ -280,11 +286,12 @@ export default function UsersPage() {
         </header>
         <div className="countries-heading">
           <div>
-            <h1>Users</h1>
+            <h1><span className="users-title-icon" aria-hidden="true"><ActionIcon name="view" /></span>Users</h1>
             <p>Review client access, approvals, and account security.</p>
           </div>
-          <div className="users-heading-actions"><button type="button" className="client-refresh" onClick={() => void load()} disabled={loading} data-action="refresh" title="Refresh"><ActionIcon name="refresh" /><span className="aipt-action-label">Refresh</span></button></div>
+          <div className="users-heading-actions"><a href="/clients" className="users-primary-link">Client List</a><button type="button" className="users-primary-link" onClick={() => setInviteOpen(true)}>Invite Client</button><button type="button" className="client-refresh" onClick={() => void load()} disabled={loading} data-action="refresh" title="Refresh"><ActionIcon name="refresh" /><span className="aipt-action-label">{loading ? 'Refreshing…' : 'Refresh'}</span></button></div>
         </div>
+        <section className="users-stat-grid" aria-label="User account summary">{stats.map(([label, count, icon]) => <article className="users-stat-card" key={label}><span className="users-stat-icon" aria-hidden="true"><ActionIcon name={icon} /></span><div><span>{label}</span><b>{count}</b></div></article>)}</section>
         {notice && (
           <div className="country-toast">
             {notice}
@@ -292,7 +299,6 @@ export default function UsersPage() {
           </div>
         )}
         {error && <p className="country-page-error">{error}</p>}
-        {users.some((user) => user.role !== 'administrator' && (!user.deletion_supported || user.deletion_policy !== 'non_admin_only')) && <p role="status">Delete actions will be available after the updated Users service is deployed.</p>}
         <section className="country-table-card">
           <nav className="statement-tabs" aria-label="User filters">
             {tabButton('all', 'All users', users.length)}
@@ -317,7 +323,6 @@ export default function UsersPage() {
               users.filter((user) => user.approval_status === 'approved')
                 .length,
             )}
-            {tabButton('rejected', 'Rejected', users.filter((user) => user.approval_status === 'rejected').length)}
             {tabButton('suspended', 'Suspended', users.filter((user) => user.approval_status === 'suspended').length)}
             {tabButton(
               'active',
@@ -336,8 +341,8 @@ export default function UsersPage() {
             )}
           </nav>
           <div className="users-toolbar">
-            <label>
-              Search{' '}
+            <label className="users-search-field" aria-label="Search users">
+              <ActionIcon name="view" />
               <input
                 value={query}
                 onChange={(event) => {
@@ -350,56 +355,44 @@ export default function UsersPage() {
             <select aria-label="Filter by role" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}><option value="">All roles</option>{[...new Set(users.map((user) => user.role))].map((role) => <option key={role} value={role}>{role}</option>)}</select>
             <select aria-label="Filter by account" value={accountFilter} onChange={(e) => { setAccountFilter(e.target.value); setPage(1); }}><option value="">All accounts</option><option value="active">Active</option><option value="inactive">Deactivated</option></select>
             <select aria-label="Filter by security" value={securityFilter} onChange={(e) => { setSecurityFilter(e.target.value); setPage(1); }}><option value="">Any security state</option><option value="locked">Locked</option><option value="unlocked">Unlocked</option></select>
-            <button type="button" onClick={() => { setQuery(''); setTab('all'); setRoleFilter(''); setAccountFilter(''); setSecurityFilter(''); setPage(1); }}>Reset</button><span>{visible.length} users</span>
+            <button type="button" onClick={() => { setQuery(''); setTab('all'); setRoleFilter(''); setAccountFilter(''); setSecurityFilter(''); setPage(1); }}><ActionIcon name="refresh" /> Reset</button><span>{visible.length} users</span>
           </div>
-          <div className="data-toolbar"><p>Excel import updates names for existing users. IDs, emails, roles and access decisions are read-only.</p><DataTransfer title="Users" columns={transferColumns} getRows={userExport} validateImport={validateUserImport} onImport={importUsers} disabled={loading || Boolean(busy)} /></div>
+          <div className="data-toolbar"><DataTransfer title="Users" columns={transferColumns} getRows={userExport} validateImport={validateUserImport} onImport={importUsers} disabled={loading || Boolean(busy)} /></div>
           <div className="country-table-wrap">
             <table className="users-table">
               <thead>
                 <tr>
-                  <th>Logo</th>
+                  <th>#</th>
                   <th>{heading('Full name', 'name')}</th>
+                  <th>Assigned No.</th>
                   <th>{heading('Company', 'company')}</th>
-                  <th>{heading('Email', 'email')}</th>
-                  <th>IP address</th>
-                  <th>{heading('Approval', 'status')}</th>
-                  <th>{heading('Registered', 'registered')}</th>
-                  <th>Account</th>
-                  <th>Security</th>
-                  <th>{heading('Last login', 'last')}</th>
+                  <th>Department</th>
+                  <th>Role/Position</th>
+                  <th>{heading('Status', 'status')}</th>
+                  <th>Account Status</th>
+                  <th>{heading('Last Login', 'last')}</th>
                   <th aria-label="Actions"><ActionIcon name="more" /></th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={11} className="country-state">
+                    <td colSpan={10} className="country-state">
                       Loading users...
                     </td>
                   </tr>
                 ) : rows.length ? (
-                  rows.map((user) => (
+                  rows.map((user, rowIndex) => (
                     <tr key={user.id}>
+                      <td>{(page - 1) * pageSize + rowIndex + 1}</td>
                       <td>
-                        {user.logo_url ? (
-                          <img
-                            className="user-logo"
-                            src={user.logo_url}
-                            alt=""
-                          />
-                        ) : (
-                          <span className="user-logo-placeholder">
-                            {user.full_name.slice(0, 1).toUpperCase() || '?'}
-                          </span>
-                        )}
-                      </td>
-                      <td>
+                        {user.logo_url ? <img className="user-logo" src={user.logo_url} alt="" /> : <span className="user-logo-placeholder">{user.full_name.slice(0, 1).toUpperCase() || '?'}</span>}
                         <b>{user.full_name || 'Unnamed user'}</b>
-                        <small>{user.role}</small>
                       </td>
+                      <td>{user.client_assigned_id || '-'}</td>
                       <td>{user.company_name || '-'}</td>
-                      <td>{user.email}</td>
-                      <td>{user.ip}</td>
+                      <td>-</td>
+                      <td>{user.role}</td>
                       <td>
                         <span
                           className={`statement-status ${user.approval_status}`}
@@ -407,7 +400,6 @@ export default function UsersPage() {
                           {user.approval_status === 'pending' ? 'Need approval' : user.approval_status[0].toUpperCase() + user.approval_status.slice(1)}
                         </span>
                       </td>
-                      <td>{formatDate(user.registration_date)}</td>
                       <td>
                         <span
                           className={`user-account-status ${user.account_status}`}
@@ -417,16 +409,9 @@ export default function UsersPage() {
                             : 'Deactivated'}
                         </span>
                       </td>
-                      <td>
-                        {user.locked ? (
-                          <span className="user-locked">Locked</span>
-                        ) : (
-                          `${user.failed_login_attempts}/5 attempts`
-                        )}
-                      </td>
                       <td>{formatDate(user.last_login_at)}</td>
                       <td>
-                        <details className="user-action-menu"><summary>Manage <span aria-hidden="true">⌄</span></summary><fieldset disabled={Boolean(busy)}>
+                        <details className="user-action-menu"><summary aria-label={`Manage ${user.full_name || user.email}`}>Manage <span aria-hidden="true">⌄</span></summary><fieldset disabled={Boolean(busy)}>
                           <div className="user-actions">
                           <button type="button" onClick={() => setReviewUser(user)}>Review</button>
                           {user.role !== 'administrator' && <button type="button" disabled={Boolean(busy) || !user.deletion_supported || user.deletion_policy !== 'non_admin_only' || !currentUserId || user.id === currentUserId} onClick={() => { setDeleteUser(user); setForceDelete(true); setConfirmEmail(''); setDeleteError(''); }}><ActionIcon name="delete" />Force Delete</button>}
@@ -496,7 +481,7 @@ export default function UsersPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={11} className="country-state">
+                    <td colSpan={10} className="country-state">
                       No users match this filter.
                     </td>
                   </tr>
@@ -519,9 +504,9 @@ export default function UsersPage() {
                   setPage(1);
                 }}
               >
-                <option>10</option>
-                <option>25</option>
                 <option>50</option>
+                <option>25</option>
+                <option>10</option>
               </select>
             </label>
             <div>
@@ -553,6 +538,7 @@ export default function UsersPage() {
         <div className="user-actions"><button type="button" disabled={Boolean(busy)} onClick={() => setDeleteUser(null)}>Cancel</button><button type="button" disabled={Boolean(busy) || confirmEmail !== deleteUser.email} onClick={() => void removeUser()}>{busy ? 'Deleting…' : forceDelete ? 'Force Delete' : 'Delete'}</button></div>
       </section></div>}
       {reviewUser && <div className="company-verify-backdrop" onMouseDown={() => setReviewUser(null)}><section className="company-verify-modal" role="dialog" aria-modal="true" aria-labelledby="review-user-title" onMouseDown={(event) => event.stopPropagation()}><button type="button" className="company-verify-close" onClick={() => setReviewUser(null)} aria-label="Close">×</button><span>ACCOUNT REVIEW</span><h2 id="review-user-title">{reviewUser.full_name || 'Unnamed user'}</h2><p><b>Email:</b> {reviewUser.email}</p><p><b>Company:</b> {reviewUser.company_name || '-'}</p><p><b>Registration:</b> {formatDate(reviewUser.registration_date)}</p><p><b>Status:</b> {reviewUser.approval_status}</p><div className="user-actions">{reviewUser.approval_status !== 'approved' && <button onClick={() => { setReviewUser(null); void action(reviewUser, { approval_status: 'approved' }, 'User approved.'); }} data-action="approve" title="Approve"><ActionIcon name="approve" /><span className="aipt-action-label">Approve</span></button>}{reviewUser.approval_status !== 'rejected' && <button onClick={() => { setReviewUser(null); void action(reviewUser, { approval_status: 'rejected' }, 'User rejected.'); }}>Reject</button>}<button type="button" onClick={() => setReviewUser(null)} data-action="cancel" title="Close"><ActionIcon name="cancel" /><span className="aipt-action-label">Close</span></button></div></section></div>}
+      {inviteOpen && <InviteClientUserModal onClose={() => setInviteOpen(false)} onSent={(message) => { setNotice(message); void load(); }} />}
     </main>
   );
 }

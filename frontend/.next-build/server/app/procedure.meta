@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/procedure/layout,_N_T_/procedure/page,_N_T_/procedure"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/80e1ead872bb8a033e885f059e92c661aa3094dc8c3560787ce0d2f8552f299a/$/procedure",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/procedure/page"
+    },
+    "isFallback": false
+  }
+}

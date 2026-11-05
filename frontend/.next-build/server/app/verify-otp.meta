@@ -1,0 +1,17 @@
+{
+  "status": 307,
+  "headers": {
+    "location": "/register",
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/verify-otp/layout,_N_T_/verify-otp/page,_N_T_/verify-otp"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/2931d1e8915e77e7a4ce6aab853ca0a7acb8164abf5329badaf5ba2cefced518/$/verify-otp",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/verify-otp/page"
+    },
+    "isFallback": false
+  }
+}

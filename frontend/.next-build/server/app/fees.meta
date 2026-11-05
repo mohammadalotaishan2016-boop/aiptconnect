@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/fees/layout,_N_T_/fees/page,_N_T_/fees"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/798776be5356ea26f9b0fdf57053e170a70c9c7b4bf028f1ec8930741f666d55/$/fees",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/fees/page"
+    },
+    "isFallback": false
+  }
+}

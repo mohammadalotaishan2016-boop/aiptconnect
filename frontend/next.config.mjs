@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: process.cwd(),
   distDir: process.env.AIPT_NEXT_DIST_DIR || '.next',
   async headers() {
     return [{

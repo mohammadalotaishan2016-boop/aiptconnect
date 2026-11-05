@@ -1,249 +1,161 @@
 'use client';
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchSupabaseFunction } from '../../../src/lib/supabase/browser';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import JSZip from 'jszip';
+import { renderAsync } from 'docx-preview';
+import { fetchSupabaseFunction, getActiveSession } from '../../../src/lib/supabase/browser';
+import { getPoaArabicCountryName, translatePoaServicesToArabic } from '../../../src/lib/poa-arabic';
+import { useAutoArabic } from '../../../src/lib/useAutoArabic';
+import { inferPoaColumn, paragraphAlignment, preparePoaDirection, replaceDocumentText, findUnresolvedPoaPlaceholder, type PoaTemplateId, type PoaValues } from '../../../src/lib/poa-docx';
 import './poa.css';
-import '../client-documents.css';
 
-type Country = { id: string; name: string; abbreviation: string; flag_url: string | null };
-type POADocument = {
-  id: string;
-  key: string;
-  countries: Country[];
-  document_name: string;
-  last_modified: string | null;
-  aws_metadata: { size_bytes: number | null; etag: string | null; storage_class: string | null; last_modified: string | null } | null;
-};
-type POAResponse = { data: POADocument[]; countries: Country[] };
+type Country = { id: string; name: string; abbreviation: string };
+type Template = { id: PoaTemplateId; label: string; filename: string; path: string };
 
-const PAGE_SIZE = 12;
+const templates: Template[] = [
+  { id: 'apostille', label: 'GPOA Apostille', filename: 'GPOAApostil .docx', path: '/templates/GPOAApostil%20.docx' },
+  { id: 'simply-signed', label: 'GPOA Simply Signed', filename: 'GPOA - Simply Signed.docx', path: '/templates/GPOA%20-%20Simply%20Signed.docx' },
+];
+const services = ['Registration', 'Renewal', 'Recording of change of name or change of address', 'Assignment', 'Licensing or licensing cancellation of trademarks', 'Goods limitation', 'Amendment of the trademark logo', 'Cancellation of trademarks', 'Goods cancellation', 'Protection of trademarks, patents, industrial designs and copyrights', 'Concessions'];
+const w = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
-function formatFileSize(size: number | null | undefined) {
-  if (size == null || !Number.isFinite(size) || size < 0) return '';
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+function ensureWordElement(document: Document, parent: Element, name: string) {
+  let element = Array.from(parent.children).find((child) => child.namespaceURI === w && child.localName === name);
+  if (!element) { element = document.createElementNS(w, `w:${name}`); parent.insertBefore(element, parent.firstElementChild); }
+  return element;
 }
 
-function formatUpdatedDate(value: string | null | undefined) {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(date);
-}
-
-async function getDownloadUrl(item: POADocument) {
-  const parameter = item.id.startsWith('legacy:') ? `key=${encodeURIComponent(item.key)}` : `id=${encodeURIComponent(item.id)}`;
-  const response = await fetchSupabaseFunction(`poa?${parameter}`);
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw Error(body.error || 'Unable to prepare this download.');
-  if (typeof body.url !== 'string') throw Error('The POA download service returned an invalid link.');
-  return body.url;
-}
-
-function triggerDownload(url: string) {
-  const link = document.createElement('a');
-  link.href = url;
-  link.rel = 'noopener';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
+function setWordValue(element: Element, value: string) { element.setAttributeNS(w, 'w:val', value); }
 
 function ClientPoaPage() {
-  const [documents, setDocuments] = useState<POADocument[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
-  const [countryFilter, setCountryFilter] = useState('');
-  const [appliedCountry, setAppliedCountry] = useState('');
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadingId, setDownloadingId] = useState('');
+  const [loadingCountries, setLoadingCountries] = useState(true);
+  const [countryError, setCountryError] = useState('');
+  const [applicantName, setApplicantName] = useState('');
+  const [applicantAddress, setApplicantAddress] = useState('');
+  const nameTranslation = useAutoArabic(applicantName, 'name');
+  const addressTranslation = useAutoArabic(applicantAddress, 'address');
+  const nameArabic = nameTranslation.arabic;
+  const addressArabic = addressTranslation.arabic;
+  const [editingArabicName, setEditingArabicName] = useState(false);
+  const [editingArabicAddress, setEditingArabicAddress] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [countrySearch, setCountrySearch] = useState('');
+  const [templateId, setTemplateId] = useState<PoaTemplateId>('apostille');
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState('');
-  const [downloadStatus, setDownloadStatus] = useState('');
-  const [preview, setPreview] = useState<{ item: POADocument; left: number; top: number } | null>(null);
-  const previewTimer = useRef<number | null>(null);
-
-  const loadDocuments = useCallback(async (signal: AbortSignal) => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await fetchSupabaseFunction('poa', { signal });
-      const body = await response.json().catch(() => ({})) as Partial<POAResponse> & { error?: string };
-      if (!response.ok) throw Error(body.error || 'Unable to load POA documents.');
-      if (!Array.isArray(body.data) || !Array.isArray(body.countries)) throw Error('The POA document service returned an invalid response.');
-      setDocuments(body.data);
-      setCountries([...new Map([...body.countries, ...body.data.flatMap(({ countries: linked }) => linked)].map(country => [country.id, country])).values()]);
-    } catch (cause) {
-      if (!signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to load POA documents.');
-    } finally {
-      if (!signal.aborted) setLoading(false);
-    }
-  }, []);
+  const [generatedBlob, setGeneratedBlob] = useState<Blob | null>(null);
+  const [zoom, setZoom] = useState(100);
+  const [generating, setGenerating] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState('');
+  const templateBuffer = useRef<ArrayBuffer | null>(null);
+  const documentRef = useRef<HTMLDivElement>(null);
+  const stylesRef = useRef<HTMLDivElement>(null);
+  const arabicNameRef = useRef<HTMLInputElement>(null);
+  const arabicAddressRef = useRef<HTMLTextAreaElement>(null);
+  const renderToken = useRef(0);
+  const currentTemplate = templates.find((item) => item.id === templateId)!;
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadDocuments(controller.signal);
+    void (async () => {
+      setLoadingCountries(true);
+      try {
+        const response = await fetchSupabaseFunction('poa', { signal: controller.signal });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(body.countries)) throw Error(body.error || 'Unable to load countries for your account.');
+        setCountries(body.countries);
+      } catch (cause) { if (!controller.signal.aborted) setCountryError(cause instanceof Error ? cause.message : 'Unable to load countries.'); }
+      finally { if (!controller.signal.aborted) setLoadingCountries(false); }
+    })();
     return () => controller.abort();
-  }, [loadDocuments]);
-  useEffect(() => () => {
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
   }, []);
+
   useEffect(() => {
-    if (!preview) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPreview(null);
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [preview]);
+    let active = true;
+    templateBuffer.current = null;
+    setGeneratedBlob(null);
+    void fetch(currentTemplate.path).then((response) => {
+      if (!response.ok) throw Error(`Could not load ${currentTemplate.filename}.`);
+      return response.arrayBuffer();
+    }).then((buffer) => { if (active) { templateBuffer.current = buffer; setError(''); } })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Unable to load the POA template.'); });
+    return () => { active = false; };
+  }, [currentTemplate]);
 
-  const filteredDocuments = useMemo(() => documents
-    .filter(({ countries: linked }) => !appliedCountry || linked.some(country =>
-      country.id === 'shared-all' || country.id === appliedCountry || country.name.trim().toLowerCase() === 'all countries'
-    ))
-    .sort((a, b) => a.document_name.localeCompare(b.document_name)), [documents, appliedCountry]);
-  const pageCount = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount);
-  const visibleDocuments = filteredDocuments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const filteredCountries = useMemo(() => countries.filter((country) => country.name.toLowerCase().includes(countrySearch.trim().toLowerCase())), [countries, countrySearch]);
+  const required = [!applicantName.trim() && 'Applicant Name', !applicantAddress.trim() && 'Applicant Address', !selectedServices.length && 'Services', !selectedCountries.length && 'Countries'].filter(Boolean) as string[];
+  const arabicServices = selectedServices.length ? translatePoaServicesToArabic(selectedServices) : '';
+  const arabicCountries = selectedCountries.length ? countries.filter((item) => selectedCountries.includes(item.id)).map((item) => getPoaArabicCountryName(item.abbreviation)).join('، ') : '';
+  const arabicValuesReady = Boolean(nameArabic.trim() && addressArabic.trim() && arabicServices.trim() && arabicCountries.trim());
+  const translationsBusy = ['pending', 'loading'].includes(nameTranslation.status) || ['pending', 'loading'].includes(addressTranslation.status);
+  const ready = !required.length && confirmed && arabicValuesReady && !translationsBusy && Boolean(templateBuffer.current) && !loadingCountries && !generating;
+  const toggle = (items: string[], value: string, setter: (value: string[]) => void) => setter(items.includes(value) ? items.filter((item) => item !== value) : [...items, value]);
 
-  const applyFilter = (event: FormEvent) => {
-    event.preventDefault();
-    setAppliedCountry(countryFilter);
-    setPage(1);
-  };
-
-  const downloadOne = async (item: POADocument) => {
-    if (downloading || downloadingId) return;
-    setError('');
-    setDownloadStatus('');
-    setDownloadingId(item.id);
+  const generate = async () => {
+    if (!templateBuffer.current) { setError('The selected POA template is still loading.'); return; }
+    if (required.length) { setError(`Complete the required fields: ${required.join(', ')}.`); return; }
+    if (!confirmed) { setError('Confirm that the applicant details are correct before generating the POA.'); return; }
+    setGenerating(true); setError(''); setGeneratedBlob(null);
     try {
-      triggerDownload(await getDownloadUrl(item));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to download this POA document.');
-    } finally {
-      setDownloadingId('');
-    }
+      const zip = await JSZip.loadAsync(templateBuffer.current);
+      const values: PoaValues = { name: applicantName.trim(), address: applicantAddress.trim(), services: selectedServices.join(', '), countries: countries.filter((item) => selectedCountries.includes(item.id)).map((item) => item.name).join(', ') };
+      const arabic: PoaValues = { name: nameArabic.trim(), address: addressArabic.trim(), services: translatePoaServicesToArabic(selectedServices), countries: countries.filter((item) => selectedCountries.includes(item.id)).map((item) => getPoaArabicCountryName(item.abbreviation)).join('، ') };
+      const xmlFiles = Object.keys(zip.files).filter((path) => /^word\/.*\.xml$/.test(path));
+      for (const path of xmlFiles) {
+        const file = zip.file(path); if (!file) continue;
+        const xml = new DOMParser().parseFromString(await file.async('text'), 'application/xml');
+        if (xml.getElementsByTagName('parsererror').length) throw Error(`Invalid template XML: ${path}`);
+        preparePoaDirection(xml, templateId);
+        for (const paragraph of Array.from(xml.getElementsByTagNameNS(w, 'p'))) {
+          const text = Array.from(paragraph.getElementsByTagNameNS(w, 't')).map((node) => node.textContent || '').join('');
+          const column = inferPoaColumn(text);
+          const replacements = column === 'arabic' ? arabic : values;
+          replaceDocumentText(paragraph, replacements);
+          setWordValue(ensureWordElement(xml, paragraph, 'jc'), paragraphAlignment(templateId, text, column));
+        }
+        const output = new XMLSerializer().serializeToString(xml);
+        if (findUnresolvedPoaPlaceholder(output)) throw Error(`A required template field remains unresolved in ${path}.`);
+        zip.file(path, output);
+      }
+      setGeneratedBlob(await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to generate the POA document.'); }
+    finally { setGenerating(false); }
   };
 
-  const showPreview = (item: POADocument, row: HTMLTableRowElement) => {
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-    const bounds = row.getBoundingClientRect();
-    const width = Math.min(350, window.innerWidth - 24);
-    const left = Math.max(12, Math.min(bounds.left, window.innerWidth - width - 12));
-    const top = Math.max(12, Math.min(bounds.top, window.innerHeight - 250));
-    setPreview({ item, left, top });
-  };
+  useEffect(() => {
+    if (!generatedBlob || !documentRef.current || !stylesRef.current) return;
+    let active = true;
+    const target = documentRef.current; const styles = stylesRef.current;
+    setRendering(true); setRenderError('');
+    void renderAsync(generatedBlob, target, styles, { inWrapper: true, hideWrapperOnPrint: false, ignoreWidth: false, ignoreHeight: false, ignoreFonts: false, breakPages: true, experimental: false, renderHeaders: false, renderFooters: false })
+      .then(() => { if (active) target.setAttribute('data-rendered', 'true'); })
+      .catch((cause) => { if (active) setRenderError(cause instanceof Error ? cause.message : 'Unable to preview the generated document.'); })
+      .finally(() => { if (active) setRendering(false); });
+    return () => { active = false; target.replaceChildren(); styles.replaceChildren(); };
+  }, [generatedBlob]);
 
-  const schedulePreviewClose = () => {
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-    previewTimer.current = window.setTimeout(() => setPreview(null), 160);
-  };
+  const download = () => { if (!generatedBlob) return; const url = URL.createObjectURL(generatedBlob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `POA-${applicantName.trim().replace(/[^a-z0-9-_]+/gi, '-')}.docx`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); };
+  const reset = () => { setApplicantName(''); setApplicantAddress(''); nameTranslation.onEdit(''); addressTranslation.onEdit(''); setSelectedServices([]); setSelectedCountries([]); setConfirmed(false); setError(''); setGeneratedBlob(null); };
 
-  const keepPreviewOpen = () => {
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-  };
-
-  const openDocument = async (item: POADocument) => {
-    setPreview(null);
-    setError('');
-    try {
-      const url = await getDownloadUrl(item);
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to open this POA document.');
-    }
-  };
-
-  const downloadAllDocuments = async () => {
-    if (!filteredDocuments.length || downloading || downloadingId) return;
-    setError('');
-    setDownloadStatus(`Preparing ${filteredDocuments.length} document${filteredDocuments.length === 1 ? '' : 's'}...`);
-    setDownloading(true);
-    try {
-      const urls = await Promise.all(filteredDocuments.map(getDownloadUrl));
-      urls.forEach(triggerDownload);
-      setDownloadStatus(`Started ${urls.length} document download${urls.length === 1 ? '' : 's'}.`);
-    } catch (cause) {
-      setDownloadStatus('');
-      setError(cause instanceof Error ? cause.message : 'Unable to prepare the POA PDF downloads.');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  return <main className="poa-page client-poa-page">
-    <div className="poa-title"><span aria-hidden="true" className="poa-title-icon"><svg viewBox="0 0 24 24"><path d="M5 2h10l5 5v15H5z"/><path d="M14 2v6h6M8 12h8M8 16h8"/></svg></span><h1>POA</h1></div>
-    <section className="poa-filter-panel" aria-label="Filter POA documents">
-      <form onSubmit={applyFilter}>
-        <label htmlFor="poa-country">Country <span aria-hidden="true">*</span></label>
-        <div className="poa-filter-controls">
-          <select id="poa-country" value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)} disabled={loading}>
-            <option value="">Select Country</option>
-            {countries.map((country) => <option key={country.id} value={country.id}>{country.name}</option>)}
-          </select>
-          <button type="submit" disabled={loading} className="poa-search-button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 5 5"/></svg>Search</button>
-        </div>
-      </form>
+  return <main className="poa-page client-poa-page"><div className="poa-generator-grid">
+    <section className="poa-generator-form-panel" aria-label="POA application form">
+      <section className="poa-choice-section poa-applicant-card"><div className="poa-section-heading"><span aria-hidden="true">♙</span><h1>Applicant</h1></div><div className="poa-applicant-fields">
+        <div className="poa-applicant-field"><label>Applicant Name <b>*</b><input value={applicantName} onChange={(event) => { setApplicantName(event.target.value); setGeneratedBlob(null); }} placeholder="Enter applicant or company name" /></label>{applicantName.trim() && <span className="poa-complete" role="status">✓ Applicant Name completed: {applicantName.trim()}</span>}<label className="poa-arabic-field">Applicant Name (Arabic)<div className="poa-arabic-edit-row"><input ref={arabicNameRef} dir="rtl" lang="ar" style={{ textAlign: 'right', unicodeBidi: 'plaintext' }} value={nameArabic} readOnly={!editingArabicName} onChange={(event) => { setNameArabic(event.target.value); setGeneratedBlob(null); }} placeholder="Arabic applicant name" /><button type="button" onClick={() => { setEditingArabicName((value) => !value); if (!editingArabicName) requestAnimationFrame(() => arabicNameRef.current?.focus()); }}>{editingArabicName ? 'Done' : 'Edit'}</button></div></label></div>
+        <div className="poa-applicant-field"><label>Applicant Address <b>*</b><textarea value={applicantAddress} onChange={(event) => { setApplicantAddress(event.target.value); setGeneratedBlob(null); }} placeholder="Enter complete applicant address..." /></label>{applicantAddress.trim() && <span className="poa-complete" role="status">✓ Applicant Address completed: {applicantAddress.trim()}</span>}<label className="poa-arabic-field">Applicant Address (Arabic)<div className="poa-arabic-edit-row"><textarea ref={arabicAddressRef} dir="rtl" lang="ar" style={{ textAlign: 'right', unicodeBidi: 'plaintext' }} value={addressArabic} readOnly={!editingArabicAddress} onChange={(event) => { setAddressArabic(event.target.value); setGeneratedBlob(null); }} placeholder="Arabic applicant address" /><button type="button" onClick={() => { setEditingArabicAddress((value) => !value); if (!editingArabicAddress) requestAnimationFrame(() => arabicAddressRef.current?.focus()); }}>{editingArabicAddress ? 'Done' : 'Edit'}</button></div></label></div>
+      </div></section>
+      <section className="poa-choice-section"><div className="poa-section-heading"><span aria-hidden="true">⚙</span><h2>Services</h2><button type="button" onClick={() => setSelectedServices(selectedServices.length === services.length ? [] : [...services])}>{selectedServices.length === services.length ? 'Clear All' : 'Select All'}</button></div><div className="poa-check-grid">{services.map((service) => <label key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggle(selectedServices, service, setSelectedServices)} />{service}</label>)}</div>{selectedServices.length > 0 && <p className="poa-complete poa-choice-complete" role="status">✓ Services selected: {selectedServices.join(', ')}</p>}</section>
+      <section className="poa-choice-section"><div className="poa-section-heading"><span aria-hidden="true">◎</span><h2>Countries</h2><button type="button" disabled={!countries.length} onClick={() => setSelectedCountries(selectedCountries.length === countries.length ? [] : countries.map((country) => country.id))}>{selectedCountries.length === countries.length && countries.length ? 'Clear All' : 'Select All'}</button></div><input className="poa-country-search" value={countrySearch} onChange={(event) => setCountrySearch(event.target.value)} placeholder="Search countries" aria-label="Search countries" /><div className="poa-check-grid poa-country-grid">{loadingCountries ? <span className="poa-no-countries">Loading available countries...</span> : filteredCountries.map((country) => <label key={country.id}><input type="checkbox" checked={selectedCountries.includes(country.id)} onChange={() => toggle(selectedCountries, country.id, setSelectedCountries)} />{country.name}</label>)}{!loadingCountries && !filteredCountries.length && <span className="poa-no-countries">{countryError || 'No countries available for your account.'}</span>}</div>{selectedCountries.length > 0 && <p className="poa-complete poa-choice-complete" role="status">✓ Countries selected: {countries.filter((item) => selectedCountries.includes(item.id)).map((item) => item.name).join(', ')}</p>}</section>
+      <section className="poa-choice-section"><div className="poa-section-heading"><span aria-hidden="true">⚖</span><h2>Type of POA</h2></div><div className="poa-type-options">{templates.map((template) => <label className={templateId === template.id ? 'selected' : ''} key={template.id}><input type="radio" name="poa-type" checked={templateId === template.id} onChange={() => { setTemplateId(template.id); setGeneratedBlob(null); }} /><span className={`poa-layout-icon ${template.id}`} aria-hidden="true"><i>EN</i>{template.id === 'apostille' && <i>AR</i>}</span><span><strong>{template.label}</strong><small>{template.id === 'apostille' ? 'English + Arabic' : 'English document'}</small></span></label>)}</div></section>
+      <label className="poa-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />I confirm that all fields are filled correctly.</label>
+      <div className="poa-form-actions"><button type="button" disabled={!ready} onClick={() => void generate()}>{generating ? 'Generating...' : 'Generate POA'}</button><button type="button" onClick={reset}>Reset</button></div>
+      {!ready && !error && <p className="poa-required-hint">Required: {[...required, !confirmed && 'confirmation', !templateBuffer.current && 'template'].filter(Boolean).join(', ')}</p>}
+      {countryError && <p className="poa-error" role="alert">{countryError}</p>}{error && <p className="poa-error" role="alert">{error}</p>}
     </section>
-
-    <section className="poa-results-panel" aria-label="POA documents">
-      <div className="poa-results-toolbar">
-        <span className="poa-results-count">{filteredDocuments.length} {filteredDocuments.length === 1 ? 'document' : 'documents'}{downloadStatus && <span className="poa-download-status" role="status">{downloadStatus}</span>}</span>
-        <button type="button" className="poa-download-all" onClick={downloadAllDocuments} disabled={loading || downloading || filteredDocuments.length === 0}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg>
-          {downloading ? 'Preparing downloads...' : 'Download All Documents'}
-        </button>
-      </div>
-
-      {error && <p className="poa-error" role="alert">{error}</p>}
-      <div className="poa-table-wrap">
-        <table className="poa-table">
-          <caption className="poa-visually-hidden">Power of Attorney documents available to your account</caption>
-          <thead><tr><th scope="col">Country</th><th scope="col">Doc Name</th><th scope="col">Download</th></tr></thead>
-          <tbody>
-            {loading && <tr><td colSpan={3} className="poa-empty"><span className="poa-loading-mark" aria-hidden="true" />Loading POA documents...</td></tr>}
-            {!loading && !error && visibleDocuments.map((item) => <tr key={item.id} tabIndex={0} onMouseEnter={event => showPreview(item, event.currentTarget)} onMouseLeave={schedulePreviewClose} onFocusCapture={event => showPreview(item, event.currentTarget)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) schedulePreviewClose(); }}>
-              <td><span className="poa-country-list">{item.countries.map(country => <span className="poa-country-cell" key={country.id}>{country.flag_url ? <img src={country.flag_url} alt="" loading="lazy" decoding="async" /> : <span className="poa-country-initials">{country.abbreviation}</span>}<span>{country.name}</span></span>)}</span></td>
-              <td><span className="poa-document-cell"><strong className="poa-document-name">{item.document_name}</strong><span className="poa-document-meta">{[
-                item.key.split('.').pop()?.toUpperCase(),
-                formatFileSize(item.aws_metadata?.size_bytes),
-                (item.aws_metadata?.last_modified || item.last_modified) ? `Updated ${formatUpdatedDate(item.aws_metadata?.last_modified || item.last_modified)}` : '',
-              ].filter(Boolean).join(' | ')}</span></span></td>
-              <td><button type="button" className="poa-download-button" onClick={() => void downloadOne(item)} disabled={downloading || Boolean(downloadingId)} aria-label={`Download ${item.document_name}`} title={downloadingId === item.id ? 'Preparing download' : 'Download'}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg></button></td>
-            </tr>)}
-            {!loading && !error && !visibleDocuments.length && <tr><td colSpan={3} className="poa-empty"><strong>{appliedCountry ? 'No documents for this country yet' : 'No POA documents available'}</strong><span>{appliedCountry ? 'Try selecting another country or clear the filter.' : 'Your available Power of Attorney documents will appear here.'}</span>{appliedCountry && <button type="button" onClick={() => { setCountryFilter(''); setAppliedCountry(''); setPage(1); }}>Clear country filter</button>}</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <footer className="poa-pagination">
-        <span>Showing {filteredDocuments.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}-{Math.min(currentPage * PAGE_SIZE, filteredDocuments.length)} of {filteredDocuments.length} documents</span>
-        <nav aria-label="POA document pages">
-          <button type="button" onClick={() => setPage(1)} disabled={currentPage === 1}>First</button>
-          <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1}>Previous</button>
-          <span aria-live="polite">{currentPage} / {pageCount}</span>
-          <button type="button" onClick={() => setPage((value) => Math.min(pageCount, value + 1))} disabled={currentPage === pageCount}>Next</button>
-          <button type="button" onClick={() => setPage(pageCount)} disabled={currentPage === pageCount}>Last</button>
-        </nav>
-      </footer>
-    </section>
-    {preview && <aside className="poa-document-preview" style={{ left: preview.left, top: preview.top }} onMouseEnter={keepPreviewOpen} onMouseLeave={schedulePreviewClose} aria-label="POA document preview">
-      <strong>{preview.item.document_name}</strong>
-      <span><b>Countries</b>{preview.item.countries.map(country => country.name).join(', ') || 'Not specified'}</span>
-      <span><b>File details</b>{[
-        preview.item.key.split('.').pop()?.toUpperCase(),
-        formatFileSize(preview.item.aws_metadata?.size_bytes),
-        (preview.item.aws_metadata?.last_modified || preview.item.last_modified) ? `Updated ${formatUpdatedDate(preview.item.aws_metadata?.last_modified || preview.item.last_modified)}` : '',
-      ].filter(Boolean).join(' · ') || 'File details unavailable'}</span>
-      <button type="button" onClick={() => void openDocument(preview.item)}>View document</button>
-    </aside>}
-  </main>;
+    <section className="poa-preview-panel" aria-label="Document preview"><div className="poa-section-heading"><span aria-hidden="true">▤</span><h2>Document Preview</h2><span className="poa-live-badge">✓ Live Preview</span></div><div className="poa-preview-toolbar"><button type="button" onClick={() => setZoom((value) => Math.max(60, value - 10))} aria-label="Zoom out">−</button><span>{zoom}%</span><button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in">+</button><button type="button" onClick={() => setZoom(100)}>100%</button><span className="poa-toolbar-divider" /><button type="button" disabled={!generatedBlob} onClick={download}>Download DOCX</button><button type="button" disabled={!generatedBlob} onClick={() => window.print()}>Print / Save PDF</button></div><div className="poa-preview-document-name">{currentTemplate.filename}</div><div className="poa-preview-canvas"><div className="poa-generated-styles" ref={stylesRef} /><div className="poa-generated-docx" ref={documentRef} style={{ zoom: zoom / 100 }} />{rendering && <div className="poa-preview-status" role="status"><span className="poa-spinner" />Rendering document...</div>}{renderError && <p className="poa-preview-error" role="alert">Preview failed: {renderError}</p>}{!generatedBlob && <p className="poa-preview-placeholder">Generate the POA to preview the completed Word document.</p>}</div></section>
+  </div></main>;
 }
 
 export default function ClientPoaRoute() { return <ClientPoaPage />; }

@@ -85,29 +85,40 @@ Deno.serve(async (request) => {
     if (!user) return json({ error: "Authentication is required." }, 401);
     const { data: profile } = await db.from("profiles").select("role,client_id").eq("id", user.id).single();
 
-    if (action === "list_eligible_clients") {
+    if (action === "list_clients" || action === "list_eligible_clients") {
       if (profile?.role !== "administrator") return json({ error: "Administrator access is required." }, 403);
-      const { data: clients, error: clientsError } = await db.from("clients")
-        .select("id,assigned_id,company_name,email,status")
-        .eq("status", "Active").is("deleted_at", null).order("assigned_id");
-      if (clientsError) throw clientsError;
-      const eligible = [];
-      for (const client of clients ?? []) {
-        const email = String(client.email ?? "").trim().toLowerCase();
-        if (!emailPattern.test(email)) continue;
-        const [authLookup, linkedProfile, activeInvitation] = await Promise.all([
-          db.rpc("find_auth_user_id_by_email", { p_email: email }),
-          db.from("profiles").select("id").eq("client_id", client.id).limit(1).maybeSingle(),
-          db.from("client_invitations").select("id,expires_at").eq("client_id", client.id)
-            .is("consumed_at", null).is("revoked_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        ]);
-        if (authLookup.error || linkedProfile.error || activeInvitation.error) throw authLookup.error ?? linkedProfile.error ?? activeInvitation.error;
-        const invitationActive = Boolean(activeInvitation.data && new Date(activeInvitation.data.expires_at) > new Date());
-        if (!authLookup.data && !linkedProfile.data && !invitationActive) {
-          eligible.push({ ...client, email, invitation_status: "not_invited" });
-        }
+      const clients = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data: batch, error } = await db.from("clients")
+          .select("id,assigned_id,company_name,email,status")
+          .is("deleted_at", null).order("assigned_id").range(offset, offset + 499);
+        if (error) throw error;
+        clients.push(...(batch ?? []));
+        if ((batch ?? []).length < 500) break;
       }
-      return json({ data: eligible });
+      const records = [];
+      for (let offset = 0; offset < clients.length; offset += 25) {
+        const batch = await Promise.all(clients.slice(offset, offset + 25).map(async (client) => {
+          const email = String(client.email ?? "").trim().toLowerCase();
+          const validEmail = emailPattern.test(email);
+          const [authLookup, linkedProfile, activeInvitation] = await Promise.all([
+            validEmail ? db.rpc("find_auth_user_id_by_email", { p_email: email }) : Promise.resolve({ data: null, error: null }),
+            db.from("profiles").select("id").eq("client_id", client.id).limit(1).maybeSingle(),
+            db.from("client_invitations").select("id,expires_at").eq("client_id", client.id)
+              .is("consumed_at", null).is("revoked_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+          ]);
+          if (authLookup.error || linkedProfile.error || activeInvitation.error) throw authLookup.error ?? linkedProfile.error ?? activeInvitation.error;
+          const invitationActive = Boolean(activeInvitation.data && new Date(activeInvitation.data.expires_at) > new Date());
+          const invitation_status = authLookup.data || linkedProfile.data ? "account_exists"
+            : invitationActive ? "invitation_exists"
+            : client.status !== "Active" ? "inactive"
+            : !validEmail ? "invalid_email"
+            : "not_invited";
+          return { ...client, email, invitation_status, eligible: invitation_status === "not_invited" };
+        }));
+        records.push(...batch);
+      }
+      return json({ data: records });
     }
 
     if (action === "create_invitation") {

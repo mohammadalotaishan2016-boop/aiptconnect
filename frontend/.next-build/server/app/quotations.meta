@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/quotations/layout,_N_T_/quotations/page,_N_T_/quotations"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/bd906450061d5cddc1e72800850afdcf6935315d3f09bd13f79b6bf58c8ee85a/$/quotations",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/quotations/page"
+    },
+    "isFallback": false
+  }
+}

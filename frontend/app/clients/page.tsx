@@ -945,8 +945,8 @@ export default function ClientsPage() {
         </header>
 
         <div className="clients-heading">
-          <div><h1>Clients</h1></div>
-          <div className="clients-actions"><button type="button" className="danger" data-action="delete" onClick={() => void prepareDeleteAllClients()} disabled={loading || deleting || bulkPreparing || bulkDeleting}><ActionIcon name="delete" /><span className="aipt-action-label">Delete All Clients</span></button><ClientDataActions search={search} onComplete={setNotice} onError={setPageError} onRefresh={() => setClientRefreshKey((value) => value + 1)} /><button type="button" className="invite-client-user" onClick={() => setInviteClientUserOpen(true)}>Invite Client User</button><button type="button" className="client-refresh" onClick={() => void loadPageData()} disabled={loading} data-action="refresh" title="Refresh"><ActionIcon name="refresh" /><span className="aipt-action-label">Refresh</span></button><button className="add-client" type="button" onClick={() => openClientModal("add")} data-action="add" title="Add New Client"><ActionIcon name="add" /><span className="aipt-action-label">Add New Client</span></button></div>
+          <div><h1>Tenants</h1></div>
+          <div className="clients-actions"><button type="button" className="danger" data-action="delete" onClick={() => void prepareDeleteAllClients()} disabled={loading || deleting || bulkPreparing || bulkDeleting}><ActionIcon name="delete" /><span className="aipt-action-label">Delete All Clients</span></button><ClientDataActions search={search} onComplete={setNotice} onError={setPageError} onRefresh={() => setClientRefreshKey((value) => value + 1)} /><button type="button" className="invite-client-user" onClick={() => setInviteClientUserOpen(true)}>Invite Tenants User</button><button type="button" className="client-refresh" onClick={() => void loadPageData()} disabled={loading} data-action="refresh" title="Refresh"><ActionIcon name="refresh" /><span className="aipt-action-label">Refresh</span></button><button className="add-client" type="button" onClick={() => openClientModal("add")} data-action="add" title="Add New Tenants"><ActionIcon name="add" /><span className="aipt-action-label">Add New Tenants</span></button></div>
         </div>
 
         {notice && <div className="client-notice" role="status">{notice}<button type="button" aria-label="Dismiss notification" onClick={() => setNotice("")}>x</button></div>}
@@ -954,7 +954,7 @@ export default function ClientsPage() {
 
         <section className="clients-table-card">
           <header>
-            <div><h2>Client Table Data</h2><p>{loading ? "Loading client records..." : `${clientTotal} total client${clientTotal === 1 ? "" : "s"}`}</p></div>
+            <div><h2>Tenants Table Data</h2><p>{loading ? "Loading client records..." : `${clientTotal} total client${clientTotal === 1 ? "" : "s"}`}</p></div>
             <label className="table-tools"><span aria-hidden="true">Search</span><input value={search} onChange={(event) => { setSearch(event.target.value); setClientPage(1); }} placeholder="Search clients..." /></label>
           </header>
           <div className="clients-table-scroll">
@@ -1105,7 +1105,7 @@ function ClientEditor({ mode, client, draft, countries, classifications, pending
 }) {
   const update = <K extends keyof ClientDraft,>(field: K, value: ClientDraft[K]) => onChange({ ...draft, [field]: value });
   return <Modal className="client-editor-modal"><form className="client-form" onSubmit={onSave}>
-    <header className="client-modal-heading"><div><span className="modal-kicker">CLIENT RECORD</span><h2>{mode === "add" ? "Add New Client" : "Edit Client"}</h2><p>{mode === "add" ? "Create an accurate client profile before adding applications." : "Update this client profile and keep the related applications intact."}</p></div><button type="button" className="modal-close" onClick={onClose} aria-label="Close">x</button></header>
+    <header className="client-modal-heading"><div><span className="modal-kicker">Tenant RECORD</span><h2>{mode === "add" ? "Add New Client" : "Edit Client"}</h2><p>{mode === "add" ? "Create an accurate client profile before adding applications." : "Update this client profile and keep the related applications intact."}</p></div><button type="button" className="modal-close" onClick={onClose} aria-label="Close">x</button></header>
     <section className="client-form-section"><h3>Client identity</h3><div className="client-form-grid">
       <FormField label="Assigned ID"><input value={client ? String(client.assigned_id) : "Generated automatically"} readOnly aria-readonly="true" /></FormField>
       <FormField label="Company Name" required><input autoFocus value={draft.company_name} onChange={(event) => update("company_name", event.target.value)} maxLength={255} required /></FormField>

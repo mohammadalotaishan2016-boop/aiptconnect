@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/client-dashboard/layout,_N_T_/client-dashboard/invoices/layout,_N_T_/client-dashboard/invoices/page,_N_T_/client-dashboard/invoices"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/d76e801e2a931882a8a53dfc7c9a95a77851371c12e6e01001f29c2f6378360a/$/client-dashboard/invoices",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/client-dashboard/invoices/page"
+    },
+    "isFallback": false
+  }
+}

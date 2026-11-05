@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/classification-of-fees/layout,_N_T_/classification-of-fees/page,_N_T_/classification-of-fees"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/5cbd18fd8a56045c56114a3f7f9164d0b99b0e8edb5bac569fc841fb152d1fb7/$/classification-of-fees",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/classification-of-fees/page"
+    },
+    "isFallback": false
+  }
+}

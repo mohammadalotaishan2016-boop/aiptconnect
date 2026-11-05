@@ -1,0 +1,361 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/images/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ],
+      "regex": "^/images(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    },
+    {
+      "source": "/fonts/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^/fonts(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    }
+  ],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/invoice/verify/[token]",
+      "regex": "^/invoice/verify/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtoken": "nxtPtoken"
+      },
+      "namedRegex": "^/invoice/verify/(?<nxtPtoken>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/invoice/[id]",
+      "regex": "^/invoice/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/invoice/(?<nxtPid>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/account",
+      "regex": "^/account(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/account(?:/)?$"
+    },
+    {
+      "page": "/admin/fees",
+      "regex": "^/admin/fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/fees(?:/)?$"
+    },
+    {
+      "page": "/admin-account",
+      "regex": "^/admin\\-account(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin\\-account(?:/)?$"
+    },
+    {
+      "page": "/change-password",
+      "regex": "^/change\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/change\\-password(?:/)?$"
+    },
+    {
+      "page": "/classification-of-fees",
+      "regex": "^/classification\\-of\\-fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/classification\\-of\\-fees(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard",
+      "regex": "^/client\\-dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/customer-service",
+      "regex": "^/client\\-dashboard/customer\\-service(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/customer\\-service(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/fees",
+      "regex": "^/client\\-dashboard/fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/fees(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/invoices",
+      "regex": "^/client\\-dashboard/invoices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/invoices(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/notifications",
+      "regex": "^/client\\-dashboard/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/notifications(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/overview",
+      "regex": "^/client\\-dashboard/overview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/overview(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/poa",
+      "regex": "^/client\\-dashboard/poa(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/poa(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/projects",
+      "regex": "^/client\\-dashboard/projects(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/projects(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/quotations",
+      "regex": "^/client\\-dashboard/quotations(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/quotations(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/requirements",
+      "regex": "^/client\\-dashboard/requirements(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/requirements(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/schedule-of-fees",
+      "regex": "^/client\\-dashboard/schedule\\-of\\-fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/schedule\\-of\\-fees(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/settings",
+      "regex": "^/client\\-dashboard/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/settings(?:/)?$"
+    },
+    {
+      "page": "/client-dashboard/statements",
+      "regex": "^/client\\-dashboard/statements(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard/statements(?:/)?$"
+    },
+    {
+      "page": "/clients",
+      "regex": "^/clients(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/clients(?:/)?$"
+    },
+    {
+      "page": "/countries",
+      "regex": "^/countries(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/countries(?:/)?$"
+    },
+    {
+      "page": "/customer-service",
+      "regex": "^/customer\\-service(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/customer\\-service(?:/)?$"
+    },
+    {
+      "page": "/fees",
+      "regex": "^/fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/fees(?:/)?$"
+    },
+    {
+      "page": "/forgot-password",
+      "regex": "^/forgot\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/forgot\\-password(?:/)?$"
+    },
+    {
+      "page": "/forgot-password/verify-otp",
+      "regex": "^/forgot\\-password/verify\\-otp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/forgot\\-password/verify\\-otp(?:/)?$"
+    },
+    {
+      "page": "/join",
+      "regex": "^/join(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/join(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/login/verify-otp",
+      "regex": "^/login/verify\\-otp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login/verify\\-otp(?:/)?$"
+    },
+    {
+      "page": "/notifications",
+      "regex": "^/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/notifications(?:/)?$"
+    },
+    {
+      "page": "/overview",
+      "regex": "^/overview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/overview(?:/)?$"
+    },
+    {
+      "page": "/poa",
+      "regex": "^/poa(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/poa(?:/)?$"
+    },
+    {
+      "page": "/procedure",
+      "regex": "^/procedure(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/procedure(?:/)?$"
+    },
+    {
+      "page": "/projects",
+      "regex": "^/projects(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/projects(?:/)?$"
+    },
+    {
+      "page": "/quotations",
+      "regex": "^/quotations(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quotations(?:/)?$"
+    },
+    {
+      "page": "/register",
+      "regex": "^/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/register(?:/)?$"
+    },
+    {
+      "page": "/requirements",
+      "regex": "^/requirements(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/requirements(?:/)?$"
+    },
+    {
+      "page": "/roles",
+      "regex": "^/roles(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/roles(?:/)?$"
+    },
+    {
+      "page": "/schedule-of-fees",
+      "regex": "^/schedule\\-of\\-fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/schedule\\-of\\-fees(?:/)?$"
+    },
+    {
+      "page": "/services",
+      "regex": "^/services(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/services(?:/)?$"
+    },
+    {
+      "page": "/spreadsheet",
+      "regex": "^/spreadsheet(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/spreadsheet(?:/)?$"
+    },
+    {
+      "page": "/statements",
+      "regex": "^/statements(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/statements(?:/)?$"
+    },
+    {
+      "page": "/user-dashboard",
+      "regex": "^/user\\-dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/user\\-dashboard(?:/)?$"
+    },
+    {
+      "page": "/users",
+      "regex": "^/users(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/users(?:/)?$"
+    },
+    {
+      "page": "/vat",
+      "regex": "^/vat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/vat(?:/)?$"
+    },
+    {
+      "page": "/verify-otp",
+      "regex": "^/verify\\-otp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/verify\\-otp(?:/)?$"
+    },
+    {
+      "page": "/video-tutorials",
+      "regex": "^/video\\-tutorials(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/video\\-tutorials(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments"
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/countries/layout,_N_T_/countries/page,_N_T_/countries"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/8f51dab776ae794baf0e4814c046e4e759e6084951c7958258f6d38153730614/$/countries",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/countries/page"
+    },
+    "isFallback": false
+  }
+}

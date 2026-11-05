@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/client-dashboard/layout,_N_T_/client-dashboard/schedule-of-fees/layout,_N_T_/client-dashboard/schedule-of-fees/page,_N_T_/client-dashboard/schedule-of-fees"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/9edd0114280255443e80239cc4f1a44e46bcf657dcd5f02bbb5812f23663f284/$/client-dashboard/schedule-of-fees",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/client-dashboard/schedule-of-fees/page"
+    },
+    "isFallback": false
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/client-dashboard/layout,_N_T_/client-dashboard/requirements/layout,_N_T_/client-dashboard/requirements/page,_N_T_/client-dashboard/requirements"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/692bfb8bcd5cc39748ae1c36c0ae834db4ed82e866b4cfdd3d7a0efc06e313da/$/client-dashboard/requirements",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/client-dashboard/requirements/page"
+    },
+    "isFallback": false
+  }
+}

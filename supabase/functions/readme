@@ -1,0 +1,191 @@
+# External API
+
+Signed access for a partner system. `X-API-KEY` selects the integration. The partner holds the matching RSA private key, and AIPT stores the public key on that row.
+
+Base path: `/api/external`
+
+![Partner signs the request, then AIPT checks the 120 second window, public key, nonce, and IP allowlist before returning the client list.](external-api-flow.jpg)
+
+## What you send
+
+`GET /api/external/clients`
+
+| Header | Required | Value |
+| --- | --- | --- |
+| `Accept` | yes | `application/json` |
+| `X-API-KEY` | yes | The `api_key` stored on the integration |
+| `X-TIMESTAMP` | yes | Unix time in seconds, digits only |
+| `X-NONCE` | yes | Unique string for this request |
+| `X-SIGNATURE` | yes | Base64 RSA-SHA256 signature of the canonical string |
+
+The timestamp must be within 120 seconds of the server clock, ahead or behind. Each nonce can be used once for that integration, and the server remembers it for 5 minutes. Send a new nonce on every call, including retries.
+
+If `allowed_ips` is set on the integration, the request IP must be in that list. Separate addresses with commas or spaces. An empty list allows any IP.
+
+## Canonical string
+
+Five lines, joined with `\n`. No trailing newline after the hash.
+
+```text
+GET
+/api/external/clients
+<X-TIMESTAMP>
+<X-NONCE>
+<sha256 hex of the raw body>
+```
+
+`GET` has an empty body. Its hash is always:
+
+```text
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+Sign that exact string with the private key using SHA-256, then base64-encode the signature. The query string is not part of the signature. This endpoint does not use one.
+
+AIPT loads the active row whose `api_key` equals `X-API-KEY`, then checks the signature with that row’s public key.
+
+## Setup
+
+Run the migration so `api_integrations` exists, then create a key pair and store the public key.
+
+```bash
+openssl rand -hex 32
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out partner-private.pem
+openssl pkey -in partner-private.pem -pubout -out partner-public.pem
+php artisan migrate --path=database/migrations/2026_09_23_092938_create_api_integrations_table.php
+```
+
+`openssl rand -hex 32` prints the 64-character `api_key`. Store it on `api_integrations.api_key` and send that same value in `X-API-KEY`. `partner-public.pem` goes in `public_key`. Keep `is_active` true. `partner-private.pem` stays with the partner.
+
+`name` is a label. `rate_limit` is stored and not enforced. `allowed_ips` is optional. `last_used_at` is updated after a request passes the checks.
+
+## Calling the endpoint
+
+```bash
+API_KEY="the api_key stored on the integration"
+TS=$(date +%s)
+NONCE=$(openssl rand -hex 16)
+BODY_HASH=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+CANON=$(printf '%s\n%s\n%s\n%s\n%s' "GET" "/api/external/clients" "$TS" "$NONCE" "$BODY_HASH")
+SIG=$(printf '%s' "$CANON" | openssl dgst -sha256 -sign partner-private.pem | base64 -w 0)
+
+curl -sS "https://your-host/api/external/clients" \
+  -H "Accept: application/json" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "X-TIMESTAMP: $TS" \
+  -H "X-NONCE: $NONCE" \
+  -H "X-SIGNATURE: $SIG"
+```
+
+`printf '%s\n' ...` would add a newline after the hash. Do not use it. The server signs the string with no trailing newline.
+
+```php
+$apiKey = 'the api_key stored on the integration';
+$method = 'GET';
+$path = '/api/external/clients';
+$timestamp = (string) time();
+$nonce = bin2hex(random_bytes(16));
+$bodyHash = hash('sha256', '');
+
+$canonical = implode("\n", [$method, $path, $timestamp, $nonce, $bodyHash]);
+
+$privateKey = openssl_pkey_get_private(file_get_contents('partner-private.pem'));
+openssl_sign($canonical, $rawSignature, $privateKey, OPENSSL_ALGO_SHA256);
+
+$headers = [
+    'Accept' => 'application/json',
+    'X-API-KEY' => $apiKey,
+    'X-TIMESTAMP' => $timestamp,
+    'X-NONCE' => $nonce,
+    'X-SIGNATURE' => base64_encode($rawSignature),
+];
+```
+
+## Success body
+
+HTTP 200. `errors` is null. `meta` is omitted on this endpoint.
+
+```json
+{
+  "success": true,
+  "status": 200,
+  "message": "Clients retrieved successfully",
+  "data": [
+    {
+      "client_name": "Acme",
+      "is_duplicate": true,
+      "departments": [
+        { "department": "Accounting", "id": 12 },
+        { "department": "Litigation", "id": 4 }
+      ]
+    }
+  ],
+  "errors": null
+}
+```
+
+Rows are grouped by the lowercased, trimmed name. `client_name` is the first spelling in that group. `is_duplicate` is true when the group has more than one source row. `departments` lists each source `department` and its `id`.
+
+The three department labels this endpoint emits are `Accounting`, `Litigation`, and `Patent`.
+
+## Error body
+
+```json
+{
+  "success": false,
+  "status": 401,
+  "message": "Request expired.",
+  "data": null,
+  "errors": null
+}
+```
+
+| HTTP | Message | When |
+| --- | --- | --- |
+| 401 | `API key is required.` | `X-API-KEY` is missing |
+| 401 | `Invalid API key.` | No active integration has that `api_key` |
+| 401 | `Valid timestamp is required.` | `X-TIMESTAMP` is missing or not all digits |
+| 401 | `Request expired.` | Timestamp is more than 120 seconds from the server |
+| 401 | `Nonce is required.` | `X-NONCE` is missing |
+| 401 | `Signature is required.` | `X-SIGNATURE` is missing |
+| 401 | `Invalid signature.` | Signature does not match that integration’s public key |
+| 401 | `Request replay detected.` | This integration already used that nonce |
+| 403 | `IP address is not allowed.` | Request IP is outside `allowed_ips` |
+| 429 | Laravel default body | More than 60 requests in a minute from the same IP |
+
+The 429 response comes from the global `api` limiter and does not use the envelope above. Its message is `Too Many Attempts.` and it may include a `Retry-After` header.
+
+Other methods on this trait, when a later endpoint uses them, keep the same envelope:
+
+| Method | HTTP |
+| --- | --- |
+| `createdResponse` | 201 |
+| `acceptedResponse` | 202 |
+| `noContentResponse` | 204, empty body |
+| `badRequestResponse` | 400 |
+| `notFoundResponse` | 404 |
+| `conflictResponse` | 409 |
+| `validationResponse` | 422, `errors` is a map of field to message list |
+| `tooManyRequestsResponse` | 429, plus `Retry-After` when a retry delay is set |
+| `serverErrorResponse` | 500 |
+| `serviceUnavailableResponse` | 503 |
+
+A paginated payload puts the items in `data` and page fields in `meta`: `per_page`, `current_page`, `last_page`, `total`, `from`, `to`, `has_more`. Cursor pages use `next_cursor` and `prev_cursor` instead of a page number.
+
+## Browser calls
+
+CORS allows `https://app.example.com` and the headers `Content-Type`, `Accept`, `X-API-KEY`, `X-TIMESTAMP`, `X-NONCE`, and `X-SIGNATURE`. A server-to-server caller does not use CORS.
+
+## Data currently loaded
+
+| `department` in the response | Table | Name column |
+| --- | --- | --- |
+| Accounting | `clients` | `client_name` |
+| Litigation | `li_clients` | `client_name` |
+| Patent | `pt_clients` | `client_name` |
+
+`clients` is the trademark client table. Accounting records in `acc_clients` are not included. The patent query filters `deleted_at`, and `pt_clients` has no `deleted_at` column, so a signed request fails when that query runs until the filter or the table changes.
+
+
+/api/external/clients
+ domain : aipterp.com

@@ -113,7 +113,8 @@ export async function fetchSupabaseFunction(path: string, init: RequestInit & { 
     return response;
   } catch (cause) {
     if (cause instanceof DOMException && cause.name === 'AbortError') throw Error('The project service took too long to respond. Check the Supabase function deployment.');
-    throw Error('Unable to reach the project service. Check your network connection and Supabase URL.');
+    const reason = cause instanceof Error && cause.message ? ` (${cause.message})` : '';
+    throw Error(`Unable to reach the project service. Check your network connection and Supabase URL.${reason}`);
   } finally {
     window.clearTimeout(timeout);
     externalSignal?.removeEventListener("abort", cancelRequest);

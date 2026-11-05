@@ -32,7 +32,7 @@ const STORAGE_KEY = 'aipt-admin-sidebar-collapsed';
 const navigation: NavigationItem[] = [
   { href: '/overview', label: 'Overview', icon: 'overview' },
   { href: '/projects', label: 'Projects', icon: 'projects' },
-  { href: '/clients', label: 'Client', icon: 'clients' },
+  { href: '/users', label: 'Users Registered', icon: 'clients' },
   { href: '/countries', label: 'Countries', icon: 'countries' },
   { href: '/requirements', label: 'Requirements', icon: 'procedures' },
   { href: '/procedure', label: 'Procedure', icon: 'procedures' },
@@ -56,7 +56,6 @@ const navigation: NavigationItem[] = [
   { href: '/poa', label: 'POA', icon: 'documents' },
   { href: '/schedule-of-fees', label: 'Schedule of Fees', icon: 'documents' },
   { href: '/video-tutorials', label: 'Video Tutorials', icon: 'documents' },
-  { href: '/users', label: 'Users', icon: 'clients' },
   { href: '/roles', label: 'Roles & Permissions', icon: 'clients' },
 ];
 
