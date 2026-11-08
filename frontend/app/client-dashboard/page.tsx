@@ -222,18 +222,7 @@ export default function ClientDashboardPage() {
   }[language];
   const tutorialStatus = !tutorialsLoaded ? uiLabels.loading : tutorialsFailed ? uiLabels.unavailable : uiLabels.notAssigned;
   const cardSettingsReady = cardSettingsLoaded && !cardSettingsFailed;
-  const availableServices = destinations.filter(({ key }) => availability[key] !== false && comingSoon[key] !== true).length;
-  const comingSoonServices = destinations.length - availableServices;
-  const updatesReady = Object.keys(cardUpdates).length === cardUpdateSources.length && Object.values(cardUpdates).every(update => !update.failed);
-  const newUpdatesCount = Object.values(cardUpdates).reduce((total, update) => total + update.count, 0);
   return <section className="client-home" aria-label={uiLabels.dashboard}>
-    <header className="client-home-feed-header"><div><h1>{uiLabels.dashboardTitle}</h1><p>{uiLabels.dashboardSubtitle}</p></div><strong>{destinations.length} {uiLabels.servicesCount}</strong></header>
-    <section className="client-home-feed-stats" aria-label={uiLabels.dashboardSubtitle}>
-      <div><span>{uiLabels.totalServices}</span><strong>{destinations.length}</strong></div>
-      <div><span>{uiLabels.availableServices}</span><strong>{cardSettingsReady ? availableServices : '—'}</strong></div>
-      <div><span>{uiLabels.comingSoonCount}</span><strong>{cardSettingsReady ? comingSoonServices : '—'}</strong></div>
-      <div><span>{uiLabels.newUpdatesCount}</span><strong>{updatesReady ? newUpdatesCount : '—'}</strong></div>
-    </section>
     <nav className="client-home-grid" aria-label={uiLabels.services}>
       {destinations.map(({ key, label, href }) => {
         const comingSoonForCard = comingSoon[key] === true;

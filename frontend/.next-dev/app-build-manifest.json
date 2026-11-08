@@ -131,6 +131,18 @@
       "static/chunks/main-app.js",
       "static/css/app/client-dashboard/requirements/page.css",
       "static/chunks/app/client-dashboard/requirements/page.js"
+    ],
+    "/client-dashboard/schedule-of-fees/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/client-dashboard/schedule-of-fees/page.css",
+      "static/chunks/app/client-dashboard/schedule-of-fees/page.js"
+    ],
+    "/client-dashboard/quotations/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/client-dashboard/quotations/page.css",
+      "static/chunks/app/client-dashboard/quotations/page.js"
     ]
   }
 }
