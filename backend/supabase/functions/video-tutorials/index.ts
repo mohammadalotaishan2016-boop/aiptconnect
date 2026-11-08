@@ -80,7 +80,7 @@ function storageError(cause: unknown) {
     return json({ error: `Confirm bucket ${bucket} exists in ${region}.` }, 502);
   }
   if (["42P01", "PGRST205", "42703", "PGRST204"].includes(code)) {
-    return json({ error: "The video tutorials database migration is not deployed." }, 503);
+    return json({ error: `The video tutorials database migration is missing or out of date: ${error.message || code}` }, 503);
   }
   if (error.message?.toLowerCase().includes("bucket not found")) {
     return json({ error: `Supabase Storage bucket ${supabaseBucket} is not configured. Apply migration 202610170001_move_video_tutorials_to_supabase_storage.sql.` }, 503);
@@ -97,6 +97,14 @@ Deno.serve(async request => {
 
     if (request.method === "GET" && auth.role === "admin" && url.searchParams.get("manage") === "true") {
       const { data, error } = await auth.db.from("video_tutorials").select("card_key,title,s3_key,file_name,content_type,file_size,updated_at").order("card_key");
+      if (error) throw error;
+      const { data: availability, error: availabilityError } = await auth.db.from("client_dashboard_card_availability").select("card_key,is_available,coming_soon");
+      if (availabilityError) throw availabilityError;
+      return json({ data: data ?? [], availability: availability ?? [] });
+    }
+
+    if (request.method === "GET" && url.searchParams.get("availability") === "true") {
+      const { data, error } = await auth.db.from("client_dashboard_card_availability").select("card_key,is_available,coming_soon");
       if (error) throw error;
       return json({ data: data ?? [] });
     }
@@ -165,6 +173,17 @@ Deno.serve(async request => {
 
     if (request.method === "PATCH" && auth.role === "admin") {
       const body = await request.json();
+      if (Object.hasOwn(body, "coming_soon")) {
+        if (!validCard(body.card_key) || typeof body.coming_soon !== "boolean") return json({ error: "Select a valid dashboard card and Coming Soon value." }, 400);
+        const { data, error } = await auth.db.from("client_dashboard_card_availability").upsert({ card_key: body.card_key, coming_soon: body.coming_soon, updated_at: new Date().toISOString() }, { onConflict: "card_key" }).select("card_key,is_available,coming_soon").single();
+        if (error) throw error;
+        return json({ data });
+      }
+      if (validCard(body.card_key) && typeof body.is_available === "boolean") {
+        const { data, error } = await auth.db.from("client_dashboard_card_availability").upsert({ card_key: body.card_key, is_available: body.is_available, updated_at: new Date().toISOString() }, { onConflict: "card_key" }).select("card_key,is_available,coming_soon").single();
+        if (error) throw error;
+        return json({ data });
+      }
       const title = typeof body.title === "string" ? body.title.trim() : "";
       if (!validCard(body.card_key) || !title || title.length > 200) return json({ error: "Enter a valid card and tutorial title." }, 400);
       const { data, error } = await auth.db.from("video_tutorials").update({ title, updated_at: new Date().toISOString() }).eq("card_key", body.card_key).select("card_key,title,s3_key,file_name,content_type,file_size,updated_at").maybeSingle();

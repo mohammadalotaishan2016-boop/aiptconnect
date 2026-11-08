@@ -33,6 +33,7 @@ const adminRoutes = new Set([
   '/statements',
   '/poa',
   '/schedule-of-fees',
+  '/client-dashboard-cards',
   '/video-tutorials',
   '/admin-account',
 ]);

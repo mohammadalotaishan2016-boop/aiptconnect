@@ -153,8 +153,25 @@ export default function ScheduleOfFeesPage() {
   }
 
   return <main className={`poa-page admin-poa-page schedule-fees-page${clientScheduleView ? ' client-schedule-fees-page' : ''}`}>
-    {clientScheduleView ? <h1 className="client-schedule-fees-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h20l-8 9v8l-4 2V12z" /></svg>Schedule of Fees</h1> : <h1 className="admin-poa-accessible-title">Schedule of Fees</h1>}
-    <section className="poa-results-panel admin-poa-results" aria-label="Manage Schedule of Fees documents">
+    {clientScheduleView ? <h1 className="client-schedule-fees-heading">Schedule of Fees</h1> : <h1 className="admin-poa-accessible-title">Schedule of Fees</h1>}
+    {clientScheduleView ? <section className="schedule-fees-download-panel" aria-label="Schedule of Fees downloads">
+      {notice && <p className="admin-poa-notice" role="status">{notice}</p>}
+      {error && <p className="poa-error" role="alert">{error}</p>}
+      {loading && <p className="schedule-fees-download-status" role="status">Loading available files...</p>}
+      {!loading && !error && <div className="schedule-fees-download-actions">
+        {documents.map(item => {
+          const extension = item.document_name.split('.').at(-1)?.toLowerCase() ?? '';
+          const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
+          const isPdf = extension === 'pdf';
+          return <button key={item.key} type="button" className={`schedule-fees-file-button${isSpreadsheet ? ' schedule-fees-file-button-xls' : isPdf ? '' : ' schedule-fees-file-button-other'}`} onClick={() => void download(item)} disabled={Boolean(busyKey)} aria-label={`Download ${item.document_name}`}>
+            {isSpreadsheet ? <svg viewBox="0 0 100 120" aria-hidden="true"><path className="file-page" d="M15 2h53l25 25v89H15z"/><path className="file-fold" d="M68 2v25h25"/><rect className="file-label" x="2" y="21" width="54" height="27" rx="3"/><text x="29" y="40" textAnchor="middle">XLS</text><rect className="sheet-grid" x="29" y="60" width="50" height="34"/><path className="sheet-lines" d="M29 71h50M29 82h50M46 60v34M63 60v34"/><text className="sheet-x" x="34" y="69">x</text></svg> : <svg viewBox="0 0 100 120" aria-hidden="true"><path className="file-page" d="M15 2h53l25 25v89H15z"/><path className="file-fold" d="M68 2v25h25"/><rect className="file-label" x="2" y="21" width="54" height="27" rx="3"/><text x="29" y="40" textAnchor="middle">PDF</text><circle className="download-ring" cx="57" cy="79" r="17"/><path className="download-arrow" d="M57 67v20m-7-7 7 7 7-7"/></svg>}
+            {!isPdf && !isSpreadsheet && <span className="schedule-fees-file-extension">{extension.toUpperCase() || 'FILE'}</span>}
+            <span className="schedule-fees-file-name" title={item.document_name}>{busyKey === item.key ? 'Downloading...' : item.document_name}</span>
+          </button>;
+        })}
+        {!documents.length && <p className="schedule-fees-download-status">No Schedule of Fees files are available.</p>}
+      </div>}
+    </section> : <section className="poa-results-panel admin-poa-results" aria-label="Manage Schedule of Fees documents">
       <div className="poa-results-toolbar schedule-fees-toolbar">
         <label className="poa-table-search" htmlFor="schedule-fees-search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 5 5"/></svg>
@@ -192,7 +209,7 @@ export default function ScheduleOfFeesPage() {
           <button type="button" onClick={() => setPage(currentPage + 1)} disabled={currentPage >= pageCount}>Next</button>
         </nav>
       </div>
-    </section>
+    </section>}
 
     {modal && <div className="admin-poa-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !saving) setModal(false); }}>
       <section className="admin-poa-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-fees-dialog-title">

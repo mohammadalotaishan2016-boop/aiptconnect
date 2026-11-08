@@ -1,8 +1,8 @@
 ﻿'use client';
 
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { fetchSupabaseFunction, getSupabaseBrowserClient } from '../lib/supabase/browser';
 import AccountMenu from './AccountMenu';
@@ -30,6 +30,7 @@ const readableDashboardRoutes: Record<string, string> = {
   '/client-dashboard/notifications': 'notifications',
   '/client-dashboard/customer-service': 'customer-service',
 };
+type CardRouteGate = { pathname: string; state: 'checking' | 'allowed' | 'blocked' };
 
 export default function ClientShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -39,6 +40,8 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   const [email, setEmail] = useState('');
   const [accessState, setAccessState] = useState<'checking' | 'allowed' | 'denied'>('checking');
   const [language, setLanguage] = useState<DashboardLanguage>('en');
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [cardRouteGate, setCardRouteGate] = useState<CardRouteGate>({ pathname: '', state: 'checking' });
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -103,6 +106,32 @@ export default function ClientShell({ children }: { children: React.ReactNode })
     void markRead();
   }, [pathname, accessState]);
 
+  useEffect(() => {
+    const cardKey = readableDashboardRoutes[pathname];
+    if (accessState !== 'allowed' || !cardKey) return;
+    const controller = new AbortController();
+    setCardRouteGate({ pathname, state: 'checking' });
+    const checkRoute = async () => {
+      try {
+        const response = await fetchSupabaseFunction('video-tutorials?availability=true', { signal: controller.signal });
+        if (!response.ok) throw new Error('Could not verify dashboard card availability.');
+        const body = await response.json();
+        const settings = Array.isArray(body.data) ? body.data.find((item: { card_key?: string }) => item.card_key === cardKey) : null;
+        const blocked = !settings || settings.is_available === false || settings.coming_soon === true;
+        if (controller.signal.aborted) return;
+        setCardRouteGate({ pathname, state: blocked ? 'blocked' : 'allowed' });
+        if (blocked) router.replace('/client-dashboard');
+      } catch {
+        if (!controller.signal.aborted) {
+          setCardRouteGate({ pathname, state: 'blocked' });
+          router.replace('/client-dashboard');
+        }
+      }
+    };
+    void checkRoute();
+    return () => controller.abort();
+  }, [pathname, accessState, router]);
+
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'CL';
   const goBack = () => router.push('/client-dashboard');
   const shellText = shellTranslations[language];
@@ -137,9 +166,9 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         </div>
       </header>
       <div className="client-home-layout">
-        <aside className="client-home-rail" aria-label={shellText.controls}>
-          <button className="client-home-rail-button" type="button" aria-label={shellText.back} title={shellText.back} onClick={goBack} disabled={pathname === '/client-dashboard'}>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5m7 7-7-7 7-7" /></svg>
+        <aside className={`client-home-rail${railCollapsed ? ' is-collapsed' : ''}`} aria-label="Client navigation">
+          <button className="client-home-rail-button client-home-dashboard-back" type="button" aria-label={pathname !== '/client-dashboard' ? shellText.back : (railCollapsed ? 'Expand dashboard navigation' : 'Collapse dashboard navigation')} title={pathname !== '/client-dashboard' ? shellText.back : (railCollapsed ? 'Expand dashboard navigation' : 'Collapse dashboard navigation')} onClick={() => { if (pathname !== '/client-dashboard') { setRailCollapsed(true); router.push('/client-dashboard'); } else setRailCollapsed(value => !value); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
           </button>
           <button className="client-home-rail-button client-home-rail-logout" type="button" aria-label={shellText.logout} onClick={() => void logout()}>
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H5v18h9" /><path d="M12 12h9m-4-4 4 4-4 4" /><path d="M10 12h.01" /></svg>
@@ -148,7 +177,8 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         <main className="client-main client-home-content">
           {accessState === 'checking' && <section className="client-access-state">{shellText.checking}</section>}
           {accessState === 'denied' && <section className="client-access-state client-error">{shellText.denied}</section>}
-          {accessState === 'allowed' && children}
+          {accessState === 'allowed' && (!readableDashboardRoutes[pathname] || (cardRouteGate.pathname === pathname && cardRouteGate.state === 'allowed')) && children}
+          {accessState === 'allowed' && readableDashboardRoutes[pathname] && (cardRouteGate.pathname !== pathname || cardRouteGate.state === 'checking') && <section className="client-access-state">Checking dashboard card availability...</section>}
           <footer className="client-home-footer">
             <span>{shellText.rights}</span>
             <span>{shellText.service}</span>

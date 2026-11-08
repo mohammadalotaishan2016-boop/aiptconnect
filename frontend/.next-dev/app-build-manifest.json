@@ -6,11 +6,26 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/dev/poa-preview/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/dev/poa-preview/page.css",
-      "static/chunks/app/dev/poa-preview/page.js"
+      "static/chunks/app/page.js"
+    ],
+    "/login/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/login/page.css",
+      "static/chunks/app/login/page.js"
+    ],
+    "/login/verify-otp/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/login/verify-otp/page.js"
+    ],
+    "/client-dashboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/client-dashboard/page.js"
     ],
     "/client-dashboard/poa/page": [
       "static/chunks/webpack.js",
@@ -18,10 +33,104 @@
       "static/css/app/client-dashboard/poa/page.css",
       "static/chunks/app/client-dashboard/poa/page.js"
     ],
-    "/api/poa/translate/route": [
+    "/client-dashboard/notifications/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/poa/translate/route.js"
+      "static/chunks/app/client-dashboard/notifications/page.js"
+    ],
+    "/overview/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/overview/page.js"
+    ],
+    "/video-tutorials/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/video-tutorials/page.css",
+      "static/chunks/app/video-tutorials/page.js"
+    ],
+    "/roles/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/roles/page.css",
+      "static/chunks/app/roles/page.js"
+    ],
+    "/spreadsheet/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/spreadsheet/page.js"
+    ],
+    "/schedule-of-fees/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/schedule-of-fees/page.css",
+      "static/chunks/app/schedule-of-fees/page.js"
+    ],
+    "/poa/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/poa/page.css",
+      "static/chunks/app/poa/page.js"
+    ],
+    "/statements/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/statements/page.js"
+    ],
+    "/customer-service/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/customer-service/page.js"
+    ],
+    "/notifications/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/notifications/page.js"
+    ],
+    "/quotations/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/quotations/page.css",
+      "static/chunks/app/quotations/page.js"
+    ],
+    "/vat/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/vat/page.css",
+      "static/chunks/app/vat/page.js"
+    ],
+    "/services/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/services/page.css",
+      "static/chunks/app/services/page.js"
+    ],
+    "/projects/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/projects/page.js"
+    ],
+    "/users/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/users/page.js"
+    ],
+    "/client-dashboard-cards/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/client-dashboard-cards/page.css",
+      "static/chunks/app/client-dashboard-cards/page.js"
+    ],
+    "/classification-of-fees/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/classification-of-fees/page.js"
+    ],
+    "/client-dashboard/requirements/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/client-dashboard/requirements/page.css",
+      "static/chunks/app/client-dashboard/requirements/page.js"
     ]
   }
 }

@@ -1,0 +1,30 @@
+/*!*****************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./app/login/login.css ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************/
+/* The supplied visual is cropped by layout; the login form remains live HTML. */
+.login-reference-page{min-height:100dvh;padding:0;background:white}
+.login-reference-page .auth-card{width:100%;min-height:100dvh;display:grid;grid-template-columns:34.7% 65.3%;border-radius:0;box-shadow:none;overflow:hidden}
+.login-reference-page .login-panel{min-height:100dvh;padding:150px 12% 100px;background:#fff;display:flex;justify-content:center;align-items:center}
+.login-reference-page .brand{top:38px;left:6%;color:#087f92!important}
+.login-reference-page .brand strong{font-size:48px;letter-spacing:-2px}
+.login-reference-page .brand span{font-size:10px;letter-spacing:1px;margin-top:10px}
+.login-reference-page .login-form{width:100%;max-width:380px;margin:0}
+.login-reference-page .login-form header{margin-bottom:34px}
+.login-reference-page .login-form h1{font-size:24px;letter-spacing:-.5px;margin-bottom:10px}
+.login-reference-page .login-form header p{font-size:13px;line-height:1.5}
+.login-reference-page .login-form>label{font-size:13px;margin-bottom:9px}
+.login-reference-page .field{height:49px;border-radius:7px;margin-bottom:20px;padding:0 12px}
+.login-reference-page .field input{font-size:13px;min-width:0}
+.login-reference-page .field-icon{font-size:19px;width:29px;flex-shrink:0}
+.login-reference-page .eye{font-size:21px}
+.login-reference-page .form-options{font-size:12px;margin-bottom:24px;gap:10px}
+.login-reference-page .primary-button{height:49px;border-radius:7px;font-size:14px;background:var(--primary-color)!important}
+.login-reference-page .auth-link{text-align:center;font-size:13px;line-height:1.7;margin-top:22px;color:#7783a0}
+.login-reference-page .auth-link a{color:var(--primary-color-active);font-weight:600}
+.login-reference-page .login-panel footer{bottom:40px;font-size:10px}
+.login-reference-visual{position:relative;min-height:100%;overflow:hidden;background:#d9edf2}
+.login-reference-image{position:absolute;inset:0 0 0 -53.16%;background-image:url('/images/login-reference.png');background-size:cover;background-position:right center;background-repeat:no-repeat}
+@media(min-width:1800px){.login-reference-page .login-panel{padding-top:180px;padding-bottom:150px}}
+@media(max-width:1050px){.login-reference-page .auth-card{grid-template-columns:44% 56%}.login-reference-page .login-panel{padding-left:9%;padding-right:9%}.login-reference-page .brand strong{font-size:40px}}
+@media(max-width:760px){.login-reference-page .auth-card{grid-template-columns:1fr}.login-reference-visual{display:none}.login-reference-page .login-panel{padding:150px 28px 90px}.login-reference-page .brand{left:28px;top:34px}.login-reference-page .login-panel footer{bottom:28px}}
+

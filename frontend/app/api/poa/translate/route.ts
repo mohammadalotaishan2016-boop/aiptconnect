@@ -8,8 +8,23 @@ type Kind = 'name' | 'address';
 type RateEntry = { startedAt: number; count: number };
 const rateByUser = new Map<string, RateEntry>();
 
-function cleanProviderText(value: string) {
-  return value.replace(/^```(?:[a-z]+)?\s*/i, '').replace(/\s*```$/, '').trim().replace(/^(["'“”‘’])(.*)\1$/s, '$2').trim();
+function cleanTranslation(value: string, originalText: string) {
+  const originalDigits = [...originalText.matchAll(/[0-9]+/g)].map(([digits]) => digits);
+  let cleaned = value
+    .replace(/^```(?:[a-z]+)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim()
+    .replace(/^(["'“”‘’])(.*)\1$/s, '$2')
+    .trim()
+    .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+  const translatedDigits = [...cleaned.matchAll(/[0-9]+/g)].map(([digits]) => digits);
+  // Translation should retain each digit run exactly, in order. If the provider
+  // changes the runs, restore the original runs only when their slots remain.
+  if (originalDigits.length === translatedDigits.length) {
+    let index = 0;
+    cleaned = cleaned.replace(/[0-9]+/g, () => originalDigits[index++]);
+  }
+  return cleaned;
 }
 
 export async function POST(request: Request) {
@@ -40,21 +55,26 @@ export async function POST(request: Request) {
   else if (rate.count >= 30) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   else rate.count += 1;
 
-  const prompt = kind === 'name'
-    ? `Phonetically transliterate the following personal or company name into Arabic letters in Modern Standard Arabic. Do not translate its meaning. Return only Arabic text, no quotes or explanation.\n\n${text.trim()}`
-    : `Translate only generic address words (street, road, building, city, district, province, country) into Arabic. Transliterate proper nouns and place names phonetically into Arabic. Keep every digit unchanged and in its original position. Return only Arabic text, no quotes or explanation.\n\n${text.trim()}`;
+  const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
+  if (!apiKey) {
+    console.error('POA translation failed: GOOGLE_TRANSLATE_API_KEY is missing');
+    return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
+  }
+  const addressPrompt = kind === 'address'
+    ? 'Translate generic address terms into Arabic; phonetically transliterate proper names and place names. Preserve every digit run exactly and in its original position. '
+    : '';
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/google-translate`, {
+    const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
-      headers: { Authorization: authorization!, apikey: publicKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target: 'ar', texts: [prompt] }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: `${addressPrompt}${text.trim()}`, source: 'en', target: 'ar', format: 'text' }),
       signal: AbortSignal.timeout(8000),
       cache: 'no-store',
     });
-    const body = await response.json().catch(() => ({})) as { translations?: unknown };
-    const value = Array.isArray(body.translations) ? body.translations[0] : null;
+    const body = await response.json().catch(() => ({})) as { data?: { translations?: Array<{ translatedText?: unknown }> } };
+    const value = body.data?.translations?.[0]?.translatedText;
     if (!response.ok || typeof value !== 'string') return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
-    const arabic = cleanProviderText(value);
+    const arabic = cleanTranslation(value, text);
     if (!arabic || /[A-Za-z]/.test(arabic)) return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
     return NextResponse.json({ arabic }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch {

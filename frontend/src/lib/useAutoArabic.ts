@@ -14,6 +14,7 @@ export function useAutoArabic(text: string, kind: ArabicTranslationKind) {
   const [manual, setManual] = useState(false);
   const manualRef = useRef(false);
   const sequence = useRef(0);
+  const requestController = useRef<AbortController | null>(null);
   const currentText = text.trim();
 
   const onEdit = useCallback((value: string) => {
@@ -33,18 +34,23 @@ export function useAutoArabic(text: string, kind: ArabicTranslationKind) {
     setManual(false);
     if (currentText) cache.get(kind)?.delete(currentText);
     sequence.current += 1;
+    requestController.current?.abort();
+    requestController.current = null;
     setArabic('');
     setStatus(currentText ? 'pending' : 'idle');
   }, [currentText, kind]);
 
   useEffect(() => {
     const ticket = ++sequence.current;
+    requestController.current?.abort();
+    requestController.current = null;
     if (manualRef.current) { setStatus('idle'); return; }
     if (!currentText) { setArabic(''); setStatus('idle'); return; }
     const cached = cache.get(kind)?.get(currentText);
     if (cached) { setArabic(cached); setStatus('idle'); return; }
 
     const controller = new AbortController();
+    requestController.current = controller;
     setStatus('pending');
     const timer = window.setTimeout(() => {
       setStatus('loading');
@@ -54,6 +60,7 @@ export function useAutoArabic(text: string, kind: ArabicTranslationKind) {
           if (!session?.access_token) throw new Error('unauthorized');
           const response = await fetch('/api/poa/translate', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: currentText, kind }),
             signal: controller.signal,
@@ -69,8 +76,8 @@ export function useAutoArabic(text: string, kind: ArabicTranslationKind) {
         }
       })();
     }, 500);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [currentText, kind, manual, sequence.current]);
+    return () => { window.clearTimeout(timer); controller.abort(); if (requestController.current === controller) requestController.current = null; };
+  }, [currentText, kind, manual]);
 
   return { arabic, status, onEdit, retranslate, manual };
 }

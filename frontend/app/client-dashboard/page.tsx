@@ -24,6 +24,7 @@ const displayLabels: Record<string, string> = {
   'customer-service': 'Customer Service',
 };
 type TutorialLink = { card_key: string; title: string; url: string };
+type CardAvailability = { card_key: string; is_available: boolean; coming_soon: boolean };
 type UpdateItem = Record<string, unknown>;
 type CardUpdate = { count: number; failed: boolean };
 const cardUpdateSources: Array<{ key: string; path: string; pagePath?: (page: number) => string; getItems: (body: unknown) => UpdateItem[]; dateFields: string[] }> = [
@@ -57,6 +58,10 @@ export default function ClientDashboardPage() {
   const [tutorials, setTutorials] = useState<Record<string, TutorialLink>>({});
   const [tutorialsLoaded, setTutorialsLoaded] = useState(false);
   const [tutorialsFailed, setTutorialsFailed] = useState(false);
+  const [availability, setAvailability] = useState<Record<string, boolean>>({});
+  const [comingSoon, setComingSoon] = useState<Record<string, boolean>>({});
+  const [cardSettingsLoaded, setCardSettingsLoaded] = useState(false);
+  const [cardSettingsFailed, setCardSettingsFailed] = useState(false);
   const [cardUpdates, setCardUpdates] = useState<Record<string, CardUpdate>>({});
   const [supportContext, setSupportContext] = useState<string | null>(null);
   const [activeTutorial, setActiveTutorial] = useState<TutorialLink | null>(null);
@@ -162,24 +167,41 @@ export default function ClientDashboardPage() {
   }, []);
   useEffect(() => {
     const controller = new AbortController();
-    const load = async () => {
+    const loadTutorials = async () => {
       try {
         const response = await fetchSupabaseFunction('video-tutorials?client=true', { signal: controller.signal });
-        if (!response.ok) throw new Error('Unable to load tutorials.');
         const body = await response.json();
-        if (!controller.signal.aborted && Array.isArray(body.data)) {
-          setTutorials(Object.fromEntries(body.data.map((item: TutorialLink) => [item.card_key, item])));
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setTutorials({});
-          setTutorialsFailed(true);
-        }
+        if (!response.ok) throw new Error('Unable to load tutorials.');
+        if (!Array.isArray(body.data)) throw new Error('The tutorials service returned invalid data.');
+        if (!controller.signal.aborted) setTutorials(Object.fromEntries(body.data.map((item: TutorialLink) => [item.card_key, item])));
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        console.error('Could not load client dashboard tutorials:', cause);
+        setTutorials({});
+        setTutorialsFailed(true);
       } finally {
         if (!controller.signal.aborted) setTutorialsLoaded(true);
       }
     };
-    void load();
+    const loadCardSettings = async () => {
+      try {
+        const response = await fetchSupabaseFunction('video-tutorials?availability=true', { signal: controller.signal });
+        const body = await response.json();
+        if (!response.ok) throw new Error('Unable to load dashboard card settings.');
+        if (!Array.isArray(body.data)) throw new Error('The dashboard cards service returned invalid data.');
+        if (!controller.signal.aborted) {
+          setAvailability(Object.fromEntries(body.data.map((item: CardAvailability) => [item.card_key, item.is_available])));
+          setComingSoon(Object.fromEntries(body.data.map((item: CardAvailability) => [item.card_key, item.coming_soon])));
+        }
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        console.error('Could not load client dashboard card availability:', cause);
+        setCardSettingsFailed(true);
+      } finally {
+        if (!controller.signal.aborted) setCardSettingsLoaded(true);
+      }
+    };
+    void Promise.all([loadTutorials(), loadCardSettings()]);
     return () => controller.abort();
   }, []);
   const translatedLabels: Record<string, Record<'en' | 'ar' | 'fil' | 'zh', string>> = {
@@ -193,15 +215,33 @@ export default function ClientDashboardPage() {
     'customer-service': { en: 'Customer Service', ar: 'خدمة العملاء', fil: 'Serbisyo sa Customer', zh: '客户服务' },
   };
   const uiLabels = {
-    en: { tutorial: 'Tutorial', chat: 'Chat Us', dashboard: 'Client dashboard', services: 'Dashboard services', watch: 'Watch', unavailable: 'unavailable', notAssigned: 'not assigned', loading: 'loading', newUpdates: 'new updates', updatesUnavailable: 'Updates unavailable' },
-    ar: { tutorial: 'شرح', chat: 'تواصل معنا', dashboard: 'لوحة العميل', services: 'خدمات لوحة التحكم', watch: 'شاهد', unavailable: 'غير متاح', notAssigned: 'غير مخصص', loading: 'جارٍ التحميل', newUpdates: 'تحديثات جديدة', updatesUnavailable: 'التحديثات غير متاحة' },
-    fil: { tutorial: 'Tutorial', chat: 'Makipag-chat', dashboard: 'Dashboard ng kliyente', services: 'Mga serbisyo ng dashboard', watch: 'Panoorin', unavailable: 'hindi available', notAssigned: 'hindi nakatalaga', loading: 'naglo-load', newUpdates: 'mga bagong update', updatesUnavailable: 'Hindi available ang mga update' },
-    zh: { tutorial: '教程', chat: '联系客服', dashboard: '客户仪表板', services: '仪表板服务', watch: '观看', unavailable: '不可用', notAssigned: '未分配', loading: '加载中', newUpdates: '条新更新', updatesUnavailable: '更新不可用' },
+    en: { tutorial: 'Tutorial', chat: 'Chat Us', dashboard: 'Client dashboard', dashboardTitle: 'Client Dashboard', dashboardSubtitle: 'Dashboard services', services: 'Dashboard services', servicesCount: 'services', totalServices: 'Total services', availableServices: 'Available', comingSoonCount: 'Coming soon', newUpdatesCount: 'New updates', watch: 'Watch', unavailable: 'unavailable', notAssigned: 'not assigned', loading: 'loading', newUpdates: 'new updates', updatesUnavailable: 'Updates unavailable', comingSoon: 'Coming soon' },
+    ar: { tutorial: 'شرح', chat: 'تواصل معنا', dashboard: 'لوحة العميل', dashboardTitle: 'لوحة العميل', dashboardSubtitle: 'خدمات لوحة التحكم', services: 'خدمات لوحة التحكم', servicesCount: 'خدمات', totalServices: 'إجمالي الخدمات', availableServices: 'متاح', comingSoonCount: 'قريباً', newUpdatesCount: 'تحديثات جديدة', watch: 'شاهد', unavailable: 'غير متاح', notAssigned: 'غير مخصص', loading: 'جارٍ التحميل', newUpdates: 'تحديثات جديدة', updatesUnavailable: 'التحديثات غير متاحة', comingSoon: 'قريباً' },
+    fil: { tutorial: 'Tutorial', chat: 'Makipag-chat', dashboard: 'Dashboard ng kliyente', dashboardTitle: 'Dashboard ng Kliyente', dashboardSubtitle: 'Mga serbisyo ng dashboard', services: 'Mga serbisyo ng dashboard', servicesCount: 'serbisyo', totalServices: 'Kabuuang serbisyo', availableServices: 'Available', comingSoonCount: 'Malapit na', newUpdatesCount: 'Mga bagong update', watch: 'Panoorin', unavailable: 'hindi available', notAssigned: 'hindi nakatalaga', loading: 'naglo-load', newUpdates: 'mga bagong update', updatesUnavailable: 'Hindi available ang mga update', comingSoon: 'Malapit na' },
+    zh: { tutorial: '教程', chat: '联系客服', dashboard: '客户仪表板', dashboardTitle: '客户仪表板', dashboardSubtitle: '仪表板服务', services: '仪表板服务', servicesCount: '项服务', totalServices: '服务总数', availableServices: '可用', comingSoonCount: '即将推出', newUpdatesCount: '最新更新', watch: '观看', unavailable: '不可用', notAssigned: '未分配', loading: '加载中', newUpdates: '条新更新', updatesUnavailable: '更新不可用', comingSoon: '即将推出' },
   }[language];
   const tutorialStatus = !tutorialsLoaded ? uiLabels.loading : tutorialsFailed ? uiLabels.unavailable : uiLabels.notAssigned;
+  const cardSettingsReady = cardSettingsLoaded && !cardSettingsFailed;
+  const availableServices = destinations.filter(({ key }) => availability[key] !== false && comingSoon[key] !== true).length;
+  const comingSoonServices = destinations.length - availableServices;
+  const updatesReady = Object.keys(cardUpdates).length === cardUpdateSources.length && Object.values(cardUpdates).every(update => !update.failed);
+  const newUpdatesCount = Object.values(cardUpdates).reduce((total, update) => total + update.count, 0);
   return <section className="client-home" aria-label={uiLabels.dashboard}>
+    <header className="client-home-feed-header"><div><h1>{uiLabels.dashboardTitle}</h1><p>{uiLabels.dashboardSubtitle}</p></div><strong>{destinations.length} {uiLabels.servicesCount}</strong></header>
+    <section className="client-home-feed-stats" aria-label={uiLabels.dashboardSubtitle}>
+      <div><span>{uiLabels.totalServices}</span><strong>{destinations.length}</strong></div>
+      <div><span>{uiLabels.availableServices}</span><strong>{cardSettingsReady ? availableServices : '—'}</strong></div>
+      <div><span>{uiLabels.comingSoonCount}</span><strong>{cardSettingsReady ? comingSoonServices : '—'}</strong></div>
+      <div><span>{uiLabels.newUpdatesCount}</span><strong>{updatesReady ? newUpdatesCount : '—'}</strong></div>
+    </section>
     <nav className="client-home-grid" aria-label={uiLabels.services}>
-      {destinations.map(({ key, label, href }) => <div className="client-home-card-wrap" key={key}>
+      {destinations.map(({ key, label, href }) => {
+        const comingSoonForCard = comingSoon[key] === true;
+        const lockedByAvailability = availability[key] === false;
+        const lockedBySetting = lockedByAvailability || comingSoonForCard;
+        const cardDisabled = !cardSettingsLoaded || cardSettingsFailed || lockedBySetting;
+        const showComingSoon = cardSettingsLoaded && !cardSettingsFailed && lockedBySetting;
+        return <div className="client-home-card-wrap" key={key}>
         <div className="client-home-tile-header">
           {tutorials[key]?.url ? <button type="button" className="client-home-tutorial-link" onClick={() => setActiveTutorial(tutorials[key])} title={tutorials[key].title} aria-label={`${uiLabels.watch} ${tutorials[key].title} ${uiLabels.tutorial} ${translatedLabels[key]?.[language] || displayLabels[key] || label}`}>
             <span>{uiLabels.tutorial}</span>
@@ -213,14 +253,18 @@ export default function ClientDashboardPage() {
             <b aria-hidden="true">{cardUpdates[key].count > 99 ? '99+' : cardUpdates[key].count}</b>
           </span>}
         </div>
-        <Link href={href} className="client-home-card" aria-label={translatedLabels[key]?.[language] || displayLabels[key] || label}>
+        {cardDisabled ? <button type="button" className="client-home-card is-disabled" disabled aria-disabled="true" aria-label={`${translatedLabels[key]?.[language] || displayLabels[key] || label}: ${showComingSoon ? uiLabels.comingSoon : uiLabels.unavailable}`} title={showComingSoon ? uiLabels.comingSoon : uiLabels.unavailable}>
           <span className="client-home-card-label" lang={language}>{translatedLabels[key]?.[language] || displayLabels[key] || label}</span>
-        </Link>
-        <button type="button" className="client-home-chat" aria-label={`${uiLabels.chat}: ${translatedLabels[key]?.[language] || label}`} onClick={() => setSupportContext(translatedLabels[key]?.[language] || displayLabels[key] || label)}>
+        </button> : <Link href={href} className="client-home-card" aria-label={translatedLabels[key]?.[language] || displayLabels[key] || label}>
+          <span className="client-home-card-label" lang={language}>{translatedLabels[key]?.[language] || displayLabels[key] || label}</span>
+        </Link>}
+        <button type="button" className={`client-home-chat${cardDisabled ? ' is-coming-soon' : ''}`} aria-label={`${uiLabels.chat}${cardDisabled ? `: ${showComingSoon ? uiLabels.comingSoon : uiLabels.unavailable}` : `: ${translatedLabels[key]?.[language] || label}`}`} disabled={cardDisabled} onClick={() => setSupportContext(translatedLabels[key]?.[language] || displayLabels[key] || label)}>
           <span className="client-home-chat-bubble" aria-hidden="true" />
           <span>{uiLabels.chat}</span>
+          {showComingSoon && <span className="client-home-coming-soon-inline" role="status">{uiLabels.comingSoon}</span>}
         </button>
-      </div>)}
+        </div>;
+      })}
     </nav>
     {activeTutorial && <div className="client-home-tutorial-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setActiveTutorial(null); }}>
       <section className="client-home-tutorial-dialog" role="dialog" aria-modal="true" aria-labelledby="client-home-tutorial-title">

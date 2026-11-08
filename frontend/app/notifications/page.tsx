@@ -1,7 +1,5 @@
-'use client';
-import TablePagination from '../../src/components/TablePagination';
+﻿'use client';
 import ActionIcon from '../../src/components/ActionIcon';
-
 import {
   ChangeEvent,
   FormEvent,
@@ -12,7 +10,6 @@ import {
   useState,
 } from "react";
 import { fetchSupabaseFunction, getSupabaseBrowserClient } from "../../src/lib/supabase/browser";
-
 type Country = {
   id: string;
   name: string;
@@ -22,21 +19,22 @@ type Country = {
 type Notification = {
   id: string;
   notification_date: string;
+  created_at: string | null;
+  updated_at: string | null;
   description: string;
   document_key: string | null;
   document_name: string | null;
   document_size: number | null;
   document_type: string | null;
+  aws_metadata?: { size_bytes: number | null; content_type: string | null; last_modified: string | null; etag: string | null } | null;
   countries: Array<{ country: Country }>;
 };
 type Modal = "add" | "view" | "edit" | "delete" | null;
-
 const toDateTimeLocal = (value: Date | string = new Date()) => {
   const date = new Date(value);
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 };
-
 function CountryFlag({ country }: { country: Country }) {
   const [failed, setFailed] = useState(false);
   return country.flag_url && !failed ? (
@@ -47,7 +45,12 @@ function CountryFlag({ country }: { country: Country }) {
     </span>
   );
 }
-
+function formatFileSize(value: number | null) {
+  if (value === null) return '';
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(0)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
 export default function NotificationsPage() {
   const [pageSize, setPageSize] = useState(10);
   const [items, setItems] = useState<Notification[]>([]),
@@ -55,18 +58,23 @@ export default function NotificationsPage() {
     [selected, setSelected] = useState<Notification | null>(null),
     [modal, setModal] = useState<Modal>(null);
   const [date, setDate] = useState(""),
+    [filterDate, setFilterDate] = useState(""),
+    [filterCountry, setFilterCountry] = useState(""),
+    [filterYear, setFilterYear] = useState(""),
     [description, setDescription] = useState(""),
     [countryIds, setCountryIds] = useState<string[]>([]),
     [file, setFile] = useState<File | null>(null),
     [countrySearch, setCountrySearch] = useState(""),
     [countryOpen, setCountryOpen] = useState(false),
     [query, setQuery] = useState(""),
+    [searchInput, setSearchInput] = useState(""),
     [page, setPage] = useState(1),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false),
     [exportOpen, setExportOpen] = useState(false);
+  const [detailsItem, setDetailsItem] = useState<Notification | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const documentRef = useRef<HTMLInputElement>(null);
   const countrySelectRef = useRef<HTMLDivElement>(null);
@@ -103,7 +111,7 @@ export default function NotificationsPage() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) throw Error("Please sign in.");
-      const response = await fetchSupabaseFunction(`${endpoint}${path}${endpoint === "notifications" && typeof window !== "undefined" && window.location.pathname.startsWith("/client-dashboard/") && (!options.method || options.method === "GET") ? (path.includes("?") ? "&" : "?") + "manage=true" : ""}`, {
+        const response = await fetchSupabaseFunction(`${endpoint}${path}`, {
         ...options,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -168,9 +176,17 @@ export default function NotificationsPage() {
         )
       : items;
   }, [items, query]);
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize)),
+  const categorized = useMemo(() => filtered.filter(item => {
+    const published = new Date(item.notification_date);
+    return (!filterDate || published.toISOString().slice(0, 10) === filterDate)
+      && (!filterYear || String(published.getFullYear()) === filterYear)
+      && (!filterCountry || item.countries.some(value => value.country.id === filterCountry))
+      ;
+  }), [filtered, filterDate, filterYear, filterCountry]);
+  const pages = Math.max(1, Math.ceil(categorized.length / pageSize)),
     current = Math.min(page, pages),
-    visible = filtered.slice((current - 1) * pageSize, current * pageSize);
+    visible = categorized.slice((current - 1) * pageSize, current * pageSize);
+  const clearFilters = () => { setSearchInput(""); setQuery(""); setFilterDate(""); setFilterYear(""); setFilterCountry(""); setPage(1); };
   const open = (kind: Exclude<Modal, null>, item?: Notification) => {
     setSelected(item ?? null);
     setDate(
@@ -310,39 +326,12 @@ export default function NotificationsPage() {
       item.countries.map((value) => value.country.name).join("; "),
       item.document_name ?? "",
     ]);
-  const csv = () =>
-    exportFile(
-      "\uFEFFDate,Description,Countries,Document\r\n" +
-        rows()
-          .map((row) =>
-            row.map((value) => `"${value.split('"').join('""')}"`).join(","),
-          )
-          .join("\r\n"),
-      "text/csv",
-      "csv",
-    );
-  const word = () =>
-    exportFile(
-      `<html><body><h1>Notifications</h1><table border="1"><tr><th>Date</th><th>Description</th><th>Countries</th><th>Document</th></tr>${rows()
-        .map(
-          (row) =>
-            `<tr>${row.map((value) => `<td>${value}</td>`).join("")}</tr>`,
-        )
-        .join("")}</table></body></html>`,
-      "application/msword",
-      "doc",
-    );
+  const csv = () => exportFile("\uFEFFDate,Description,Countries,Document\r\n" + rows().map(row => row.map(value => `"${value.split('"').join('""')}"`).join(",")).join("\r\n"), "text/csv", "csv");
+  const word = () => exportFile(`<html><body><h1>Notifications</h1><table border="1"><tr><th>Date</th><th>Description</th><th>Countries</th><th>Document</th></tr>${rows().map(row => `<tr>${row.map(value => `<td>${value}</td>`).join("")}</tr>`).join("")}</table></body></html>`, "application/msword", "doc");
   const pdf = () => {
     const popup = window.open("", "_blank");
     if (!popup) return setError("Allow pop-ups to export PDF.");
-    popup.document.write(
-      `<h1>Notifications</h1><table border="1" cellspacing="0" cellpadding="8">${rows()
-        .map(
-          (row) =>
-            `<tr>${row.map((value) => `<td>${value}</td>`).join("")}</tr>`,
-        )
-        .join("")}</table><script>window.onload=()=>window.print()<\/script>`,
-    );
+    popup.document.write(`<h1>Notifications</h1><table border="1" cellspacing="0" cellpadding="8">${rows().map(row => `<tr>${row.map(value => `<td>${value}</td>`).join("")}</tr>`).join("")}</table><script>window.onload=()=>window.print()<\/script>`);
     popup.document.close();
     setExportOpen(false);
   };
@@ -392,152 +381,30 @@ export default function NotificationsPage() {
       setSaving(false);
     }
   };
+  const dateOptions = Array.from(new Set(items.map(item => new Date(item.notification_date).toISOString().slice(0, 10)))).sort().reverse();
+  const yearOptions = Array.from(new Set(items.map(item => String(new Date(item.notification_date).getFullYear())))).sort().reverse();
+  const totalCountries = new Set(items.flatMap(item => item.countries.map(entry => entry.country.id))).size;
+  const withDocuments = items.filter(item => Boolean(item.document_key || item.document_name)).length;
+  const [clientView, setClientView] = useState(false);
+  useEffect(() => setClientView(window.location.pathname.startsWith('/client-dashboard/')), []);
+  const dateLabel = (value: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+  const timeLabel = (value: string) => new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  const fileBadge = (item: Notification) => (item.document_name?.split('.').pop() || item.document_type?.split('/').pop() || 'FILE').replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'DOCX').replace('vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'XLSX').slice(0, 4).toUpperCase();
+  const applySearch = () => { setQuery(searchInput); setPage(1); };
+  const applyFilters = () => setPage(1);
+  const recent = [...items].sort((a, b) => Date.parse(b.notification_date) - Date.parse(a.notification_date)).slice(0, 5);
   return (
-    <main className="procedure-page notification-page">
-      <section>
-        <header className="countries-topbar">
-          <p>
-            Home <i>/</i> <b>Notifications</b>
-          </p>
-          <div className="top-profile">
-            <button>♧</button>
-            <span>MS</span>
-            <b>
-              Mohammad Saleh<small>Administrator</small>
-            </b>
-          </div>
-        </header>
-        <div className="countries-heading">
-          <div>
-            <h1>Notifications</h1>
-            <p>View and manage all system notifications.</p>
-          </div>
-          <div className="procedure-controls">
-            <input
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setPage(1);
-              }}
-              placeholder="⌕ Search..."
-            />
-            <input
-              ref={importRef}
-              className="procedure-file-input"
-              type="file"
-              accept=".csv"
-              onChange={importCsv}
-            />
-            <button
-              className="procedure-import"
-              onClick={() => importRef.current?.click()}
-             data-action="import" title="Import"><ActionIcon name="import" /><span className="aipt-action-label">Import</span></button>
-            <div className="procedure-export">
-              <button onClick={() => setExportOpen((value) => !value)} data-action="export" title="Export"><ActionIcon name="export" /><span className="aipt-action-label">Export</span></button>
-              {exportOpen && (
-                <div>
-                  <button onClick={csv} data-action="export" title="Excel"><ActionIcon name="export" /><span className="aipt-action-label">Excel</span></button>
-                  <button onClick={word} data-action="export" title="Word"><ActionIcon name="export" /><span className="aipt-action-label">Word</span></button>
-                  <button onClick={pdf} data-action="pdf" title="PDF"><ActionIcon name="pdf" /><span className="aipt-action-label">PDF</span></button>
-                </div>
-              )}
-            </div>
-            <button className="country-add" onClick={() => open("add")} data-action="add" title="Add Notification"><ActionIcon name="add" /><span className="aipt-action-label">Add Notification</span></button>
-          </div>
-        </div>
-        {notice && (
-          <div className="country-toast">
-            {notice}
-            <button onClick={() => setNotice("")}>×</button>
-          </div>
-        )}
-        <section className="country-table-card">
-          {error && !modal && <p className="country-page-error">{error}</p>}
-          <div className="country-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Description</th>
-                  <th>Countries</th>
-                  <th>Document to Download</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="country-state">
-                      Loading notifications…
-                    </td>
-                  </tr>
-                ) : visible.length ? (
-                  visible.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <b>
-                          {new Date(
-                            item.notification_date,
-                          ).toLocaleDateString()}
-                        </b>
-                        <small className="notification-time">
-                          {new Date(item.notification_date).toLocaleTimeString(
-                            [],
-                            { hour: "2-digit", minute: "2-digit" },
-                          )}
-                        </small>
-                      </td>
-                      <td>{item.description}</td>
-                      <td>
-                        {item.countries
-                          .map((value) => value.country.name)
-                          .join(", ")}
-                      </td>
-                      <td>
-                        <button
-                          className="document-link"
-                          disabled={!item.document_key}
-                          onClick={() => downloadDocument(item)}
-                        >
-                          ▣ {item.document_name ?? "No document"}
-                          <small>
-                            {item.document_size
-                              ? `${Math.ceil(item.document_size / 1024)} KB`
-                              : ""}
-                          </small>
-                        </button>
-                      </td>
-                      <td>
-                        <button
-                          className="country-icon"
-                          onClick={() => open("view", item)}
-                        >
-                          ⊙
-                        </button>
-                        <button
-                          className="country-icon"
-                          onClick={() => open("edit", item)}
-                         data-action="edit" data-icon-only="true" title="Edit"><ActionIcon name="edit" /><span className="aipt-action-label">Edit</span></button>
-                        <button
-                          className="country-icon delete"
-                          onClick={() => open("delete", item)}
-                         data-action="delete" data-icon-only="true" title="Delete"><ActionIcon name="delete" /><span className="aipt-action-label">Delete</span></button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="country-state">
-                      No notifications found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <TablePagination page={current} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={setPageSize} loading={loading} />
-        </section>
-      </section>
+    <main className={`procedure-page notification-page${clientView ? ' client-notification-feed' : ''}`}><section className="notification-news-shell">
+      <header className="countries-topbar notification-admin-topbar"><p>Home <i>/</i> <b>Notifications</b></p><div className="top-profile"><span>MS</span><b>Notifications<small>News Feed</small></b></div></header>
+      <header className="notification-feed-header"><div><h1>{clientView ? <><span className="client-feed-banner-bell" aria-hidden="true">🔔</span> Notifications</> : 'News Feed'}</h1><p>{clientView ? `${categorized.length} of ${items.length} notifications` : 'Stay updated with the latest notifications.'}</p></div><strong>{clientView ? `${categorized.length} of ${items.length} notifications` : `${items.length} total notifications`}</strong></header>
+      <section className="notification-feed-stats" aria-label="Notification statistics"><div><span>Total notifications</span><strong>{loading ? 'â€”' : items.length}</strong></div><div><span>With documents</span><strong>{loading ? 'â€”' : withDocuments}</strong></div><div><span>Countries covered</span><strong>{loading ? 'â€”' : totalCountries}</strong></div><div><span>Records displayed</span><strong>{loading ? 'â€”' : categorized.length}</strong></div></section>
+      <div className="notification-searchbar"><input aria-label="Search news by title or content" value={searchInput} onChange={event => setSearchInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') applySearch(); }} placeholder={clientView ? 'Search by description, country...' : 'Search descriptions, document names, and countries...'} /><button type="button" onClick={applySearch}>Search</button></div>
+      {clientView && <div className="client-notification-category-tabs" aria-label="Notification types"><span className="is-active">All</span><span>Images</span><span>Documents</span></div>}
+      {notice && <div className="country-toast" role="status">{notice}<button type="button" onClick={() => setNotice('')}>Ã—</button></div>}
+      <div className="notification-feed-layout"><div className="notification-feed-main">
+        <section className="notification-feed-list">{error && !modal && <p className="country-page-error" role="alert">{error}</p>}{loading ? <p className="notification-feed-state">Loading notifications from the database...</p> : visible.length ? <div className="notification-card-list">{visible.map(item => { const firstCountry = item.countries[0]?.country; const timestamp = new Date(item.notification_date); const created = item.created_at || item.notification_date; const updated = item.updated_at || item.created_at || item.notification_date; const fileSize = item.document_size ?? item.aws_metadata?.size_bytes ?? null; const fileType = item.document_type || item.aws_metadata?.content_type || 'File type unavailable'; const attachmentUpdated = item.aws_metadata?.last_modified; return <article className="notification-news-card" key={item.id}>{clientView ? <><span className="client-feed-bell" aria-hidden="true">â™Ÿ</span><div className="notification-news-copy"><div className="client-feed-title"><h2>{item.description}</h2><time>{dateLabel(item.notification_date)}, {timeLabel(item.notification_date)}</time></div><code className="client-feed-reference">Ref: {item.id}</code><div className="client-feed-countries">{item.countries.map(value => <span key={value.country.id}><CountryFlag country={value.country} />{value.country.name}</span>)}</div>{item.document_name && <div className="client-feed-attachment"><span className="client-feed-file-badge">{fileBadge(item)}</span><span className="client-feed-file-info"><strong>{item.document_name}</strong><small>{fileType}{formatFileSize(fileSize) ? ` Â· ${formatFileSize(fileSize)}` : ''}{attachmentUpdated ? ` Â· Stored ${dateLabel(attachmentUpdated)}` : ''}</small></span><button type="button" onClick={() => void downloadDocument(item)} disabled={!item.document_key}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>Open</button></div>}<small className="client-feed-audit">Created {dateLabel(created)}, {timeLabel(created)} Â· Updated {dateLabel(updated)}, {timeLabel(updated)}</small></div></> : <><div className="notification-news-copy"><h2>{item.description}</h2><button className="notification-read-more" type="button" onClick={() => setDetailsItem(item)}>Read More</button><div className="notification-admin-actions"><button type="button" onClick={() => open('view', item)}>Details</button><button type="button" data-action="edit" onClick={() => open('edit', item)}>Edit</button><button type="button" data-action="delete" onClick={() => open('delete', item)}>Delete</button></div></div><div className="notification-news-meta"><strong>{firstCountry && <CountryFlag country={firstCountry} />}<span>{item.countries.map(value => value.country.name).join(', ') || 'All countries'}</span></strong><span>{dateLabel(item.notification_date)}</span><span>{timeLabel(item.notification_date)}</span><b className="notification-year-badge">{timestamp.getFullYear()}</b>{item.document_name && <div className="notification-document-details"><span>{item.document_type || "File type unavailable"}{formatFileSize(item.document_size) ? ` Â· ${formatFileSize(item.document_size)}` : ""}</span><button type="button" onClick={() => void downloadDocument(item)}>{item.document_name} Â· Download</button></div>}</div></>}</article>; })}</div> : <p className="notification-feed-state">No notifications match the current search or filters.</p>}<footer className="notification-feed-pagination"><span>Showing {categorized.length ? (current - 1) * pageSize + 1 : 0} to {Math.min(current * pageSize, categorized.length)} of {categorized.length} records</span><label>Rows<select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></label><nav aria-label="Notifications pagination"><button type="button" onClick={() => setPage(1)} disabled={loading || current <= 1}>First</button><button type="button" onClick={() => setPage(current - 1)} disabled={loading || current <= 1}>Previous</button><b>{current} / {pages}</b><button type="button" onClick={() => setPage(current + 1)} disabled={loading || current >= pages}>Next</button><button type="button" onClick={() => setPage(pages)} disabled={loading || current >= pages}>Last</button></nav></footer></section>
+      </div><aside className="notification-feed-sidebar"><section className="notification-sidebar-panel"><header>Filter News</header><div className="notification-filter-fields"><label>By Date<select value={filterDate} onChange={event => setFilterDate(event.target.value)}><option value="">All Dates</option>{dateOptions.map(value => <option value={value} key={value}>{dateLabel(value)}</option>)}</select></label><label>By Country<select value={filterCountry} onChange={event => setFilterCountry(event.target.value)}><option value="">All Countries</option>{countries.map(country => <option value={country.id} key={country.id}>{country.name}</option>)}</select></label><label>By Year<select value={filterYear} onChange={event => setFilterYear(event.target.value)}><option value="">All Years</option>{yearOptions.map(value => <option value={value} key={value}>{value}</option>)}</select></label><button type="button" onClick={applyFilters}>Apply Filters</button><button type="button" className="notification-clear-filters" onClick={clearFilters}>Clear filters</button></div></section><section className="notification-sidebar-panel notification-recent-panel"><header>Recent News</header>{recent.map(item => <button type="button" key={item.id} onClick={() => setDetailsItem(item)}><b>{item.description}</b><small>{dateLabel(item.notification_date)}</small></button>)}</section></aside></div>
+      {detailsItem && <div className="notification-details-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsItem(null); }}><section className="notification-details-modal" role="dialog" aria-modal="true" aria-labelledby="notification-details-title"><button className="notification-details-close" type="button" onClick={() => setDetailsItem(null)} aria-label="Close">Ã—</button><span className="notification-category-badge">{detailsItem.document_type || detailsItem.document_name?.split('.').pop()?.toUpperCase() || 'Announcement'}</span><h2 id="notification-details-title">{detailsItem.description}</h2><div className="notification-detail-meta">{detailsItem.countries.map(value => <span key={value.country.id}>{value.country.name}</span>)}<span>{dateLabel(detailsItem.notification_date)} Â· {timeLabel(detailsItem.notification_date)} Â· {new Date(detailsItem.notification_date).getFullYear()}</span></div>{detailsItem.document_name && <div className="notification-details-document"><strong>Attachment:</strong> {detailsItem.document_name}<br /><strong>Type:</strong> {detailsItem.document_type || "Unavailable"}<br /><strong>Size:</strong> {formatFileSize(detailsItem.document_size) || "Unavailable"}<br /><button type="button" className="notification-read-more" onClick={() => void downloadDocument(detailsItem)} disabled={!detailsItem.document_key}>Download document</button></div>}</section></div>}
       {modal && (
         <div className="country-modal-backdrop" onMouseDown={close}>
           <section
@@ -547,12 +414,12 @@ export default function NotificationsPage() {
             {modal === "delete" && selected ? (
               <>
                 <header className="country-panel-heading delete-title">
-                  <i>♲</i>
+                  <i>â™²</i>
                   <div>
                     <h2>Delete Notification</h2>
                     <small>This action cannot be undone.</small>
                   </div>
-                  <button onClick={close}>×</button>
+                  <button onClick={close}>Ã—</button>
                 </header>
                 <NotificationSummary item={selected} />
                 {error && <p className="country-form-error">{error}</p>}
@@ -569,7 +436,7 @@ export default function NotificationsPage() {
               <>
                 <header className="country-panel-heading">
                   <h2>Notification Details</h2>
-                  <button onClick={close}>×</button>
+                  <button onClick={close}>Ã—</button>
                 </header>
                 <NotificationSummary item={selected} />
                 <footer className="country-panel-footer">
@@ -584,7 +451,7 @@ export default function NotificationsPage() {
                       ? "Add New Notification"
                       : "Edit Notification"}
                   </h2>
-                  <button onClick={close}>×</button>
+                  <button onClick={close}>Ã—</button>
                 </header>
                 <form onSubmit={save}>
                   <label className="country-label">
@@ -613,12 +480,12 @@ export default function NotificationsPage() {
                     <span className="notification-field-label">Countries <em>*</em></span>
                     <div className="country-multiselect" ref={countrySelectRef}>
                       <div className="country-search-control">
-                        <span aria-hidden="true">⌕</span>
+                        <span aria-hidden="true">âŒ•</span>
                         <input value={countrySearch} onFocus={() => setCountryOpen(true)} onChange={(event) => { setCountrySearch(event.target.value); setCountryOpen(true); }} placeholder={countryIds.length ? "Search to add another country..." : "Search and select countries..."} />
-                        <button type="button" aria-label="Toggle country list" onClick={() => setCountryOpen((open) => !open)}>⌄</button>
+                        <button type="button" aria-label="Toggle country list" onClick={() => setCountryOpen((open) => !open)}>âŒ„</button>
                       </div>
-                      {countryIds.length > 0 && <div className="country-tags">{countryIds.map((id) => { const country = countries.find((value) => value.id === id); return country ? <button type="button" key={id} onClick={() => toggleCountry(id)}><CountryFlag country={country} /><span>{country.name}</span><i aria-hidden="true">×</i></button> : null; })}</div>}
-                      {countryOpen && <div className="country-options">{matchingCountries.length ? matchingCountries.map((country) => <button type="button" className={countryIds.includes(country.id) ? "is-selected" : ""} key={country.id} onClick={() => toggleCountry(country.id)}><CountryFlag country={country} /><span>{country.name}<small>{country.abbreviation}</small></span><i aria-hidden="true">{countryIds.includes(country.id) ? "✓" : ""}</i></button>) : <p>No countries match your search.</p>}</div>}
+                      {countryIds.length > 0 && <div className="country-tags">{countryIds.map((id) => { const country = countries.find((value) => value.id === id); return country ? <button type="button" key={id} onClick={() => toggleCountry(id)}><CountryFlag country={country} /><span>{country.name}</span><i aria-hidden="true">Ã—</i></button> : null; })}</div>}
+                      {countryOpen && <div className="country-options">{matchingCountries.length ? matchingCountries.map((country) => <button type="button" className={countryIds.includes(country.id) ? "is-selected" : ""} key={country.id} onClick={() => toggleCountry(country.id)}><CountryFlag country={country} /><span>{country.name}<small>{country.abbreviation}</small></span><i aria-hidden="true">{countryIds.includes(country.id) ? "âœ“" : ""}</i></button>) : <p>No countries match your search.</p>}</div>}
                     </div>
                     <small>Search and select one or more countries.</small>
                   </div>
@@ -626,14 +493,14 @@ export default function NotificationsPage() {
                     <span className="notification-field-label">Document to Download <em>*</em></span>
                     <input ref={documentRef} className="notification-file-input" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.svg" onChange={(event) => validateDocument(event.target.files?.[0] ?? null)} />
                     <div className="notification-dropzone" role="button" tabIndex={0} onClick={() => documentRef.current?.click()} onKeyDown={(event) => event.key === "Enter" && documentRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); validateDocument(event.dataTransfer.files?.[0] ?? null); }}>
-                      <span className="notification-upload-icon">⇧</span>
+                      <span className="notification-upload-icon">â‡§</span>
                       <span><b>{file ? file.name : "Click to upload"}</b>{!file && " or drag and drop"}<small>{file ? `${Math.ceil(file.size / 1024)} KB selected` : "PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, SVG (Max. 10MB)"}</small></span>
                       <button type="button" onClick={(event) => { event.stopPropagation(); documentRef.current?.click(); }}>Browse</button>
                     </div>
                     <small>
                       {file?.name ??
                         selected?.document_name ??
-                        "PDF, DOC, DOCX, XLS, XLSX — maximum 10MB"}
+                        "PDF, DOC, DOCX, XLS, XLSX â€” maximum 10MB"}
                     </small>
                   </label>
                   {error && <p className="country-form-error">{error}</p>}
@@ -641,7 +508,7 @@ export default function NotificationsPage() {
                     <button type="button" onClick={close} data-action="cancel" title="Cancel"><ActionIcon name="cancel" /><span className="aipt-action-label">Cancel</span></button>
                     <button disabled={saving} data-action={selected ? "update" : "add"} title="Save Notification"><ActionIcon name="update" /><span className="aipt-action-label">
                       {saving
-                        ? "Saving…"
+                        ? "Savingâ€¦"
                         : modal === "add"
                           ? "Save Notification"
                           : "Update Notification"}
@@ -653,6 +520,7 @@ export default function NotificationsPage() {
           </section>
         </div>
       )}
+      </section>
     </main>
   );
 }

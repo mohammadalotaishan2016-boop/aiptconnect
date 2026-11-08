@@ -1,5 +1,8 @@
 {
-  "/api/poa/translate/route": "app/api/poa/translate/route.js",
-  "/client-dashboard/poa/page": "app/client-dashboard/poa/page.js",
-  "/dev/poa-preview/page": "app/dev/poa-preview/page.js"
+  "/login/verify-otp/page": "app/login/verify-otp/page.js",
+  "/client-dashboard/requirements/page": "app/client-dashboard/requirements/page.js",
+  "/login/page": "app/login/page.js",
+  "/overview/page": "app/overview/page.js",
+  "/client-dashboard/notifications/page": "app/client-dashboard/notifications/page.js",
+  "/client-dashboard/page": "app/client-dashboard/page.js"
 }
