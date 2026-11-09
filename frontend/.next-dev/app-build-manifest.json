@@ -83,6 +83,12 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/poa/translate/route.js"
+    ],
+    "/client-dashboard/quotations/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/client-dashboard/quotations/page.css",
+      "static/chunks/app/client-dashboard/quotations/page.js"
     ]
   }
 }

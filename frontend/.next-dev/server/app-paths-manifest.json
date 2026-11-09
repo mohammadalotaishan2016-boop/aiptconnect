@@ -1,7 +1,7 @@
 {
   "/client-dashboard/page": "app/client-dashboard/page.js",
-  "/client-dashboard/notifications/page": "app/client-dashboard/notifications/page.js",
   "/client-dashboard/schedule-of-fees/page": "app/client-dashboard/schedule-of-fees/page.js",
   "/client-dashboard/poa/page": "app/client-dashboard/poa/page.js",
-  "/client-dashboard/requirements/page": "app/client-dashboard/requirements/page.js"
+  "/client-dashboard/requirements/page": "app/client-dashboard/requirements/page.js",
+  "/client-dashboard/quotations/page": "app/client-dashboard/quotations/page.js"
 }

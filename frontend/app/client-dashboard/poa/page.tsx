@@ -17,6 +17,33 @@ const templates: Template[] = [
   { id: 'simply-signed', label: 'GPOA Simply Signed', filename: 'GPOA - Simply Signed.docx', path: '/templates/GPOA%20-%20Simply%20Signed.docx' },
 ];
 const services = ['Registration', 'Renewal', 'Recording of change of name or change of address', 'Assignment', 'Licensing or licensing cancellation of trademarks', 'Goods limitation', 'Amendment of the trademark logo', 'Cancellation of trademarks', 'Goods cancellation', 'Protection of trademarks, patents, industrial designs and copyrights', 'Concessions'];
+
+function normalizeApostillePreview(root: HTMLElement) {
+  const arabicPattern = /[\u0600-\u06ff]/;
+  for (const table of Array.from(root.querySelectorAll('table'))) {
+    table.dir = 'ltr';
+    for (const row of Array.from(table.querySelectorAll('tr'))) {
+      const cells = Array.from(row.children).filter((child): child is HTMLTableCellElement => child instanceof HTMLTableCellElement);
+      if (cells.length < 2) continue;
+      const firstIsArabic = arabicPattern.test(cells[0].textContent || '');
+      const secondIsEnglish = /[A-Za-z]/.test(cells[1].textContent || '');
+      if (firstIsArabic && secondIsEnglish) row.insertBefore(cells[1], cells[0]);
+      for (const cell of cells) {
+        const isArabic = arabicPattern.test(cell.textContent || '');
+        cell.dir = isArabic ? 'rtl' : 'ltr';
+        cell.lang = isArabic ? 'ar' : 'en';
+        cell.style.unicodeBidi = 'isolate';
+        for (const paragraph of Array.from(cell.querySelectorAll('p'))) {
+          const paragraphArabic = arabicPattern.test(paragraph.textContent || '');
+          paragraph.dir = paragraphArabic ? 'rtl' : 'ltr';
+          paragraph.lang = paragraphArabic ? 'ar' : 'en';
+          paragraph.style.unicodeBidi = 'isolate';
+        }
+      }
+    }
+  }
+}
+
 function ClientPoaPage() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [loadingCountries, setLoadingCountries] = useState(true);
@@ -114,10 +141,26 @@ function ClientPoaPage() {
     target.replaceChildren(); styles.replaceChildren();
     const timeout = window.setTimeout(() => { if (active && renderToken.current === token) { setRendering(false); setRenderError('Preview did not finish within 15 seconds.'); } }, 15000);
     void renderAsync(generatedBlob, target, styles, { inWrapper: true, hideWrapperOnPrint: false, ignoreWidth: false, ignoreHeight: false, ignoreFonts: false, breakPages: true, ignoreLastRenderedPageBreak: false })
-      .then(() => { if (active && renderToken.current === token) target.setAttribute('data-rendered', 'true'); })
+      .then(() => {
+        if (active && renderToken.current === token) {
+          if (templateId === 'apostille') normalizeApostillePreview(target);
+          target.setAttribute('data-rendered', 'true');
+        }
+      })
       .catch((cause) => { if (active && renderToken.current === token) setRenderError(cause instanceof Error ? cause.message : 'Unable to preview the generated document.'); })
       .finally(() => { window.clearTimeout(timeout); if (active && renderToken.current === token) setRendering(false); });
     return () => { active = false; window.clearTimeout(timeout); };
+  }, [generatedBlob, templateId]);
+
+  useEffect(() => {
+    if (!generatedBlob) return;
+    const canvas = documentRef.current?.parentElement;
+    if (!canvas) return;
+    const fit = () => setZoom(Math.max(50, Math.min(100, Math.floor(((canvas.clientWidth - 32) / 794) * 100))));
+    const observer = new ResizeObserver(fit);
+    observer.observe(canvas);
+    fit();
+    return () => observer.disconnect();
   }, [generatedBlob]);
 
   const download = () => { if (!generatedBlob) return; const url = URL.createObjectURL(generatedBlob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `POA-${applicantName.trim().replace(/[^a-z0-9-_]+/gi, '-')}.docx`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); };
@@ -142,7 +185,7 @@ function ClientPoaPage() {
       {!ready && !error && <p className="poa-required-hint">Required: {[...required, !confirmed && 'confirmation', !templateBuffer.current && 'template'].filter(Boolean).join(', ')}</p>}
       {countryError && <p className="poa-error" role="alert">{countryError}</p>}{error && <p className="poa-error" role="alert">{error}</p>}
     </section>
-    <section className="poa-preview-panel" aria-label="Document preview"><div className="poa-section-heading"><span aria-hidden="true">â–¤</span><h2>Document Preview</h2><span className="poa-live-badge">âœ“ Live Preview</span></div><div className="poa-preview-toolbar"><button type="button" onClick={() => setZoom((value) => Math.max(60, value - 10))} aria-label="Zoom out">âˆ’</button><span>{zoom}%</span><button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in">+</button><button type="button" onClick={() => setZoom(100)}>100%</button><button type="button" onClick={fitWidth}>Fit width</button><span className="poa-toolbar-divider" /><button type="button" disabled={!generatedBlob} onClick={download}>Download DOCX</button><button type="button" disabled={!generatedBlob} onClick={() => window.print()}>Print / Save PDF</button></div><div className="poa-preview-document-name">{currentTemplate.filename}</div><div className="poa-preview-canvas"><div className="poa-generated-styles" ref={stylesRef} /><div className="poa-generated-docx" ref={documentRef} style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center", height: `${Math.max(1123, documentRef.current?.querySelectorAll(".docx").length || 1) * zoom / 100}px` }} />{rendering && <div className="poa-preview-status" role="status"><span className="poa-spinner" />Rendering document...</div>}{renderError && <p className="poa-preview-error" role="alert">Preview failed: {renderError}</p>}{!generatedBlob && <p className="poa-preview-placeholder">Generate the POA to preview the completed Word document.</p>}</div></section>
+    <section className="poa-preview-panel" aria-label="Document preview"><div className="poa-section-heading"><span aria-hidden="true">â–¤</span><h2>Document Preview</h2><span className="poa-live-badge">âœ“ Live Preview</span></div><div className="poa-preview-toolbar"><button type="button" onClick={() => setZoom((value) => Math.max(60, value - 10))} aria-label="Zoom out">âˆ’</button><span>{zoom}%</span><button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in">+</button><button type="button" onClick={() => setZoom(100)}>100%</button><button type="button" onClick={fitWidth}>Fit width</button><span className="poa-toolbar-divider" /><button type="button" disabled={!generatedBlob} onClick={download}>Download DOCX</button><button type="button" disabled={!generatedBlob} onClick={() => window.print()}>Print / Save PDF</button></div><div className="poa-preview-document-name">{currentTemplate.filename}</div><div className="poa-preview-canvas"><div className="poa-generated-styles" ref={stylesRef} /><div className="poa-generated-docx" data-template={templateId} ref={documentRef} style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center", height: `${Math.max(1123, documentRef.current?.querySelectorAll(".docx").length || 1) * zoom / 100}px` }} />{rendering && <div className="poa-preview-status" role="status"><span className="poa-spinner" />Rendering document...</div>}{renderError && <p className="poa-preview-error" role="alert">Preview failed: {renderError}</p>}{!generatedBlob && <p className="poa-preview-placeholder">Generate the POA to preview the completed Word document.</p>}</div></section>
   </div></main>;
 }
 

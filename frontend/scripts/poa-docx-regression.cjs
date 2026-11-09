@@ -61,50 +61,15 @@ function prepareXmlDirection(root, template) {
       }
       if (node.name === 'w:pPr') removeChild(node, 'w:bidi');
       if (node.name === 'w:rPr') removeChild(node, 'w:rtl');
-      if (node.name === 'w:sectPr') { removeChild(node, 'w:bidi'); removeChild(node, 'w:rtlGutter'); }
-      if (node.name === 'w:tblPr') removeChild(node, 'w:bidiVisual');
     });
   }
-  if (template === 'apostille') {
-    visit(root, node => {
-      if (node.name === 'w:tc') {
-        const arabic = /[\u0600-\u06ff]/.test(textOf(node));
-        let tcPr = (node.elements || []).find(child => child.name === 'w:tcPr');
-        if (!tcPr) { tcPr = { type:'element', name:'w:tcPr', elements:[], parent:node }; node.elements ||= []; node.elements.unshift(tcPr); }
-        let tcW = (tcPr.elements || []).find(child => child.name === 'w:tcW');
-        if (!tcW) { tcW = { type:'element', name:'w:tcW', attributes:{}, parent:tcPr }; tcPr.elements ||= []; tcPr.elements.push(tcW); }
-        setAttr(tcW, 'w:w', '4819'); setAttr(tcW, 'w:type', 'dxa');
-        let margins = (tcPr.elements || []).find(child => child.name === 'w:tcMar');
-        if (!margins) { margins = { type:'element', name:'w:tcMar', elements:[], parent:tcPr }; tcPr.elements ||= []; tcPr.elements.push(margins); }
-        for (const [side, amount] of [['top','227'],['bottom','227'],[arabic?'left':'right','284']]) {
-          let margin = (margins.elements || []).find(child => child.name === `w:${side}`);
-          if (!margin) { margin = { type:'element', name:`w:${side}`, attributes:{}, parent:margins }; margins.elements ||= []; margins.elements.push(margin); }
-          setAttr(margin, 'w:w', amount); setAttr(margin, 'w:type', 'dxa');
-        }
-      }
-      if (node.name === 'w:tblPr') {
-        for (const [name, attributes] of [['w:tblW',{'w:w':'9638','w:type':'dxa'}],['w:tblInd',{'w:w':'0','w:type':'dxa'}]]) {
-          let el = (node.elements || []).find(child => child.name === name);
-          if (!el) { el = { type:'element', name, attributes:{}, parent:node }; node.elements ||= []; node.elements.push(el); }
-          Object.assign(el.attributes, attributes);
-        }
-      }
-      if (node.name === 'w:sectPr') {
-        const margins = (node.elements || []).find(child => child.name === 'w:pgMar');
-        if (margins) Object.assign(margins.attributes, {'w:top':'1417','w:bottom':'1417','w:left':'1134','w:right':'1134','w:header':'709','w:footer':'709','w:gutter':'0'});
-      }
-      if (node.name === 'w:gridCol') setAttr(node, 'w:w', '4819');
-      if (node.name === 'w:tblPr') removeChild(node, 'w:bidiVisual');
-      if (node.name === 'w:tr') {
-        const cells = (node.elements || []).filter(child => child.name === 'w:tc');
-        if (cells.length >= 2 && /[\u0600-\u06ff]/.test(textOf(cells[0])) && /[A-Za-z]/.test(textOf(cells[1]))) {
-          const first = cells[0], second = cells[1];
-          const i = node.elements.indexOf(first), j = node.elements.indexOf(second);
-          node.elements[i] = second; node.elements[j] = first;
-        }
-      }
-    });
-  }
+  if (template === 'apostille') visit(root, node => {
+    if (node.name !== 'w:tr') return;
+    let trPr = (node.elements || []).find(child => child.name === 'w:trPr');
+    if (!trPr) { trPr = { type:'element', name:'w:trPr', elements:[], parent:node }; node.elements ||= []; node.elements.unshift(trPr); }
+    let cantSplit = (trPr.elements || []).find(child => child.name === 'w:cantSplit');
+    if (!cantSplit) { cantSplit = { type:'element', name:'w:cantSplit', parent:trPr }; trPr.elements ||= []; trPr.elements.unshift(cantSplit); }
+  });
 }
 function transformXml(root, template, helpers) {
   prepareXmlDirection(root, template);
@@ -122,11 +87,15 @@ function transformXml(root, template, helpers) {
     while (cell && cell.name !== 'w:tc') cell = cell.parent;
     const arabic = /[\u0600-\u06ff]/.test(text) || (!/[A-Za-z]/.test(text) && Boolean(cell && /[\u0600-\u06ff]/.test(textOf(cell))));
     const alignment = helpers.paragraphAlignment(template, text, arabic ? 'arabic' : 'english');
+    let row = node.parent;
+    while (row && row.name !== 'w:tr') row = row.parent;
+    const table = row?.parent;
+    const firstRow = template === 'apostille' && row && descendants(table, 'w:tr')[0] === row;
     let pPr = (node.elements || []).find(child => child.name === 'w:pPr');
     if (!pPr) { pPr = { type: 'element', name: 'w:pPr', elements: [], parent: node }; node.elements ||= []; node.elements.unshift(pPr); }
     let jc = (pPr.elements || []).find(child => child.name === 'w:jc');
     if (!jc) { jc = { type: 'element', name: 'w:jc', parent: pPr }; pPr.elements ||= []; pPr.elements.push(jc); }
-    setAttr(jc, 'w:val', alignment);
+    setAttr(jc, 'w:val', firstRow ? 'center' : alignment);
     const pPrIndex = node.elements.indexOf(pPr);
     node.elements.splice(pPrIndex, 1);
     node.elements.unshift(pPr);
@@ -238,33 +207,41 @@ function transformXml(root, template, helpers) {
       assert.equal(size?.attributes?.['w:h'],'16838',`${filename}: A4 page height`);
     }
     const originalSections=xmljs.xml2js(await original.file('word/document.xml').async('text'),{compact:false,addParent:true});
-    if (template === 'apostille') {
-      const margins = descendants(documentXml,'w:pgMar')[0]?.attributes;
-      assert.equal(margins?.['w:top'],'1417'); assert.equal(margins?.['w:bottom'],'1417');
-      assert.equal(margins?.['w:left'],'1134'); assert.equal(margins?.['w:right'],'1134');
-      assert.equal(margins?.['w:header'],'709'); assert.equal(margins?.['w:footer'],'709');
-    } else assert.deepEqual(descendants(documentXml,'w:pgMar').map(item=>item.attributes),descendants(originalSections,'w:pgMar').map(item=>item.attributes),`${filename}: template margins unchanged`);
+    assert.deepEqual(descendants(documentXml,'w:pgMar').map(item=>item.attributes),descendants(originalSections,'w:pgMar').map(item=>item.attributes),`${filename}: source template margins preserved`);
     const originalDoc = xmljs.xml2js(await original.file('word/document.xml').async('text'),{compact:false,addParent:true});
     assert.equal(descendants(documentXml,'w:p').length,descendants(originalDoc,'w:p').length,`${filename}: paragraph structure unchanged`);
     assert.equal(descendants(documentXml,'w:br').length + descendants(documentXml,'w:cr').length,descendants(originalDoc,'w:br').length + descendants(originalDoc,'w:cr').length,`${filename}: explicit line breaks unchanged`);
     if (template === 'simply-signed') {
       assert.ok(assertSignatureOrder(texts), 'Simply Signed signature labels must end NAME, SIGNATURE, DATE');
       assert.ok(texts.join('\n').includes(EN_VALUES.name) && texts.join('\n').includes(EN_VALUES.address) && texts.join('\n').includes(EN_VALUES.services) && texts.join('\n').includes(EN_VALUES.countries), 'Simply Signed contains all English values');
+      for (const paragraph of paragraphs) {
+        const text = textOf(paragraph).trim();
+        if (!text) continue;
+        const pPr = (paragraph.elements || []).find(child => child.name === 'w:pPr');
+        const jc = (pPr?.elements || []).find(child => child.name === 'w:jc');
+        assert.equal(jc?.attributes?.['w:val'], text.includes('Power of Attorney (POA)') ? 'center' : (/^(NAME:|SIGNATURE:|DATE:)$/.test(text) ? 'left' : 'both'));
+        assert.equal((pPr?.elements || []).some(child => child.name === 'w:bidi'), false, 'Simply Signed English paragraphs stay LTR');
+      }
+      const table = descendants(outputDoc, 'w:tbl')[0];
+      assert.equal(descendants(table, 'w:tc').length, 1, 'Simply Signed keeps its single-cell table');
+      assert.equal(descendants(table, 'w:tblW')[0]?.attributes?.['w:w'], '10612', 'Simply Signed keeps its source table width');
     }
     else {
       const table = descendants(outputDoc, 'w:tbl')[0];
       assert.ok(table, 'Apostille must retain a table');
-      assert.equal(descendants(table, 'w:bidiVisual').length, 0, 'Apostille normalization removes bidiVisual after reordering cells');
+      assert.equal(descendants(table, 'w:bidiVisual').length, 1, 'Apostille preserves template visual RTL table order');
       for (const row of descendants(table, 'w:tr')) {
         const cells = (row.elements || []).filter(child => child.name === 'w:tc');
         if (cells.length < 2) continue;
-        assert.doesNotMatch(textOf(cells[0]), /[\u0600-\u06ff]/, 'first Apostille cell must be English');
-        assert.match(textOf(cells[1]), /[\u0600-\u06ff]/, 'second Apostille cell must be Arabic');
+        assert.match(textOf(cells[0]), /[\u0600-\u06ff]/, 'first Apostille source cell remains Arabic/right column');
+        assert.match(textOf(cells[1]), /[A-Za-z]/, 'second Apostille source cell remains English/left column');
       }
       for (const paragraph of paragraphs) {
         let parent = paragraph.parent;
         while (parent && parent.name !== 'w:tc') parent = parent.parent;
         if (!parent) continue;
+        const row = parent.parent;
+        const header = row === descendants(table, 'w:tr')[0];
         const arabic = /[\u0600-\u06ff]/.test(textOf(parent));
         const pPr = (paragraph.elements || []).find(child => child.name === 'w:pPr');
         const jc = (pPr?.elements || []).find(child => child.name === 'w:jc');
@@ -280,7 +257,7 @@ function transformXml(root, template, helpers) {
           assert.ok(runs.every(run => descendants(run, 'w:rtl').length === 0), 'English runs have no w:rtl');
           assert.ok(runs.every(run => descendants(run, 'w:lang').some(lang => lang.attributes?.['w:val'] === 'en-US')), 'English runs specify en-US language');
         }
-        if (text.includes('Power of Attorney (POA)')) assert.equal(jc?.attributes?.['w:val'], 'center', 'POA title remains centered');
+        if (header || text.includes('Power of Attorney (POA)')) assert.equal(jc?.attributes?.['w:val'], 'center', 'both Apostille header cells are centered');
         else if (arabic) assert.equal(jc?.attributes?.['w:val'], 'right', 'Arabic paragraphs remain right-aligned');
         else assert.equal(jc?.attributes?.['w:val'], /^(NAME:|SIGNATURE:|DATE:)$/.test(text.trim()) ? 'left' : 'both', 'English body is justified and signature labels are left-aligned');
       }
@@ -296,18 +273,11 @@ function transformXml(root, template, helpers) {
       assert.ok(texts.some(text => text.includes(AR_VALUES.countries)), 'Arabic country value is present');
       const rows = descendants(table, 'w:tr');
       assert.ok(rows.length >= 2, 'Apostille table must contain aligned paragraph rows');
-      const tableProps = descendants(table, 'w:tblPr')[0];
-      assert.equal(descendants(tableProps, 'w:tblW')[0]?.attributes?.['w:w'], '9638');
-      assert.deepEqual(descendants(table, 'w:gridCol').map(col => col.attributes?.['w:w']), ['4819','4819']);
-      for (const cell of cells) {
-        const arabic = /[\u0600-\u06ff]/.test(textOf(cell));
-        const cellProps = descendants(cell, 'w:tcPr')[0];
-        assert.equal(descendants(cellProps, 'w:tcW')[0]?.attributes?.['w:w'], '4819');
-        const cellMargins = descendants(cellProps, 'w:tcMar')[0];
-        const getMargin = side => (cellMargins?.elements || []).find(item => item.name === `w:${side}`)?.attributes?.['w:w'];
-        assert.equal(getMargin('top'), '227'); assert.equal(getMargin('bottom'), '227');
-        assert.equal(getMargin(arabic ? 'left' : 'right'), '284');
-      }
+      assert.ok(rows.every(row => descendants(row, 'w:cantSplit').length === 1), 'Apostille rows cannot split across pages');
+      const sourceTable = descendants(originalDoc, 'w:tbl')[0];
+      assert.equal(descendants(table, 'w:tblW')[0]?.attributes?.['w:w'], '10013');
+      assert.deepEqual(descendants(table, 'w:gridCol').map(col => col.attributes?.['w:w']), descendants(sourceTable, 'w:gridCol').map(col => col.attributes?.['w:w']));
+      assert.deepEqual(descendants(documentXml,'w:pgMar').map(item=>item.attributes),descendants(originalSections,'w:pgMar').map(item=>item.attributes),'Apostille keeps source margins');
     }
     assert.equal(await original.file('word/document.xml').async('text'), await JSZip.loadAsync(fs.readFileSync(path.join(__dirname, '../public/templates', filename))).then(z => z.file('word/document.xml').async('text')), 'Template must not be modified');
     console.log(`${filename}: PASS XML direction, alignment, placeholder, punctuation, and Arabic-order assertions (${(await output.generateAsync({ type: 'nodebuffer' })).length} bytes)`);

@@ -32,6 +32,8 @@ export async function generatePoaDocx(type: PoaTemplateId, english: PoaValues, a
       replaceDocumentText(paragraph, replacements[column]);
     }
     normalizePoaTextDirection(xml);
+    if (type === 'apostille') normalizeApostilleDirection(xml);
+    else normalizeSimplySignedLayout(xml);
     normalizePoaFonts(xml);
     const output = new XMLSerializer().serializeToString(xml);
     if (findUnresolvedPoaPlaceholder(output)) throw new Error(`A required template field remains unresolved in ${path}.`);
@@ -196,8 +198,11 @@ function setParagraphProperties(paragraph: Element, alignmentValue: string, rtl:
   const properties = getOrCreate(paragraph, 'pPr', paragraph.firstElementChild?.localName === 'pPr' ? paragraph.firstElementChild : null);
   const alignment = getOrCreate(properties, 'jc');
   alignment.setAttributeNS(WORD_NS, 'w:val', alignmentValue);
-  const bidi = getOrCreate(properties, 'bidi');
-  bidi.setAttributeNS(WORD_NS, 'w:val', rtl ? '1' : '0');
+  if (rtl) getOrCreate(properties, 'bidi').setAttributeNS(WORD_NS, 'w:val', '1');
+  else {
+    const bidi = Array.from(properties.children).find(child => child.namespaceURI === WORD_NS && child.localName === 'bidi');
+    bidi?.parentNode?.removeChild(bidi);
+  }
   Array.from(paragraph.getElementsByTagNameNS(WORD_NS, 'r')).forEach(run => {
     if (!rtl) normalizeEnglishRun(run);
     else {
@@ -219,43 +224,6 @@ export function preparePoaDirection(document: Document, template: PoaTemplateId)
     if (styleParagraphProperties) setOnOff(styleParagraphProperties, 'bidi', false);
     for (const properties of Array.from(document.getElementsByTagNameNS(WORD_NS, 'pPr'))) setOnOff(properties, 'bidi', false);
     for (const properties of Array.from(document.getElementsByTagNameNS(WORD_NS, 'rPr'))) setOnOff(properties, 'rtl', false);
-    for (const section of Array.from(document.getElementsByTagNameNS(WORD_NS, 'sectPr'))) {
-      setOnOff(section, 'bidi', false);
-      setOnOff(section, 'rtlGutter', false);
-      const margins = getOrCreate(section, 'pgMar');
-      margins.setAttributeNS(WORD_NS, 'w:top', '1417');
-      margins.setAttributeNS(WORD_NS, 'w:bottom', '1417');
-      margins.setAttributeNS(WORD_NS, 'w:left', '1134');
-      margins.setAttributeNS(WORD_NS, 'w:right', '1134');
-      margins.setAttributeNS(WORD_NS, 'w:header', '709');
-      margins.setAttributeNS(WORD_NS, 'w:footer', '709');
-      margins.setAttributeNS(WORD_NS, 'w:gutter', '0');
-    }
-  }
-  for (const table of Array.from(document.getElementsByTagNameNS(WORD_NS, 'tbl'))) {
-    const properties = Array.from(table.children).find(child => child.namespaceURI === WORD_NS && child.localName === 'tblPr');
-    if (!properties) continue;
-    const bidiVisual = Array.from(properties.children).find(child => child.namespaceURI === WORD_NS && child.localName === 'bidiVisual');
-    if (template !== 'apostille') continue;
-    // docx-preview does not apply Word's visual bidi column reversal reliably.
-    // Convert the effective Word order (English-left, Arabic-right) to physical
-    // cell order and remove bidiVisual as one atomic transformation.
-    for (const row of Array.from(table.getElementsByTagNameNS(WORD_NS, 'tr'))) {
-      const cells = Array.from(row.children).filter(child => child.namespaceURI === WORD_NS && child.localName === 'tc');
-      if (cells.length < 2) continue;
-      const firstText = Array.from(cells[0].getElementsByTagNameNS(WORD_NS, 't')).map(node => node.textContent || '').join('');
-      const secondText = Array.from(cells[1].getElementsByTagNameNS(WORD_NS, 't')).map(node => node.textContent || '').join('');
-      if (/[\u0600-\u06ff]/.test(firstText) && /[A-Za-z]/.test(secondText)) row.insertBefore(cells[1], cells[0]);
-    }
-    bidiVisual?.parentNode?.removeChild(bidiVisual);
-  }
-  if (template === 'apostille') {
-    // The section-level RTL flag reverses the physical table a second time in
-    // docx-preview even after bidiVisual is removed and cells are normalized.
-    for (const section of Array.from(document.getElementsByTagNameNS(WORD_NS, 'sectPr'))) {
-      setOnOff(section, 'bidi', false);
-      setOnOff(section, 'rtlGutter', false);
-    }
   }
 }
 
@@ -270,27 +238,16 @@ export function normalizeA4PageSize(document: Document) {
 export function normalizePoaFonts(document: Document) {
   const runs = Array.from(document.getElementsByTagNameNS(WORD_NS, 'r'));
   for (const run of runs) {
-    let paragraph: Element | null = run;
-    while (paragraph && !(paragraph.namespaceURI === WORD_NS && paragraph.localName === 'p')) paragraph = paragraph.parentElement;
-    const hasArabic = /[\u0600-\u06ff]/.test(paragraph?.textContent || '');
     const properties = getOrCreate(run, 'rPr', run.firstElementChild?.localName === 'rPr' ? run.firstElementChild : null);
     const fonts = getOrCreate(properties, 'rFonts');
-    const font = hasArabic ? 'Times New Roman' : 'Calibri';
-    for (const attribute of ['ascii', 'hAnsi', 'cs', 'eastAsia']) fonts.setAttributeNS(WORD_NS, `w:${attribute}`, font);
+    for (const attribute of ['ascii', 'hAnsi', 'cs', 'eastAsia']) fonts.setAttributeNS(WORD_NS, `w:${attribute}`, 'Times New Roman');
   }
   const defaults = document.getElementsByTagNameNS(WORD_NS, 'docDefaults')[0];
   if (defaults) {
     const runDefault = getOrCreate(defaults, 'rPrDefault');
     const defaultRun = getOrCreate(runDefault, 'rPr');
     const fonts = getOrCreate(defaultRun, 'rFonts');
-    for (const attribute of ['ascii', 'hAnsi', 'cs', 'eastAsia']) fonts.setAttributeNS(WORD_NS, `w:${attribute}`, 'Calibri');
-    for (const sizeName of ['sz', 'szCs']) getOrCreate(defaultRun, sizeName).setAttributeNS(WORD_NS, 'w:val', '22');
-    const paragraphDefault = getOrCreate(defaults, 'pPrDefault');
-    const defaultParagraph = getOrCreate(paragraphDefault, 'pPr');
-    const spacing = getOrCreate(defaultParagraph, 'spacing');
-    spacing.setAttributeNS(WORD_NS, 'w:after', '200');
-    spacing.setAttributeNS(WORD_NS, 'w:line', '276');
-    spacing.setAttributeNS(WORD_NS, 'w:lineRule', 'auto');
+    for (const attribute of ['ascii', 'hAnsi', 'cs', 'eastAsia']) fonts.setAttributeNS(WORD_NS, `w:${attribute}`, 'Times New Roman');
   }
 }
 
@@ -343,42 +300,25 @@ export function normalizeApostilleDirection(document: Document) {
     if (pPr) setOnOff(pPr, 'bidi', false);
     for (const rPr of Array.from(style.getElementsByTagNameNS(WORD_NS, 'rPr'))) setOnOff(rPr, 'rtl', false);
   }
+  for (const row of Array.from(document.getElementsByTagNameNS(WORD_NS, 'tr'))) {
+    const properties = getOrCreate(row, 'trPr', row.firstElementChild);
+    setOnOff(properties, 'cantSplit', true);
+  }
   for (const paragraph of Array.from(document.getElementsByTagNameNS(WORD_NS, 'p'))) {
     const text = Array.from(paragraph.getElementsByTagNameNS(WORD_NS, 't')).map(node => node.textContent || '').join('');
     const arabic = classifyApostilleParagraph(paragraph) === 'arabic';
-    setParagraphProperties(paragraph, paragraphAlignment('apostille', text, arabic ? 'arabic' : 'english'), arabic, text.includes('Power of Attorney (POA)'));
+    const row = paragraph.parentElement?.parentElement;
+    const firstRow = row?.namespaceURI === WORD_NS && row.localName === 'tr'
+      && Array.from(document.getElementsByTagNameNS(WORD_NS, 'tr'))[0] === row;
+    const header = text.includes('Power of Attorney (POA)') || Boolean(firstRow);
+    setParagraphProperties(paragraph, header ? 'center' : paragraphAlignment('apostille', text, arabic ? 'arabic' : 'english'), arabic, header);
   }
-  // Match the requested page inset while keeping equal physical columns.
-  for (const table of Array.from(document.getElementsByTagNameNS(WORD_NS, 'tbl'))) {
-    const properties = getOrCreate(table, 'tblPr', table.firstElementChild?.localName === 'tblPr' ? table.firstElementChild : null);
-    const width = getOrCreate(properties, 'tblW');
-    width.setAttributeNS(WORD_NS, 'w:w', '9638');
-    width.setAttributeNS(WORD_NS, 'w:type', 'dxa');
-    const indent = getOrCreate(properties, 'tblInd');
-    indent.setAttributeNS(WORD_NS, 'w:w', '0');
-    indent.setAttributeNS(WORD_NS, 'w:type', 'dxa');
-    const grid = Array.from(table.children).find(child => child.namespaceURI === WORD_NS && child.localName === 'tblGrid');
-    const columns = grid ? Array.from(grid.children).filter(child => child.namespaceURI === WORD_NS && child.localName === 'gridCol') : [];
-    for (const column of columns.slice(0, 2)) column.setAttributeNS(WORD_NS, 'w:w', '4819');
-  }
-  for (const cell of Array.from(document.getElementsByTagNameNS(WORD_NS, 'tc'))) {
-    const text = Array.from(cell.getElementsByTagNameNS(WORD_NS, 't')).map(node => node.textContent || '').join('');
-    const arabic = /[\u0600-\u06ff]/.test(text);
-    const properties = getOrCreate(cell, 'tcPr', cell.firstElementChild?.localName === 'tcPr' ? cell.firstElementChild : null);
-    const width = getOrCreate(properties, 'tcW');
-    width.setAttributeNS(WORD_NS, 'w:w', '4819');
-    width.setAttributeNS(WORD_NS, 'w:type', 'dxa');
-    const margins = getOrCreate(properties, 'tcMar');
-    for (const [side, amount] of [['top', '227'], ['bottom', '227'], [arabic ? 'left' : 'right', '284']] as const) {
-      const margin = getOrCreate(margins, side);
-      margin.setAttributeNS(WORD_NS, 'w:w', amount);
-      margin.setAttributeNS(WORD_NS, 'w:type', 'dxa');
-    }
-  }
-  const defaults = Array.from(document.getElementsByTagNameNS(WORD_NS, 'docDefaults'))[0];
-  if (defaults) {
-    for (const rPr of Array.from(defaults.getElementsByTagNameNS(WORD_NS, 'rPr'))) setOnOff(rPr, 'rtl', false);
-    for (const pPr of Array.from(defaults.getElementsByTagNameNS(WORD_NS, 'pPr'))) setOnOff(pPr, 'bidi', false);
+}
+
+export function normalizeSimplySignedLayout(document: Document) {
+  for (const paragraph of Array.from(document.getElementsByTagNameNS(WORD_NS, 'p'))) {
+    const text = Array.from(paragraph.getElementsByTagNameNS(WORD_NS, 't')).map(node => node.textContent || '').join('');
+    setParagraphProperties(paragraph, paragraphAlignment('simply-signed', text), false, text.includes('Power of Attorney (POA)'));
   }
 }
 
