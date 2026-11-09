@@ -273,6 +273,11 @@
 .project-search-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 40px; border: 1px solid #dce0ec; border-radius: 8px; background: #fff; color: #414967; padding: 0 12px; font: 12px Inter, Arial, sans-serif; text-align: left; cursor: pointer; }
 .project-search-trigger:hover, .project-search-trigger.is-open { border-color: var(--primary-color); box-shadow: 0 0 0 3px #6342df18; }
 .project-search-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-search-trigger:disabled { opacity: .72; cursor: wait; background: #f7f8fb; }
+.project-service-input { display: grid; gap: 6px; }
+.project-service-input > small { color: #68758c; font-size: 11px; line-height: 1.4; }
+.project-service-input > .project-service-error { color: #b42332; }
+.project-service-error button { padding: 0; border: 0; background: transparent; color: #5734d7; font: inherit; text-decoration: underline; cursor: pointer; }
 .project-search-trigger .is-placeholder { color: #9aa3b8; }
 .project-search-trigger > b { color: var(--primary-color); font-size: 13px; font-weight: 700; }
 .project-selection-tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; max-height: 34px; overflow: hidden; }

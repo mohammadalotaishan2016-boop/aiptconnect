@@ -22,6 +22,9 @@ verify_jwt = false
 [functions.company-registration]
 verify_jwt = false
 
+[functions.news-feed]
+verify_jwt = false
+
 [functions.fees]
 verify_jwt = false
 

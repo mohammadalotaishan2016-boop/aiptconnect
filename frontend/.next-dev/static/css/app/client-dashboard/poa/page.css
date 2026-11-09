@@ -24,6 +24,15 @@
 @media(max-width:680px){.poa-preview-canvas{padding:12px 8px 24px}.poa-generated-docx{transform-origin:top center}}
 @media print{@page{size:A4 portrait;margin:0}.poa-generated-styles{display:contents}.poa-preview-canvas{padding:0!important;overflow:visible!important;background:#fff!important}.poa-generated-docx,.poa-generated-docx .docx-wrapper{display:block!important;width:auto!important;min-width:0!important;padding:0!important;background:#fff!important}.poa-generated-docx .docx-wrapper{gap:0!important}.poa-generated-docx .docx{width:210mm!important;min-height:297mm!important;max-width:none!important;margin:0!important;box-shadow:none!important;page-break-after:always;break-after:page}.poa-generated-docx .docx:last-child{page-break-after:auto;break-after:auto}}
 
+/* The Apostille preview mirrors the generator's A4 page box and print margins. */
+.poa-generated-docx .docx{padding:25mm 20mm!important}
+.poa-generated-docx .docx table{width:100%!important;table-layout:fixed!important;margin:0!important}
+.poa-generated-docx .docx table td{box-sizing:border-box!important;width:50%!important;padding-top:4mm!important;padding-bottom:4mm!important;vertical-align:top}
+.poa-generated-docx .docx table td:first-child{padding-right:5mm!important}
+.poa-generated-docx .docx table td:last-child{padding-left:5mm!important}
+.poa-generated-docx .docx table td p{page-break-inside:avoid;break-inside:avoid}
+@media print{@page{size:A4 portrait;margin:0}.poa-generated-docx .docx{padding:25mm 20mm!important}.poa-generated-docx .docx table td:first-child{padding-right:5mm!important}.poa-generated-docx .docx table td:last-child{padding-left:5mm!important}}
+
 .poa-complete{margin:2px 0 0;color:#16803c;font-size:12px;font-weight:700}.poa-applicant-fields .poa-complete{grid-column:1/-1}.poa-choice-complete{padding:0 15px 8px}.poa-required-hint{margin:0 15px 12px;color:#91610b;font-size:12px}
 .poa-applicant-field{display:grid;grid-gap:7px;gap:7px}.poa-applicant-fields .poa-arabic-field{display:grid;grid-template-columns:1fr;grid-gap:5px;gap:5px;color:#31506a;font-size:13px}.poa-arabic-edit-row{display:flex;align-items:stretch;gap:7px}.poa-applicant-fields .poa-arabic-edit-row input,.poa-applicant-fields .poa-arabic-edit-row textarea{flex:1 1;min-width:0;grid-column:auto;background:#f8fbfc}.poa-arabic-edit-row button,.poa-arabic-field>button{min-width:54px;padding:0 10px;border:1px solid #c8dce8;border-radius:7px;background:#fff;color:#087f91;font-weight:700;cursor:pointer}.poa-translation-status{margin:8px 15px;color:#087f91;font-size:12px;font-weight:600}
 .poa-arabic-summary{margin:0;padding:0 15px 8px;color:#087f91;font-size:13px;text-align:right;unicode-bidi:plaintext}.poa-preview-placeholder{align-self:center;margin:auto;text-align:center}.poa-generated-docx .docx{box-sizing:border-box;width:210mm!important;min-width:210mm!important;min-height:297mm!important;max-height:none!important;overflow:hidden!important;scrollbar-width:none}.poa-generated-docx .docx::-webkit-scrollbar{display:none}

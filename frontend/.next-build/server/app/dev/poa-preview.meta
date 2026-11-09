@@ -1,0 +1,16 @@
+{
+  "status": 404,
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dev/layout,_N_T_/dev/poa-preview/layout,_N_T_/dev/poa-preview/page,_N_T_/dev/poa-preview"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/2467b35e4d85446a98ee9f18b1c3ceaf51f46062e39d8c22a2d59666f76cda30/$/dev/poa-preview",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/dev/poa-preview/page"
+    },
+    "isFallback": false
+  }
+}

@@ -133,6 +133,8 @@ export default function ProjectsPage() {
   const [direction, setDirection] = useState('desc');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesError, setServicesError] = useState('');
   const loadVersion = useRef(0);
   const lookupPromise = useRef<Promise<[LookupListResponse | null, Lookup[] | null, LookupListResponse | null, LookupListResponse | null, CustomField[] | null]> | null>(null);
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 300); return () => window.clearTimeout(timer); }, [search]);
@@ -193,6 +195,30 @@ export default function ProjectsPage() {
     }
     return (parsed as T | null) ?? null;
   }, []);
+
+  const loadServices = useCallback(async () => {
+    setServicesLoading(true);
+    setServicesError('');
+    try {
+      const result: Lookup[] = [];
+      let pageNumber = 1;
+      let totalServices = Number.POSITIVE_INFINITY;
+      while (result.length < totalServices) {
+        const response = await api<LookupListResponse>(`services?page=${pageNumber}&page_size=100`);
+        const batch = response?.data ?? [];
+        result.push(...batch);
+        totalServices = response?.total ?? result.length;
+        if (!batch.length) break;
+        pageNumber += 1;
+      }
+      setServices(result);
+      if (!result.length) setServicesError('No active services were found. Add a service in Services and try again.');
+    } catch (cause) {
+      setServicesError(cause instanceof Error ? cause.message : 'Unable to load services from the Services page.');
+    } finally {
+      setServicesLoading(false);
+    }
+  }, [api]);
 
   const load = useCallback(async () => {
     const version = ++loadVersion.current;
@@ -287,6 +313,7 @@ export default function ProjectsPage() {
         : blank()
     );
     setError('');
+    void loadServices();
     setModal('form');
   };
 
@@ -719,12 +746,18 @@ export default function ProjectsPage() {
               </Field>
 
               <Field t="Service">
-                <Select
-                  value={draft.service_id}
-                  items={services}
-                  keyName="service"
-                  change={(v) => setDraft({ ...draft, service_id: v, procedure_id: '', procedure_ids: [] })}
-                />
+                <div className="project-service-input">
+                  <Select
+                    value={draft.service_id}
+                    items={services}
+                    keyName="service"
+                    disabled={servicesLoading || !services.length}
+                    placeholder={servicesLoading ? 'Loading services...' : 'Search and select a service'}
+                    change={(v) => setDraft({ ...draft, service_id: v, procedure_id: '', procedure_ids: [] })}
+                  />
+                  {servicesLoading && <small role="status">Loading services from Services...</small>}
+                  {servicesError && <small className="project-service-error" role="alert">{servicesError} <button type="button" onClick={() => void loadServices()}>Retry</button></small>}
+                </div>
               </Field>
 
               <Field t="Client Ref no.">
@@ -1017,11 +1050,15 @@ function Select({
   items,
   keyName,
   change,
+  disabled = false,
+  placeholder = 'Select and search',
 }: {
   value: string;
   items: Lookup[];
   keyName: keyof Lookup;
   change: (x: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -1039,8 +1076,8 @@ function Select({
   }, []);
 
   return <div className="project-search-select" ref={ref}>
-    <button type="button" className={`project-search-trigger${open ? ' is-open' : ''}`} onClick={() => setOpen((current) => !current)} aria-expanded={open}>
-      <span className={label ? '' : 'is-placeholder'}>{label || 'Select and search'}</span><b>v</b>
+    <button type="button" className={`project-search-trigger${open ? ' is-open' : ''}`} disabled={disabled} onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+      <span className={label ? '' : 'is-placeholder'}>{label || placeholder}</span><b>v</b>
     </button>
     {open && <div className="project-search-menu">
       <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search options..." />

@@ -27,6 +27,7 @@ const adminRoutes = new Set([
   '/vat',
   '/quotations',
   '/notifications',
+  '/admin/newsfeed',
   '/customer-service',
   '/users',
   '/roles',

@@ -10,7 +10,7 @@ const destinations: { key: string; label: string; href: string }[] = [
   { key: 'statements', label: 'Statements', href: '/client-dashboard/statements' },
   { key: 'poa', label: 'POA', href: '/client-dashboard/poa' },
   { key: 'projects', label: 'Project', href: '/client-dashboard/projects' },
-  { key: 'notifications', label: 'Notification', href: '/client-dashboard/notifications' },
+  { key: 'notifications', label: 'News Feed', href: '/client-dashboard/notifications' },
   { key: 'customer-service', label: 'Customer Service', href: '/client-dashboard/customer-service' },
 ];
 const displayLabels: Record<string, string> = {
@@ -20,7 +20,7 @@ const displayLabels: Record<string, string> = {
   statements: 'Statements',
   poa: 'Power of Attorney',
   projects: 'Your Projects',
-  notifications: 'Notifications',
+  notifications: 'News Feed',
   'customer-service': 'Customer Service',
 };
 type TutorialLink = { card_key: string; title: string; url: string };
@@ -211,7 +211,7 @@ export default function ClientDashboardPage() {
     statements: { en: 'Statements', ar: 'الكشوفات', fil: 'Mga Pahayag', zh: '账单' },
     poa: { en: 'POA', ar: 'التوكيل', fil: 'POA', zh: '授权书' },
     projects: { en: 'Your Work', ar: 'أعمالك', fil: 'Iyong Trabaho', zh: '您的项目' },
-    notifications: { en: 'Notifications', ar: 'الإشعارات', fil: 'Mga Abiso', zh: '通知' },
+    notifications: { en: 'News Feed', ar: 'الإشعارات', fil: 'Mga Abiso', zh: '通知' },
     'customer-service': { en: 'Customer Service', ar: 'خدمة العملاء', fil: 'Serbisyo sa Customer', zh: '客户服务' },
   };
   const uiLabels = {

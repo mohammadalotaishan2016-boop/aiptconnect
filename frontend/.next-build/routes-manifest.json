@@ -83,6 +83,12 @@
       "namedRegex": "^/admin/fees(?:/)?$"
     },
     {
+      "page": "/admin/newsfeed",
+      "regex": "^/admin/newsfeed(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/newsfeed(?:/)?$"
+    },
+    {
       "page": "/admin-account",
       "regex": "^/admin\\-account(?:/)?$",
       "routeKeys": {},
@@ -179,6 +185,12 @@
       "namedRegex": "^/client\\-dashboard/statements(?:/)?$"
     },
     {
+      "page": "/client-dashboard-cards",
+      "regex": "^/client\\-dashboard\\-cards(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/client\\-dashboard\\-cards(?:/)?$"
+    },
+    {
       "page": "/clients",
       "regex": "^/clients(?:/)?$",
       "routeKeys": {},
@@ -195,6 +207,12 @@
       "regex": "^/customer\\-service(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/customer\\-service(?:/)?$"
+    },
+    {
+      "page": "/dev/poa-preview",
+      "regex": "^/dev/poa\\-preview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dev/poa\\-preview(?:/)?$"
     },
     {
       "page": "/fees",

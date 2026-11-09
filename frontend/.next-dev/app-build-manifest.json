@@ -6,22 +6,6 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
-    "/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/login/page.css",
-      "static/chunks/app/login/page.js"
-    ],
-    "/login/verify-otp/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/login/verify-otp/page.js"
-    ],
     "/client-dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -36,68 +20,41 @@
     "/client-dashboard/notifications/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
+      "static/css/app/client-dashboard/notifications/page.css",
       "static/chunks/app/client-dashboard/notifications/page.js"
+    ],
+    "/login/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/login/page.css",
+      "static/chunks/app/login/page.js"
+    ],
+    "/login/verify-otp/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/login/verify-otp/page.js"
     ],
     "/overview/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/overview/page.js"
     ],
-    "/video-tutorials/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/video-tutorials/page.css",
-      "static/chunks/app/video-tutorials/page.js"
-    ],
-    "/roles/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/roles/page.css",
-      "static/chunks/app/roles/page.js"
-    ],
-    "/spreadsheet/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/spreadsheet/page.js"
-    ],
-    "/schedule-of-fees/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/schedule-of-fees/page.css",
-      "static/chunks/app/schedule-of-fees/page.js"
-    ],
-    "/poa/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/poa/page.css",
-      "static/chunks/app/poa/page.js"
-    ],
-    "/statements/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/statements/page.js"
-    ],
-    "/customer-service/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/customer-service/page.js"
-    ],
     "/notifications/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/notifications/page.js"
     ],
-    "/quotations/page": [
+    "/admin/newsfeed/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/quotations/page.css",
-      "static/chunks/app/quotations/page.js"
+      "static/css/app/admin/newsfeed/page.css",
+      "static/chunks/app/admin/newsfeed/page.js"
     ],
-    "/vat/page": [
+    "/countries/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/vat/page.css",
-      "static/chunks/app/vat/page.js"
+      "static/css/app/countries/page.css",
+      "static/chunks/app/countries/page.js"
     ],
     "/services/page": [
       "static/chunks/webpack.js",
@@ -105,32 +62,10 @@
       "static/css/app/services/page.css",
       "static/chunks/app/services/page.js"
     ],
-    "/projects/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/projects/page.js"
-    ],
-    "/users/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/users/page.js"
-    ],
-    "/client-dashboard-cards/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/client-dashboard-cards/page.css",
-      "static/chunks/app/client-dashboard-cards/page.js"
-    ],
-    "/classification-of-fees/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/classification-of-fees/page.js"
-    ],
-    "/client-dashboard/requirements/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/client-dashboard/requirements/page.css",
-      "static/chunks/app/client-dashboard/requirements/page.js"
+      "static/chunks/app/page.js"
     ],
     "/client-dashboard/schedule-of-fees/page": [
       "static/chunks/webpack.js",
@@ -138,11 +73,16 @@
       "static/css/app/client-dashboard/schedule-of-fees/page.css",
       "static/chunks/app/client-dashboard/schedule-of-fees/page.js"
     ],
-    "/client-dashboard/quotations/page": [
+    "/client-dashboard/requirements/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/client-dashboard/quotations/page.css",
-      "static/chunks/app/client-dashboard/quotations/page.js"
+      "static/css/app/client-dashboard/requirements/page.css",
+      "static/chunks/app/client-dashboard/requirements/page.js"
+    ],
+    "/api/poa/translate/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/poa/translate/route.js"
     ]
   }
 }

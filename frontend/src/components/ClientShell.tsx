@@ -135,12 +135,6 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'CL';
   const goBack = () => router.push('/client-dashboard');
   const shellText = shellTranslations[language];
-  const logout = async () => {
-    const supabase = getSupabaseBrowserClient();
-    if (supabase) await supabase.auth.signOut();
-    router.replace('/login');
-  };
-
   return <ClientIdentity.Provider value={{ name, email }}>
     <div className="client-app-shell client-home-shell" ref={shellRef}>
       {accessState === 'allowed' && <ClientAutoTranslator rootRef={shellRef} language={language} />}
@@ -169,9 +163,6 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         <aside className={`client-home-rail${railCollapsed ? ' is-collapsed' : ''}`} aria-label="Client navigation">
           <button className="client-home-rail-button client-home-dashboard-back" type="button" aria-label={pathname !== '/client-dashboard' ? shellText.back : (railCollapsed ? 'Expand dashboard navigation' : 'Collapse dashboard navigation')} title={pathname !== '/client-dashboard' ? shellText.back : (railCollapsed ? 'Expand dashboard navigation' : 'Collapse dashboard navigation')} onClick={() => { if (pathname !== '/client-dashboard') { setRailCollapsed(true); router.push('/client-dashboard'); } else setRailCollapsed(value => !value); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
-          </button>
-          <button className="client-home-rail-button client-home-rail-logout" type="button" aria-label={shellText.logout} onClick={() => void logout()}>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H5v18h9" /><path d="M12 12h9m-4-4 4 4-4 4" /><path d="M10 12h.01" /></svg>
           </button>
         </aside>
         <main className="client-main client-home-content">

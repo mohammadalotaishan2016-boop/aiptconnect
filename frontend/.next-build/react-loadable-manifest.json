@@ -2,26 +2,16 @@
   "app\\client-dashboard\\fees\\page.tsx -> ../../schedule-of-fees/page": {
     "id": 36702,
     "files": [
-      "static/css/ae912e8f25d1f5c1.css",
+      "static/css/dc2b7ad02f19b81b.css",
       "static/css/edd4eb2e21e30d51.css",
-      "static/css/2e3fa0a38fe47b24.css",
-      "static/chunks/6702-68fdb3369fddef7e.js"
-    ]
-  },
-  "app\\client-dashboard\\notifications\\page.tsx -> ../../../src/components/ClientReference": {
-    "id": 34525,
-    "files": []
-  },
-  "app\\client-dashboard\\notifications\\page.tsx -> ../../notifications/page": {
-    "id": 33005,
-    "files": [
-      "static/chunks/3005-be12a1cb91d8b738.js"
+      "static/css/8b99ee9701690b48.css",
+      "static/chunks/6702-45046b1b5d25dd8e.js"
     ]
   },
   "app\\client-dashboard\\projects\\page.tsx -> ../../projects/page": {
     "id": 34491,
     "files": [
-      "static/chunks/4491-492745e16427d2a0.js"
+      "static/chunks/4491-5ebd9ddd1112bf48.js"
     ]
   },
   "app\\client-dashboard\\requirements\\page.tsx -> ../../../src/lib/table-files": {
@@ -75,7 +65,7 @@
   "src\\components\\AdminAppShell.tsx -> ./ClientPortalShell": {
     "id": 97667,
     "files": [
-      "static/chunks/7667.358e0e1abd869016.js"
+      "static/chunks/7667.1288f035e2203ce3.js"
     ]
   },
   "src\\components\\ClientShell.tsx -> ./ClientAutoTranslator": {
@@ -89,6 +79,10 @@
     "files": [
       "static/chunks/3394.a6241cb5eaadabd2.js"
     ]
+  },
+  "src\\lib\\poa-docx.ts -> jszip": {
+    "id": 7496,
+    "files": []
   },
   "src\\lib\\project-files.ts -> docx": {
     "id": 67863,

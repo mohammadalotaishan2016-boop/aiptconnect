@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/admin/layout,_N_T_/admin/newsfeed/layout,_N_T_/admin/newsfeed/page,_N_T_/admin/newsfeed"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/8f23c0c5c9d43480cf556a49fe87f156053bd8e65dbb4dcf5c1fbf185727298f/$/admin/newsfeed",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/admin/newsfeed/page"
+    },
+    "isFallback": false
+  }
+}

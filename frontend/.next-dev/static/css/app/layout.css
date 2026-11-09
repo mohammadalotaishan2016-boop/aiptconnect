@@ -1369,6 +1369,11 @@
 .project-search-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 40px; border: 1px solid #dce0ec; border-radius: 8px; background: #fff; color: #414967; padding: 0 12px; font: 12px Inter, Arial, sans-serif; text-align: left; cursor: pointer; }
 .project-search-trigger:hover, .project-search-trigger.is-open { border-color: var(--primary-color); box-shadow: 0 0 0 3px #6342df18; }
 .project-search-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-search-trigger:disabled { opacity: .72; cursor: wait; background: #f7f8fb; }
+.project-service-input { display: grid; grid-gap: 6px; gap: 6px; }
+.project-service-input > small { color: #68758c; font-size: 11px; line-height: 1.4; }
+.project-service-input > .project-service-error { color: #b42332; }
+.project-service-error button { padding: 0; border: 0; background: transparent; color: #5734d7; font: inherit; text-decoration: underline; cursor: pointer; }
 .project-search-trigger .is-placeholder { color: #9aa3b8; }
 .project-search-trigger > b { color: var(--primary-color); font-size: 13px; font-weight: 700; }
 .project-selection-tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; max-height: 34px; overflow: hidden; }
@@ -2820,80 +2825,59 @@
   width: 27%;
 }
 
-/* Client dashboard social feed */
+/* Client dashboard news feed */
 .client-notifications-route{display:flex;min-height:calc(100vh - 112px);flex:1 1;flex-direction:column}
-.client-notifications-manage{display:flex;justify-content:flex-end;padding:7px 24px 0;background:#f3f7f9}
-.client-notifications-manage button{min-height:27px;border:1px solid #16809a;border-radius:999px;padding:0 12px;background:#fff;color:#16809a;font-size:11px;font-weight:650;cursor:pointer}
-.client-notification-feed{width:100%;min-height:calc(100vh - 112px)!important;flex:1 1;padding:18px 28px!important;background:#f3f7f9!important;color:#253943!important;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif!important}
+.client-notification-feed{width:100%;min-height:calc(100vh - 112px)!important;flex:1 1;padding:12px!important;background:#f5fbfd!important;color:#12345a!important;font-family:Inter,Arial,sans-serif!important}
 .client-notification-feed .notification-news-shell{max-width:none}
-.client-notification-feed .notification-feed-header{min-height:58px;margin:0 0 12px;padding:12px 17px;border-radius:11px;background:linear-gradient(105deg,#1b86a0,#2aa7c0);box-shadow:none}
-.client-notification-feed .notification-feed-header h1{font-size:16px;font-weight:700;letter-spacing:0}
-.client-notification-feed .notification-feed-header p{margin-top:2px;font-size:11px}
-.client-notification-feed .notification-feed-header>strong{display:none}
-.client-notification-feed .client-feed-banner-bell{display:inline-grid;width:18px;height:18px;place-items:center;margin-right:4px;border-radius:50%;background:#ffffff24;font-size:12px}
-.client-notification-feed .notification-feed-stats{display:none}
-.client-notification-feed>.notification-news-shell>.notification-searchbar{height:38px;margin-bottom:12px;padding-right:84px}
-.client-notification-feed .notification-searchbar input{height:38px;border-color:#d4e2e8;border-radius:8px;padding-left:14px;font-size:13px}
-.client-notification-feed .notification-searchbar button{width:75px;height:38px;border-radius:8px;background:#168da6;font-size:12px}
-.client-notification-feed .notification-feed-layout{display:block}
-.client-notification-feed .notification-feed-sidebar{display:none}
-.client-notification-feed .notification-feed-list{width:100%}
-.client-notification-feed .notification-card-list{gap:13px}
-.client-notification-feed .notification-news-card{position:relative;display:block;min-height:0;border:1px solid #d7e4e9;border-radius:12px;padding:15px 16px 13px 68px;background:#fff;box-shadow:none}
-.client-notification-feed .client-feed-bell{position:absolute;top:16px;left:16px;display:grid;width:40px;height:40px;place-items:center;border-radius:50%;background:#e4f4f7;color:#16809a;font-size:0}
-.client-notification-feed .client-feed-bell:before{width:14px;height:14px;border:1.8px solid currentColor;border-radius:50%;content:""}
-.client-notification-feed .client-feed-bell:after{position:absolute;top:24px;width:17px;height:4px;border:1.6px solid currentColor;border-top:0;border-radius:0 0 8px 8px;content:""}
-.client-notification-feed .client-feed-title{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.client-notification-feed .client-feed-title h2{margin:1px 0 4px;color:#16809a;font-size:16px;line-height:1.25;font-weight:700}
-.client-notification-feed .client-feed-title time{flex:none;color:#687e87;font-size:11px}
-.client-notification-feed .client-feed-reference{display:inline-block;border:1px solid #d9e9ee;border-radius:5px;padding:2px 8px;background:#edf5f7;color:#738791;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}
-.client-notification-feed .client-feed-countries{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
-.client-notification-feed .client-feed-countries>span{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;background:#e7f4f6;color:#38525b;font-size:11px}
-.client-notification-feed .client-feed-countries .country-select-flag{width:15px;height:11px;object-fit:cover}
-.client-notification-feed .client-feed-attachment{display:flex;align-items:center;gap:10px;min-height:58px;border:1px solid #d8e5e9;border-radius:11px;padding:9px 10px;background:#f4f8f9}
-.client-notification-feed .client-feed-file-badge{display:grid;flex:none;width:38px;height:38px;place-items:center;border-radius:9px;background:#229cb4;color:white;font-size:10px;font-weight:800}
-.client-notification-feed .client-feed-file-info{display:grid;min-width:0;flex:1 1;grid-gap:3px;gap:3px}
-.client-notification-feed .client-feed-file-info strong{overflow:hidden;color:#16809a;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
-.client-notification-feed .client-feed-file-info small{overflow-wrap:anywhere;color:#71858d;font-size:10px}
-.client-notification-feed .client-feed-attachment button{display:flex;flex:none;align-items:center;gap:5px;min-height:35px;border:1px solid #1598b3;border-radius:9px;padding:0 13px;background:white;color:#16809a;font-size:12px;font-weight:700;cursor:pointer}
-.client-notification-feed .client-feed-attachment button svg{width:15px;height:15px}
-.client-notification-feed .client-feed-attachment button:disabled{opacity:.5;cursor:not-allowed}
-.client-notification-feed .client-feed-audit{display:block;margin-top:10px;color:#70848d;font-size:10px}
-.client-notification-feed .notification-feed-pagination{color:#627982}
-.client-notification-feed .notification-feed-pagination{display:none}
-.client-notification-feed .notification-news-shell{font-family:Arial,Helvetica,sans-serif}
-.client-notification-feed .notification-feed-header{min-height:33px;margin-bottom:7px;padding:7px 11px;border-radius:7px}
-.client-notification-feed .notification-feed-header h1{font-size:13px}
-.client-notification-feed .notification-feed-header p{font-size:9px}
-.client-notification-feed>.notification-news-shell>.notification-searchbar{height:30px;margin-bottom:7px;padding-right:44px}
-.client-notification-feed .notification-searchbar input{height:30px;border-radius:6px;padding-left:9px;font-size:10px}
-.client-notification-feed .notification-searchbar button{width:42px;height:30px;border-radius:6px;font-size:9px}
-.client-notification-feed .client-notification-category-tabs{display:flex;gap:5px;margin:0 0 8px}
-.client-notification-feed .client-notification-category-tabs span{display:grid;min-height:22px;place-items:center;border:1px solid #dce7ea;border-radius:999px;padding:0 10px;background:#fff;color:#485b62;font-size:9px}
-.client-notification-feed .client-notification-category-tabs span.is-active{border-color:#1c9bb1;background:#1c9bb1;color:#fff}
-.client-notification-feed .notification-card-list{gap:8px}
-.client-notification-feed .notification-news-card{min-height:0;border-radius:8px;padding:10px 10px 8px 39px}
-.client-notification-feed .client-feed-bell{top:10px;left:9px;width:23px;height:23px;font-size:12px}
-.client-notification-feed .client-feed-bell:before,.client-notification-feed .client-feed-bell:after{display:none}
-.client-notification-feed .client-feed-title h2{font-size:11px}
-.client-notification-feed .client-feed-title time{font-size:8px}
-.client-notification-feed .client-feed-reference{font-size:8px}
-.client-notification-feed .client-feed-countries{gap:4px;margin:6px 0}
-.client-notification-feed .client-feed-countries>span{padding:2px 6px;font-size:8px}
-.client-notification-feed .client-feed-attachment{min-height:35px;gap:6px;border-radius:6px;padding:4px 6px}
-.client-notification-feed .client-feed-file-badge{width:22px;height:22px;border-radius:5px;font-size:7px}
-.client-notification-feed .client-feed-file-info{gap:1px}
-.client-notification-feed .client-feed-file-info strong{font-size:8px}
-.client-notification-feed .client-feed-file-info small{font-size:7px}
-.client-notification-feed .client-feed-attachment button{min-height:21px;gap:3px;border-radius:5px;padding:0 7px;font-size:8px}
-.client-notification-feed .client-feed-attachment button svg{width:11px;height:11px}
-.client-notification-feed .client-feed-audit{margin-top:5px;font-size:7px}
-.client-notification-feed .client-notification-manage{margin:0 0 7px;text-align:right}
-.client-notification-feed .client-notification-manage button{border:1px solid #d0e3e7;border-radius:5px;padding:5px 8px;background:#fff;color:#42636c;font-size:9px}
-@media(max-width:700px){.client-notification-feed{padding:14px 12px!important}.client-notification-feed .notification-news-card{padding:65px 12px 12px}.client-notification-feed .client-feed-bell{top:13px;left:13px}.client-notification-feed .client-feed-title{flex-direction:column;gap:2px}.client-notification-feed .client-feed-title time{font-size:10px}.client-notification-feed .client-feed-attachment{gap:7px}.client-notification-feed .client-feed-attachment button{padding:0 9px}}
-@media(max-width:700px){.client-notification-feed .notification-news-card{padding:42px 9px 9px}.client-notification-feed .client-feed-bell{top:9px;left:9px}.client-notification-feed .client-feed-title{flex-direction:row;align-items:flex-start;gap:8px}.client-notification-feed .client-feed-title time{font-size:8px}.client-notification-feed .client-feed-attachment{gap:5px}.client-notification-feed .client-feed-attachment button{padding:0 6px}}
+.client-notification-feed .notification-feed-header{min-height:61px;margin:0 0 10px;padding:12px 16px;border-radius:9px}
+.client-notification-feed .notification-feed-header h1{font-size:18px}
+.client-notification-feed .notification-feed-header p{margin-top:3px;font-size:10px}
+.client-notification-feed .notification-feed-header>strong{padding:5px 9px;font-size:9px}
+.client-notification-feed .notification-feed-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-gap:6px;gap:6px;margin:0 0 9px}
+.client-notification-feed .notification-feed-stats>div{gap:2px;border-radius:6px;padding:6px 8px}
+.client-notification-feed .notification-feed-stats span{font-size:8px}
+.client-notification-feed .notification-feed-stats strong{font-size:13px}
+.client-notification-feed>.notification-news-shell>.notification-searchbar{height:27px;margin:0 0 9px;padding-right:80px}
+.client-notification-feed .notification-searchbar input{height:27px;border-color:#bce8ef;border-radius:5px;padding-left:9px;font-size:9px}
+.client-notification-feed .notification-searchbar button{width:72px;height:27px;border-radius:5px;background:#008fbd;font-size:9px}
+.client-notification-feed .notification-feed-layout{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:8px;gap:8px}
+.client-notification-feed .notification-feed-main,.client-notification-feed .notification-feed-list,.client-notification-feed .notification-card-list{width:100%;min-width:0}
+.client-notification-feed .notification-feed-main{display:block}
+.client-notification-feed .notification-feed-list{grid-column:auto;grid-row:auto}
+.client-notification-feed .notification-feed-sidebar{display:none!important}
+.client-notification-feed .notification-card-list{gap:7px}
+.client-notification-feed .notification-news-card{width:100%;max-width:none;grid-template-columns:minmax(0,1fr) 240px;min-height:112px;gap:18px;border-radius:9px;padding:16px 20px}
+.client-notification-feed .notification-news-copy h2{margin:0 0 7px;font-size:17px;line-height:1.35}
+.client-notification-feed .notification-read-more{min-width:68px;min-height:19px;height:19px;border-radius:5px;padding:0 9px;font-size:8px}
+.client-notification-feed .notification-admin-actions,.client-notification-feed .notification-admin-controls,.client-notification-feed .notification-details-edit-actions{display:none!important}
+.client-notification-feed .notification-news-meta{grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;border-left:1px solid #d8e9ee;padding-left:16px;font-size:13px}
+.client-notification-feed .notification-news-meta strong{grid-column:1/-1;font-size:14px}
+.client-notification-feed .notification-news-meta>span{font-size:12px}
+.client-notification-feed .notification-year-badge{font-size:8px}
+.client-notification-feed .notification-document-details{gap:4px;font-size:7px}
+.client-notification-feed .notification-document-details button{font-size:7px}
+.client-notification-feed .client-notification-record-data{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-gap:4px 9px;gap:4px 9px;grid-column:1/-1;margin-top:4px;border-top:1px solid #d8e9ee;padding-top:5px;color:#456b82;font-size:8px}
+.client-notification-feed .client-notification-record-data>span{display:flex;min-width:0;gap:4px;overflow-wrap:anywhere}
+.client-notification-feed .client-notification-record-data b{flex:0 0 auto;color:#315874}
+.client-notification-feed .client-notification-record-data code{min-width:0;overflow-wrap:anywhere;color:#087ca0;font:inherit}
+.client-notification-feed .notification-category-badge{display:none!important}
+.client-notification-feed .notification-clear-filters{display:none!important}
+.client-notification-feed .notification-feed-pagination{display:flex;margin-top:6px;padding:3px 5px;font-size:8px}
+.client-notification-feed .notification-feed-pagination nav{gap:3px}
+.client-notification-feed .notification-feed-pagination nav button{min-width:30px;height:22px;padding:0 5px;font-size:7px}
+.client-notification-feed .notification-feed-pagination nav b{min-width:22px;height:22px}
+.client-notification-feed .notification-sidebar-panel{margin:0 0 7px;border-radius:7px}
+.client-notification-feed .notification-sidebar-panel>header{padding:6px 10px;font-size:10px}
+.client-notification-feed .notification-filter-fields{gap:5px;padding:7px}
+.client-notification-feed .notification-filter-fields label{gap:3px;font-size:8px}
+.client-notification-feed .notification-filter-fields select{height:23px;border-radius:5px;padding:0 7px;font-size:8px}
+.client-notification-feed .notification-filter-fields>button:not(.notification-clear-filters){height:24px;min-width:0;border-radius:5px;font-size:8px}
+.client-notification-feed .notification-recent-panel>button{padding:6px 8px;font-size:8px}
+.client-notification-feed .notification-recent-panel>button small{font-size:7px}
+@media(max-width:720px){.client-notification-feed{padding:12px!important}.client-notification-feed .notification-news-card{grid-template-columns:minmax(0,1fr) 190px;gap:12px;padding:14px}}
+@media(max-width:520px){.client-notification-feed .notification-feed-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.client-notification-feed .notification-news-card{grid-template-columns:minmax(0,1fr);gap:10px;padding:13px}.client-notification-feed .notification-news-meta{grid-template-columns:minmax(0,1fr) auto;border-top:1px solid #d8e9ee;border-left:0;padding:10px 0 0}.client-notification-feed .notification-news-meta strong{grid-column:1/-1}.client-notification-feed .notification-feed-pagination{align-items:flex-start;flex-direction:column}.client-notification-feed .notification-feed-pagination nav{flex-wrap:wrap}}
 @media(min-width:651px){.client-notifications-route{min-height:calc(100vh - 112px)}}
-@media(max-width:650px){.client-notifications-route,.client-notification-feed{min-height:calc(100vh - 178px)!important}.client-notifications-manage{padding:6px 12px 0}}
+@media(max-width:650px){.client-notifications-route,.client-notification-feed{min-height:calc(100vh - 178px)!important}}
 .notification-page th:nth-child(3) {
   width: 19%;
 }

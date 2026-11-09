@@ -6,428 +6,78 @@
 /*!*******************************************************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./app/client-dashboard/requirements/client-requirements.css ***!
   \*******************************************************************************************************************************************************************************************************************************************************************************************************/
-.client-main:has(.reference-requirements) .client-requirements-topbar {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  height: 106px;
-  min-height: 106px;
-  padding: 10px;
-  border-bottom: 2px solid #42d8ed;
-  background: linear-gradient(110deg, #20abc2, #1798b6);
-  color: #fff;
-  font-family: Arial, Helvetica, sans-serif;
-}
-.client-requirements-topbar .client-quotation-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding-right: 18px;
-  border-right: 3px solid #fff;
-  color: #fff;
-  text-decoration: none;
-}
-.client-requirements-topbar .client-quotation-brand span {
-  display: grid;
-  width: 78px;
-  height: 78px;
-  place-items: center;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  font-size: 35px;
-  font-weight: 700;
-}
-.client-requirements-topbar .client-quotation-brand b {
-  font-size: 24px;
-}
-.client-requirements-topbar .client-quotation-welcome {
-  display: grid;
-  align-content: center;
-  grid-gap: 2px;
-  gap: 2px;
-  min-width: 0;
-  color: #fff;
-}
-.client-requirements-topbar .client-quotation-welcome span {
-  font-size: 24px;
-  font-weight: 700;
-}
-.client-requirements-topbar .client-quotation-welcome strong {
-  overflow: hidden;
-  font-size: 34px;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.client-requirements-topbar .client-quotation-avatar {
-  display: grid;
-  flex: 0 0 66px;
-  width: 66px;
-  height: 66px;
-  margin-left: auto;
-  place-items: center;
-  border-radius: 50%;
-  background: #fff;
-  color: #20a5bd;
-  font-size: 27px;
-  font-weight: 700;
-}
 .reference-requirements {
-  min-height: calc(100vh - 106px);
-  padding: 12px 20px 24px;
-  background: #fff;
-}
-.reference-requirements .reference-title {
-  margin: 0 0 8px;
-  padding: 0;
-  border-radius: 4px;
-  background: #25a9c2;
-}
-.reference-requirements .reference-title h1 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  margin: 0;
-  padding: 5px 8px;
-  color: #fff;
-  font-size: 16px;
-  line-height: 1.2;
-}
-.reference-requirements .reference-title h1 svg {
-  width: 18px;
-  height: 18px;
-  color: #fff;
-}
-.reference-requirements .reference-filter {
-  grid-template-columns: 1.05fr 1.45fr 1.2fr 100px;
-  gap: 9px;
-  align-items: end;
-  padding: 7px 9px;
-  border: 1px solid #a6eafa;
-  border-radius: 6px;
-  background: #fbfeff;
-}
-.reference-requirements .reference-filter label,
-.reference-requirements .reference-country-filter > span {
-  gap: 5px;
-  color: #00a6c9;
-  font-size: 10px;
-}
-.reference-requirements .reference-filter :is(select, .reference-country-filter summary) {
-  min-height: 30px;
-  border: 1px solid #86def5;
-  border-radius: 6px;
-  background: #fff;
-  color: #00a6c9;
-  font: 11px Arial, Helvetica, sans-serif;
-}
-.reference-requirements .reference-filter .reference-primary {
-  display: flex;
-  min-height: 30px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border: 1px solid #00afd0;
-  border-radius: 6px;
-  background: #00afd0;
-  color: #fff;
-  font: 700 11px Arial, Helvetica, sans-serif;
-}
-.reference-requirements .reference-filter .reference-primary svg {
-  width: 15px;
-  height: 15px;
-}
-.reference-requirements .reference-table-card {
-  margin-top: 8px;
-  padding: 6px;
-  border: 1px solid #a6eafa;
-  border-radius: 6px;
-  background: #fff;
-}
-.reference-requirements .reference-table-toolbar {
-  justify-content: flex-end;
-  padding: 0 0 6px;
-}
-.reference-requirements .reference-table-toolbar .reference-primary {
-  display: flex;
-  min-height: 28px;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border: 1px solid #00afd0;
-  border-radius: 6px;
-  background: #00afd0;
-  color: #fff;
-  font: 700 10px Arial, Helvetica, sans-serif;
-}
-.reference-requirements .reference-table-scroll {
-  overflow: auto;
-  border: 1px solid #b0eafa;
-  border-radius: 5px;
-}
-.reference-requirements .reference-table {
-  width: 100%;
-  min-width: 1000px;
-  border-collapse: collapse;
-}
-.reference-requirements .reference-table thead th {
-  height: 27px;
-  padding: 5px 8px;
-  border: 1px solid #bdeefa;
-  background: #25a9c2;
-  color: #fff;
-  font: 700 9px Arial, Helvetica, sans-serif;
-  text-align: left;
-  white-space: nowrap;
-}
-.reference-requirements .reference-table tbody td {
-  padding: 3px 6px;
-  border: 1px solid #c4eff9;
-  background: #fff;
-  color: #00a6c9;
-  font: 8px/1.2 Arial, Helvetica, sans-serif;
-  vertical-align: middle;
-}
-.reference-requirements .reference-table tbody td strong {
-  color: #008eac;
-}
-.reference-requirements .reference-table .reference-description {
-  color: #287f98;
-  font: 7px/1.15 Arial, Helvetica, sans-serif;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-}
-.reference-requirements .reference-country {
-  margin: 1px;
-  padding: 2px 6px;
-  border-radius: 12px;
-  background: #e3f8fc;
-  color: #168eb0;
-  font: 700 8px Arial, Helvetica, sans-serif;
-}
-.reference-requirements .reference-country img {
-  width: 12px;
-  height: 9px;
-  object-fit: cover;
-}
-.reference-requirements .reference-icon-button {
-  width: 25px;
-  height: 25px;
-  border: 1px solid #86def5;
-  border-radius: 5px;
-  background: #fbfeff;
-  color: #00a6c9;
-}
-.reference-requirements .aipt-pagination {
-  padding: 8px 0 0;
-  color: #00a6c9;
-  font: 10px Arial, Helvetica, sans-serif;
-}
-.reference-requirements .aipt-pagination button {
-  min-height: 30px;
-  border: 1px solid #a1e5f8;
-  border-radius: 5px;
-  background: #fbfeff;
-  color: #00a6c9;
-}
-@media (min-width: 601px) and (max-width: 1023px) {
-  .client-main:has(.reference-requirements) .client-requirements-topbar {
-    padding-left: 58px;
-  }
-}
-@media (max-width: 850px) {
-  .reference-requirements .reference-filter {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .reference-requirements .reference-filter .reference-primary {
-    width: 100%;
-  }
-}
-@media (max-width: 600px) {
-  .client-main:has(.reference-requirements) .client-requirements-topbar {
-    height: 78px;
-    min-height: 78px;
-    gap: 10px;
-    padding: 8px 8px 8px 58px;
-  }
-  .client-requirements-topbar .client-quotation-brand {
-    padding-right: 10px;
-  }
-  .client-requirements-topbar .client-quotation-brand span {
-    width: 52px;
-    height: 52px;
-    font-size: 23px;
-  }
-  .client-requirements-topbar .client-quotation-brand b {
-    font-size: 17px;
-  }
-  .client-requirements-topbar .client-quotation-welcome span {
-    font-size: 16px;
-  }
-  .client-requirements-topbar .client-quotation-welcome strong {
-    font-size: 20px;
-  }
-  .client-requirements-topbar .client-quotation-avatar {
-    flex-basis: 48px;
-    width: 48px;
-    height: 48px;
-    font-size: 20px;
-  }
-  .reference-requirements {
-    padding: 12px 10px 18px;
-  }
-  .reference-requirements .reference-filter {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .reference-requirements .reference-table {
-    min-width: 900px;
-  }
-}
-.reference-statements {
-  min-height: calc(100vh - 106px);
-  padding: 12px 20px 24px;
-  background: #fff;
-  color: #00a6c9;
-  font: 12px Arial, Helvetica, sans-serif;
-}
-.reference-statements .reference-title {
-  display: flex;
-  min-height: 30px;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 8px;
-  padding: 0 8px;
-  border-radius: 4px;
-  background: #25a9c2;
-}
-.reference-statements .reference-title h1 {
-  min-height: 30px;
-  padding: 5px 0;
-}
-.reference-statements .reference-title .client-secondary {
-  min-height: 26px;
-  border: 1px solid rgba(255,255,255,.7);
-  border-radius: 5px;
-  background: transparent;
-  color: #fff;
-}
-.reference-statements .client-toolbar {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-  padding: 7px 9px;
-  border: 1px solid #a6eafa;
-  border-radius: 6px;
-  background: #fbfeff;
-  color: #00a6c9;
-}
-.reference-statements .client-toolbar label {
-  display: flex;
-  width: min(100%, 420px);
-  min-height: 30px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  border: 1px solid #86def5;
-  border-radius: 6px;
-  background: #fff;
-  color: #00a6c9;
-}
-.reference-statements .client-toolbar input {
-  min-width: 0;
-  flex: 1 1;
-  border: 0;
-  outline: 0;
-  color: #168eb0;
-  font: 11px Arial, Helvetica, sans-serif;
-}
-.reference-statements .client-toolbar .result-count {
-  color: #168eb0;
-  font-size: 11px;
-}
-.reference-statements .reference-table-card {
+  --req-brand: #0e7c86;
+  --req-tint: #e7f4f4;
+  --req-tint-strong: #d4ebec;
+  --req-border: #c7dfe0;
+  --req-ink: #15383b;
+  --req-muted: #587477;
   width: 100%;
   box-sizing: border-box;
-  margin-top: 0;
-  padding: 6px;
+  min-height: calc(100vh - 70px);
+  padding: 28px clamp(20px, 3vw, 48px) 36px;
+  background: #f5fafa;
+  color: var(--req-ink);
+  font: 16px/1.5 Figtree, system-ui, sans-serif;
 }
-.reference-statements,
-.reference-statements .client-toolbar,
-.reference-statements .reference-table-scroll {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
+.reference-requirements * { box-sizing: border-box; }
+.reference-requirements :is(button, select, input, summary) { font: inherit; }
+.reference-requirements :is(button, select, input, summary, input[type="checkbox"]):focus-visible { outline: 3px solid var(--req-brand); outline-offset: 2px; }
+.requirements-header { margin: 0 0 20px; }
+.requirements-header h1 { margin: 0; color: var(--req-ink); font-size: 28px; line-height: 1.25; font-weight: 700; }
+.requirements-header p { margin: 6px 0 0; color: var(--req-muted); }
+.requirements-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-gap: 16px; gap: 16px; padding: 20px; border: 1px solid var(--req-border); border-radius: 12px; background: #fff; }
+.requirements-filters > label, .requirements-country-filter { display: grid; min-width: 0; grid-gap: 6px; gap: 6px; margin: 0; color: var(--req-ink); font-weight: 600; }
+.requirements-filters select, .requirements-filters input[type="search"], .requirements-country-filter summary { width: 100%; height: 44px; min-width: 0; padding: 0 12px; border: 1px solid var(--req-border); border-radius: 8px; background: #fff; color: var(--req-ink); }
+.requirements-country-filter { position: relative; }
+.requirements-country-filter details { position: relative; }
+.requirements-country-filter summary { display: flex; align-items: center; cursor: pointer; list-style: none; font-weight: 400; }
+.requirements-country-filter summary::-webkit-details-marker { display: none; }
+.requirements-country-options { position: absolute; z-index: 4; top: 48px; left: 0; right: 0; display: none; max-height: 220px; overflow-y: auto; padding: 7px; border: 1px solid var(--req-border); border-radius: 8px; background: #fff; }
+.requirements-country-filter details[open] .requirements-country-options { display: grid; }
+.requirements-country-options label { display: flex; align-items: center; gap: 8px; padding: 5px; cursor: pointer; }
+.requirements-country-options input { accent-color: var(--req-brand); }
+.requirements-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 0 0; }
+.requirements-chips button { border: 1px solid var(--req-border); border-radius: 20px; background: var(--req-tint); color: var(--req-brand); padding: 5px 12px; cursor: pointer; }
+.requirements-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0 12px; }
+.requirements-toolbar p { margin: 0; color: var(--req-muted); }
+.requirements-primary, .requirements-secondary { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--req-brand); border-radius: 8px; cursor: pointer; }
+.requirements-primary { background: var(--req-brand); color: #fff; font-weight: 700; }
+.requirements-primary svg, .requirements-secondary svg { width: 18px; height: 18px; }
+.requirements-secondary { background: #fff; color: var(--req-brand); }
+.requirements-primary:disabled, .requirements-secondary:disabled { opacity: .5; cursor: not-allowed; }
+.requirements-list { display: grid; grid-gap: 14px; gap: 14px; }
+.requirements-card { display: grid; grid-template-columns: 260px minmax(0, 1fr) auto; grid-gap: 24px; gap: 24px; align-items: start; padding: 20px; border: 1px solid var(--req-border); border-left: 5px solid var(--req-brand); border-radius: 10px; background: #fff; page-break-inside: avoid; break-inside: avoid; }
+.requirements-card-country { display: grid; justify-items: start; grid-gap: 8px; gap: 8px; }
+.requirements-country { display: flex; align-items: center; gap: 10px; color: var(--req-ink); }
+.requirements-country strong { font-size: 18px; }
+.requirements-country img { width: 36px; height: 24px; border: 1px solid var(--req-border); border-radius: 4px; object-fit: cover; }
+.requirements-service { color: var(--req-muted); }
+.requirements-procedure { display: inline-flex; border-radius: 5px; background: var(--req-tint); color: var(--req-brand); padding: 3px 9px; font-size: 14px; }
+.requirements-card-content { min-width: 0; }
+.requirements-card-content h2 { margin: 0 0 8px; color: var(--req-ink); font-size: 18px; line-height: 1.35; font-weight: 700; }
+.requirements-items { columns: 1; margin: 0; padding-left: 22px; }
+.requirements-items li { padding: 0 0 5px 2px; overflow-wrap: anywhere; }
+.requirements-expand { border: 0; background: transparent; color: var(--req-brand); padding: 3px 0; text-decoration: underline; cursor: pointer; }
+.requirements-card-actions { display: flex; justify-content: flex-end; }
+.requirements-empty { display: grid; justify-items: center; grid-gap: 14px; gap: 14px; padding: 38px 20px; border: 1px dashed var(--req-border); border-radius: 10px; background: #fff; color: var(--req-muted); text-align: center; }
+.requirements-empty p { margin: 0; }
+.requirements-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 22px 0 0; }
+.requirements-pagination span { color: var(--req-muted); }
+.requirements-error { color: var(--req-brand); }
+@media (min-width: 1201px) { .requirements-items { columns: 2; column-gap: 28px; } }
+@media (max-width: 900px) { .requirements-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .requirements-card { grid-template-columns: 200px minmax(0, 1fr); } .requirements-card-actions { grid-column: 2; justify-content: flex-start; } }
+@media (max-width: 600px) { .reference-requirements { padding: 20px; } .requirements-filters { grid-template-columns: minmax(0, 1fr); padding: 16px; } .requirements-card { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 16px; } .requirements-card-actions { grid-column: 1; } .requirements-toolbar { align-items: stretch; flex-direction: column; } .requirements-toolbar .requirements-primary { width: 100%; } .requirements-pagination { gap: 9px; } }
+@media (prefers-color-scheme: dark) {
+  .reference-requirements { --req-brand: #3fb7c2; --req-tint: #153d41; --req-tint-strong: #1a4b50; --req-border: #31575a; --req-ink: #e4f3f3; --req-muted: #adc5c7; background: #102b2e; color: var(--req-ink); }
+  .requirements-filters, .requirements-card, .requirements-empty { background: #163639; }
+  .requirements-filters select, .requirements-filters input[type="search"], .requirements-country-filter summary, .requirements-country-options, .requirements-secondary { background: #102b2e; color: var(--req-ink); }
+  .requirements-primary { color: #102b2e; }
 }
-.reference-statements .statement-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 0 0 6px;
-}
-.reference-statements .statement-tabs button {
-  min-height: 28px;
-  padding: 5px 10px;
-  border: 1px solid #a6eafa;
-  border-radius: 5px;
-  background: #fbfeff;
-  color: #168eb0;
-  font: 700 10px Arial, Helvetica, sans-serif;
-}
-.reference-statements .statement-tabs button.active {
-  border-color: #00a9c5;
-  background: #00a9c5;
-  color: #fff;
-}
-.reference-statements .panel-title {
-  min-height: 30px;
-  margin: 0 0 6px;
-  padding: 5px 8px;
-  border-radius: 4px;
-  background: #25a9c2;
-  color: #fff;
-}
-.reference-statements .panel-title h2,
-.reference-statements .panel-title span {
-  color: #fff;
-  font-size: 11px;
-}
-.reference-statements .reference-table {
-  min-width: 790px;
-}
-.reference-statements .reference-table tbody td {
-  padding: 6px 8px;
-  color: #168eb0;
-  font: 10px/1.35 Arial, Helvetica, sans-serif;
-}
-.reference-statements .country-pagination {
-  padding: 8px 0 0;
-  color: #00a6c9;
-  font: 10px Arial, Helvetica, sans-serif;
-}
-.reference-statements .country-pagination button {
-  min-height: 30px;
-  border: 1px solid #a1e5f8;
-  border-radius: 5px;
-  background: #fbfeff;
-  color: #00a6c9;
-}
-@media (max-width: 600px) {
-  .reference-statements {
-    padding: 12px 10px 18px;
-  }
-  .reference-statements .client-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .reference-statements .client-toolbar label {
-    width: 100%;
-  }
-  .reference-statements .statement-tabs {
-    flex-wrap: wrap;
-  }
+@media print {
+  .requirements-filters, .requirements-chips, .requirements-toolbar button, .requirements-card-actions, .requirements-expand, .requirements-pagination, .requirements-error { display: none !important; }
+  .reference-requirements { padding: 0; background: #fff; color: #15383b; }
+  .requirements-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none; }
 }
 
