@@ -44,6 +44,61 @@ function normalizeApostillePreview(root: HTMLElement) {
   }
 }
 
+function copyComputedStyles(source: Element, target: Element) {
+  const computed = window.getComputedStyle(source);
+  const style = (target as HTMLElement | SVGElement).style;
+  for (let index = 0; index < computed.length; index++) {
+    const property = computed.item(index);
+    style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+  }
+  const sourceChildren = Array.from(source.children);
+  const targetChildren = Array.from(target.children);
+  sourceChildren.forEach((child, index) => {
+    if (targetChildren[index]) copyComputedStyles(child, targetChildren[index]);
+  });
+}
+
+function renderPreviewPageToPng(page: HTMLElement, scale = 3) {
+  const width = page.offsetWidth;
+  const height = page.offsetHeight;
+  if (!width || !height) throw new Error('The generated document preview is not ready for PDF export.');
+  const clone = page.cloneNode(true) as HTMLElement;
+  copyComputedStyles(page, clone);
+  clone.style.setProperty('box-shadow', 'none');
+  clone.style.setProperty('margin', '0');
+  clone.style.setProperty('transform', 'none');
+  clone.style.setProperty('width', `${width}px`);
+  clone.style.setProperty('height', `${height}px`);
+  const serialized = new XMLSerializer().serializeToString(clone);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}"><foreignObject width="${width}" height="${height}">${serialized}</foreignObject></svg>`;
+  const image = new Image();
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+  return new Promise<Uint8Array>((resolve, reject) => {
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Unable to render the preview for PDF export.');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(async (blob) => {
+          URL.revokeObjectURL(svgUrl);
+          if (!blob) { reject(new Error('Unable to create the PDF page image.')); return; }
+          resolve(new Uint8Array(await blob.arrayBuffer()));
+        }, 'image/png');
+      } catch (cause) {
+        URL.revokeObjectURL(svgUrl);
+        reject(cause);
+      }
+    };
+    image.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error('Unable to render the document preview for PDF export.')); };
+    image.src = svgUrl;
+  });
+}
+
 function ClientPoaPage() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [loadingCountries, setLoadingCountries] = useState(true);
@@ -164,6 +219,33 @@ function ClientPoaPage() {
   }, [generatedBlob]);
 
   const download = () => { if (!generatedBlob) return; const url = URL.createObjectURL(generatedBlob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `POA-${applicantName.trim().replace(/[^a-z0-9-_]+/gi, '-')}.docx`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); };
+  const downloadPdf = async () => {
+    if (!generatedBlob || !documentRef.current || rendering) return;
+    setError('');
+    try {
+      const pages = Array.from(documentRef.current.querySelectorAll<HTMLElement>('.docx'));
+      if (!pages.length) throw new Error('Generate the document preview before downloading the PDF.');
+      const { PDFDocument } = await import('pdf-lib');
+      const pdf = await PDFDocument.create();
+      for (const page of pages) {
+        const image = await renderPreviewPageToPng(page);
+        const embedded = await pdf.embedPng(image);
+        const pdfPage = pdf.addPage([595.28, 841.89]);
+        pdfPage.drawImage(embedded, { x: 0, y: 0, width: 595.28, height: 841.89 });
+      }
+      const pdfBytes = await pdf.save();
+      const pdfBuffer = pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer;
+      const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `POA-${applicantName.trim().replace(/[^a-z0-9-_]+/gi, '-')}.pdf`;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to download the PDF.');
+    }
+  };
   const fitWidth = () => {
     const canvas = documentRef.current?.parentElement;
     if (!canvas) return;
@@ -185,7 +267,7 @@ function ClientPoaPage() {
       {!ready && !error && <p className="poa-required-hint">Required: {[...required, !confirmed && 'confirmation', !templateBuffer.current && 'template'].filter(Boolean).join(', ')}</p>}
       {countryError && <p className="poa-error" role="alert">{countryError}</p>}{error && <p className="poa-error" role="alert">{error}</p>}
     </section>
-    <section className="poa-preview-panel" aria-label="Document preview"><div className="poa-section-heading"><span aria-hidden="true">â–¤</span><h2>Document Preview</h2><span className="poa-live-badge">âœ“ Live Preview</span></div><div className="poa-preview-toolbar"><button type="button" onClick={() => setZoom((value) => Math.max(60, value - 10))} aria-label="Zoom out">âˆ’</button><span>{zoom}%</span><button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in">+</button><button type="button" onClick={() => setZoom(100)}>100%</button><button type="button" onClick={fitWidth}>Fit width</button><span className="poa-toolbar-divider" /><button type="button" disabled={!generatedBlob} onClick={download}>Download DOCX</button><button type="button" disabled={!generatedBlob} onClick={() => window.print()}>Print / Save PDF</button></div><div className="poa-preview-document-name">{currentTemplate.filename}</div><div className="poa-preview-canvas"><div className="poa-generated-styles" ref={stylesRef} /><div className="poa-generated-docx" data-template={templateId} ref={documentRef} style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center", height: `${Math.max(1123, documentRef.current?.querySelectorAll(".docx").length || 1) * zoom / 100}px` }} />{rendering && <div className="poa-preview-status" role="status"><span className="poa-spinner" />Rendering document...</div>}{renderError && <p className="poa-preview-error" role="alert">Preview failed: {renderError}</p>}{!generatedBlob && <p className="poa-preview-placeholder">Generate the POA to preview the completed Word document.</p>}</div></section>
+    <section className="poa-preview-panel" aria-label="Document preview"><div className="poa-section-heading"><span aria-hidden="true">â–¤</span><h2>Document Preview</h2><span className="poa-live-badge">âœ“ Live Preview</span></div><div className="poa-preview-toolbar"><button type="button" onClick={() => setZoom((value) => Math.max(60, value - 10))} aria-label="Zoom out">âˆ’</button><span>{zoom}%</span><button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in">+</button><button type="button" onClick={() => setZoom(100)}>100%</button><button type="button" onClick={fitWidth}>Fit width</button><span className="poa-toolbar-divider" /><button type="button" disabled={!generatedBlob || rendering} onClick={download}>Download DOCX</button><button type="button" disabled={!generatedBlob || rendering} onClick={() => window.print()}>Print / Save PDF</button><button type="button" disabled={!generatedBlob || rendering} onClick={() => void downloadPdf()}>Download PDF</button></div><div className="poa-preview-document-name">{currentTemplate.filename}</div><div className="poa-preview-canvas"><div className="poa-generated-styles" ref={stylesRef} /><div className="poa-generated-docx" data-template={templateId} ref={documentRef} style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center", height: `${Math.max(1123, documentRef.current?.querySelectorAll(".docx").length || 1) * zoom / 100}px` }} />{rendering && <div className="poa-preview-status" role="status"><span className="poa-spinner" />Rendering document...</div>}{renderError && <p className="poa-preview-error" role="alert">Preview failed: {renderError}</p>}{!generatedBlob && <p className="poa-preview-placeholder">Generate the POA to preview the completed Word document.</p>}</div></section>
   </div></main>;
 }
 

@@ -1,7 +1,8 @@
 {
-  "/client-dashboard/page": "app/client-dashboard/page.js",
-  "/client-dashboard/schedule-of-fees/page": "app/client-dashboard/schedule-of-fees/page.js",
+  "/client-dashboard/quotations/page": "app/client-dashboard/quotations/page.js",
   "/client-dashboard/poa/page": "app/client-dashboard/poa/page.js",
-  "/client-dashboard/requirements/page": "app/client-dashboard/requirements/page.js",
-  "/client-dashboard/quotations/page": "app/client-dashboard/quotations/page.js"
+  "/login/verify-otp/page": "app/login/verify-otp/page.js",
+  "/client-dashboard/page": "app/client-dashboard/page.js",
+  "/login/page": "app/login/page.js",
+  "/api/poa/translate/route": "app/api/poa/translate/route.js"
 }
