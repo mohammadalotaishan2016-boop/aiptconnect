@@ -1,50 +1,8 @@
 {
-  "app\\client-dashboard\\poa\\page.tsx -> pdf-lib": {
-    "id": "app\\client-dashboard\\poa\\page.tsx -> pdf-lib",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_pdf-lib_es_index_js.js"
-    ]
-  },
-  "app\\client-dashboard\\requirements\\page.tsx -> ../../../src/lib/table-files": {
-    "id": "app\\client-dashboard\\requirements\\page.tsx -> ../../../src/lib/table-files",
-    "files": [
-      "static/chunks/_app-pages-browser_src_lib_table-files_ts.js"
-    ]
-  },
-  "app\\client-dashboard\\requirements\\page.tsx -> ../../requirements/page": {
-    "id": "app\\client-dashboard\\requirements\\page.tsx -> ../../requirements/page",
-    "files": [
-      "static/chunks/_app-pages-browser_app_requirements_page_tsx.js"
-    ]
-  },
-  "app\\quotations\\page.tsx -> ../../src/components/DataTransfer": {
-    "id": "app\\quotations\\page.tsx -> ../../src/components/DataTransfer",
-    "files": [
-      "static/chunks/_app-pages-browser_src_components_DataTransfer_tsx.js"
-    ]
-  },
-  "app\\quotations\\page.tsx -> ../../src/components/QuotationDocument": {
-    "id": "app\\quotations\\page.tsx -> ../../src/components/QuotationDocument",
-    "files": [
-      "static/chunks/_app-pages-browser_src_components_QuotationDocument_tsx.js"
-    ]
-  },
   "node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts": {
     "id": "node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts",
     "files": [
       "static/chunks/_app-pages-browser_node_modules_next_dist_client_dev_noop-turbopack-hmr_js.js"
-    ]
-  },
-  "node_modules\\next\\dist\\client\\index.js -> ../pages/_app": {
-    "id": "node_modules\\next\\dist\\client\\index.js -> ../pages/_app",
-    "files": [
-      "static/chunks/_pages-dir-browser_node_modules_next_dist_pages__app_js.js"
-    ]
-  },
-  "node_modules\\next\\dist\\client\\index.js -> ../pages/_error": {
-    "id": "node_modules\\next\\dist\\client\\index.js -> ../pages/_error",
-    "files": [
-      "static/chunks/_pages-dir-browser_node_modules_next_dist_pages__error_js.js"
     ]
   },
   "src\\components\\AdminAppShell.tsx -> ./ClientPortalShell": {
@@ -62,11 +20,5 @@
   "src\\lib\\poa-docx.ts -> jszip": {
     "id": "src\\lib\\poa-docx.ts -> jszip",
     "files": []
-  },
-  "src\\lib\\table-files.ts -> exceljs": {
-    "id": "src\\lib\\table-files.ts -> exceljs",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_exceljs_dist_exceljs_min_js.js"
-    ]
   }
 }

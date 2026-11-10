@@ -159,9 +159,11 @@ export function replaceDocumentText(paragraph: Element, replacements: Record<str
 }
 
 export function paragraphAlignment(template: PoaTemplateId, text: string, column: PoaColumn = 'single'): 'center' | 'right' | 'left' | 'both' {
-  if (text.includes('Power of Attorney (POA)')) return 'center';
   if (template === 'apostille') {
-    if (column === 'arabic') return 'right';
+    if (text.includes(String.fromCharCode(1608,1603,1575,1604,1577))) return 'center';
+    const normalizedText = text.trim().replace(/\s+/g, ' ');
+    if (/^(?:\u0623\u0646\u0627 \u0627\u0644\u0645\u0648\u0642\u0639 \u0627\u062f\u0646\u0627\u0647:|\u0627\u0644\u0645\u0642\u064a\u0645 \u0641\u064a:?|\u0627\u0644\u0627\u0633\u0645:|\u0627\u0644\u062a\u0648\u0642\u064a\u0639:|\u0627\u0644\u062a\u0627\u0631\u064a\u062e:)$/.test(normalizedText)) return 'right';
+    if (column === 'arabic') return 'both';
     if (/^(NAME:|SIGNATURE:|DATE:)$/.test(text.trim())) return 'left';
     return 'both';
   }
@@ -310,7 +312,7 @@ export function normalizeApostilleDirection(document: Document) {
     const row = paragraph.parentElement?.parentElement;
     const firstRow = row?.namespaceURI === WORD_NS && row.localName === 'tr'
       && Array.from(document.getElementsByTagNameNS(WORD_NS, 'tr'))[0] === row;
-    const header = text.includes('Power of Attorney (POA)') || Boolean(firstRow);
+    const header = text.includes('Power of Attorney (POA)') || /\u0648\u0643\u0627\u0644\u0629/.test(text);
     setParagraphProperties(paragraph, header ? 'center' : paragraphAlignment('apostille', text, arabic ? 'arabic' : 'english'), arabic, header);
   }
 }
