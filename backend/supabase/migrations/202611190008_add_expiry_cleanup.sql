@@ -1,8 +1,9 @@
 -- Scheduled expiry cleanup via pg_cron.
--- pg_cron must be enabled in the Supabase dashboard under
--- Database → Extensions before this migration runs.
--- If not yet enabled, run: create extension if not exists pg_cron;
--- (requires superuser; use the Supabase dashboard instead).
+-- pg_cron is enabled here via CREATE EXTENSION IF NOT EXISTS.
+-- The migration runner connects as the postgres superuser, so this succeeds
+-- without any manual dashboard action.
+
+create extension if not exists pg_cron;
 
 -- ============================================================================
 -- Remove any stale schedules from previous runs (idempotent)

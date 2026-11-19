@@ -31,11 +31,11 @@ do $$ begin
     where schemaname = 'public' and tablename = 'fee_classifications'
       and policyname = 'authenticated users can read fee classifications'
   ) then
-    execute $$
+    execute $p$
       create policy "authenticated users can read fee classifications"
         on public.fee_classifications for select to authenticated
         using (deleted_at is null)
-    $$;
+    $p$;
   end if;
 end $$;
 

@@ -35,13 +35,29 @@
 - backend/supabase/functions/login/index.ts — reads profiles.status (not approval_status/account_status/locked_at)
 - CLAUDE.md — updated ROLES section to three roles
 
+## Done (continued)
+- All 8 T0B migrations applied to live project `davupzevvsngppcrynoj` (2026-11-19)
+- pg_cron self-enabled in migration 8 (no manual dashboard step needed)
+- `backend/.env` — added missing `SUPABASE_ANON_KEY` for target project
+
+### Status backfill verified (post-migration)
+| status | role | count |
+|---|---|---|
+| active | administrator | 1 |
+| active | client | 2 |
+| deactivated | administrator | 1 |
+| deactivated | client | 4 |
+| suspended | client | 1 |
+
+### pg_cron jobs active
+- `cleanup-expired-otp-challenges` — */15 * * * *
+- `cleanup-stale-client-invitations` — 0 2 * * *
+- `cleanup-expired-idempotency-keys` — 5 * * * *
+
 ## Next
-- Run migrations on staging (davupzevvsngppcrynoj — confirm staging vs prod with user first)
-- Enable pg_cron extension in Supabase dashboard before migration 8
-- Verify: check status backfill on all 9 live profiles
-- Run Supabase security and performance advisors after migration
+- T1: User management UI / admin panel
+- Future: drop legacy `approval_status`, `account_status` columns from profiles once all app code reads `profiles.status`
+- Run Supabase security and performance advisors
 
 ## Open questions / decisions
-- Production deploy: waiting for explicit user approval before pushing to live DB
-- pg_cron: user must enable the extension via Supabase dashboard (Extensions tab) before migration 8
 - associate role flagged rows: 0 live records; audit_logs entry written if any appear in future
