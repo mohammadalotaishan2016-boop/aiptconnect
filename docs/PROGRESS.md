@@ -67,14 +67,35 @@
 ### Edge Function deploy
 `npx supabase functions deploy login --project-ref davupzevvsngppcrynoj` — deployed successfully (775 kB)
 
+## T3 — Register page (self-registration + existing-company invite) ✅ (committed `7a06f33`)
+**Branch**: `task/t3-register`
+
+### What changed
+**Migration**
+- `backend/supabase/migrations/202611200003_register_profile_trigger_phone_address.sql` — updates `handle_new_user_profile()` trigger to persist `phone` and `address` from `raw_user_meta_data` into `profiles`; applied to production via `--db-url`
+
+**Frontend**
+- `frontend/src/lib/countries.ts` — 195-country dataset (iso2, name, dialCode) + `countryFlag()` emoji utility
+- `frontend/app/register/page.tsx` — full rewrite:
+  - Custom `DialCodePicker`: searchable dropdown, flag + dial code + country name, 195 countries
+  - Custom `CountrySelect`: searchable dropdown, 195 countries
+  - Selecting a country auto-syncs dial code (unless user manually picked a dial code)
+  - Zod field-level validation; E.164 phone check (`+[1-9]\d{6,14}`)
+  - Field-level errors shown below each input
+  - Existing invitation flow, password strength, and `supabase.auth.signUp()` preserved
+- `frontend/app/register-security.css` — added picker dropdown, phone-field, and field-error styles
+
+### TypeScript check
+`npx tsc --noEmit` — 0 errors
+
 ---
 
 ## Open questions / decisions needed
 - None currently
 
 ## Next tasks
-- **T3**: Register page (self-registration, starts as `pending`)
 - **T4**: Reset/forgot password
+- **T5**: Invitation flow (administrator invites user, starts as `active`)
 - **T5**: Invitation flow (administrator invites user, starts as `active`)
 - **T6**: Admin pages, permissions, audit logs
 - **Future**: Drop legacy `approval_status`, `account_status` columns from profiles once confirmed unused
