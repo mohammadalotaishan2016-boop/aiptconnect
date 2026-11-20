@@ -119,7 +119,7 @@ Deno.serve(async (request) => {
       .eq("status", "active");
 
     const fingerprintExists = fingerprint
-      ? (await admin.from("devices").select("id", { head: true }).eq("user_id", authUserId).eq("device_id", fingerprint).eq("status", "active")).count ?? 0
+      ? (await admin.from("devices").select("id", { count: "exact", head: true }).eq("user_id", authUserId).eq("device_id", fingerprint).eq("status", "active")).count ?? 0
       : 0;
 
     const foreignActiveCount = (activeCount ?? 0) - Number(fingerprintExists > 0);
