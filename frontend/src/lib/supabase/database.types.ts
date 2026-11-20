@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       audit_logs: {
@@ -1671,6 +1646,56 @@ export type Database = {
         }
         Relationships: []
       }
+      login_requests: {
+        Row: {
+          created_at: string
+          device_fingerprint: string
+          expires_at: string
+          id: string
+          ip: unknown
+          resolved_at: string | null
+          session_access_token: string | null
+          session_refresh_token: string | null
+          status: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_fingerprint: string
+          expires_at?: string
+          id?: string
+          ip?: unknown
+          resolved_at?: string | null
+          session_access_token?: string | null
+          session_refresh_token?: string | null
+          status?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_fingerprint?: string
+          expires_at?: string
+          id?: string
+          ip?: unknown
+          resolved_at?: string | null
+          session_access_token?: string | null
+          session_refresh_token?: string | null
+          status?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "login_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       news_feed: {
         Row: {
           created_at: string
@@ -3226,9 +3251,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

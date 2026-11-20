@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
 import dynamic from 'next/dynamic';
 import { getSupabaseBrowserClient, isFeeSyncActive } from '../lib/supabase/browser';
+import DeviceApprovalBanner from './DeviceApprovalBanner';
 
 const ClientPortalShell = dynamic(() => import('./ClientPortalShell'), {
   loading: () => <section className="client-page client-page-loading" aria-busy="true"><span className="client-loading-spinner" aria-hidden="true" />Loading your dashboard…</section>,
@@ -61,11 +62,13 @@ export default function AdminAppShell({ children }: { children: ReactNode }) {
   const [welcome, setWelcome] = useState('');
   const [idleWarning, setIdleWarning] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(300);
+  const [adminUserId, setAdminUserId] = useState('');
 
   useEffect(() => {
     if (!adminRoutes.has(pathname) && !clientRoutes.has(pathname)) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => { if (data.user) setAdminUserId(data.user.id); }).catch(() => undefined);
     const idleLimit = 30 * 60 * 1000;
     const warningAt = 25 * 60 * 1000;
     let lastActivity = Date.now();
@@ -127,5 +130,5 @@ export default function AdminAppShell({ children }: { children: ReactNode }) {
 
   if (!adminRoutes.has(pathname)) return <>{children}{welcomeToast}</>;
 
-  return <><div className="admin-app-shell"><AdminSidebar /><div className="admin-dashboard-content"><AdminDashboardHeader />{children}</div></div>{welcomeToast}{idleNotice}</>;
+  return <><div className="admin-app-shell"><AdminSidebar /><div className="admin-dashboard-content"><AdminDashboardHeader />{children}</div></div>{welcomeToast}{idleNotice}{adminUserId && <DeviceApprovalBanner userId={adminUserId} />}</>;
 }

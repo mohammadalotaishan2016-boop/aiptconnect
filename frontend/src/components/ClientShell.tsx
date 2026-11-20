@@ -8,6 +8,7 @@ import { fetchSupabaseFunction, getSupabaseBrowserClient } from '../lib/supabase
 import AccountMenu from './AccountMenu';
 import ClientDashboardLanguageSelector from './ClientDashboardLanguageSelector';
 import type { DashboardLanguage } from './ClientDashboardLanguageSelector';
+import DeviceApprovalBanner from './DeviceApprovalBanner';
 
 const ClientAutoTranslator = dynamic(() => import('./ClientAutoTranslator'), { ssr: false });
 
@@ -38,6 +39,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   const shellRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState('Client');
   const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState('');
   const [accessState, setAccessState] = useState<'checking' | 'allowed' | 'denied'>('checking');
   const [language, setLanguage] = useState<DashboardLanguage>('en');
   const [railCollapsed, setRailCollapsed] = useState(false);
@@ -50,14 +52,14 @@ export default function ClientShell({ children }: { children: React.ReactNode })
       if (!data.user) { router.replace('/login'); return; }
       setName(data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Client');
       setEmail(data.user.email || '');
-      const { data: profile } = await supabase.from('profiles').select('role,client_id,approval_status,account_status').eq('id', data.user.id).maybeSingle();
+      setUserId(data.user.id);
+      const { data: profile } = await supabase.from('profiles').select('role,client_id,status').eq('id', data.user.id).maybeSingle();
       const { data: client } = profile?.client_id ? await supabase.from('clients').select('email').eq('id', profile.client_id).is('deleted_at', null).maybeSingle() : { data: null };
       const authenticatedEmail = (data.user.email || '').trim().toLowerCase();
       const linkedEmail = (client?.email || '').trim().toLowerCase();
       const role = String(profile?.role || '').toLowerCase();
-      const approvalStatus = String(profile?.approval_status || '').toLowerCase();
-      const accountStatus = String(profile?.account_status || '').toLowerCase();
-      if (role !== 'client' || approvalStatus !== 'approved' || accountStatus !== 'active' || !profile?.client_id || !authenticatedEmail || linkedEmail !== authenticatedEmail) {
+      const status = String(profile?.status || '').toLowerCase();
+      if (role !== 'client' || status !== 'active' || !profile?.client_id || !authenticatedEmail || linkedEmail !== authenticatedEmail) {
         setAccessState('denied');
         await supabase.auth.signOut();
         window.sessionStorage.setItem('aipt-auth-message', 'This account is not approved or its registered client email is not correctly linked.');
@@ -136,6 +138,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   const goBack = () => router.push('/client-dashboard');
   const shellText = shellTranslations[language];
   return <ClientIdentity.Provider value={{ name, email }}>
+    {userId && <DeviceApprovalBanner userId={userId} />}
     <div className="client-app-shell client-home-shell" ref={shellRef}>
       {accessState === 'allowed' && <ClientAutoTranslator rootRef={shellRef} language={language} />}
       <header className="client-home-header" dir="ltr">

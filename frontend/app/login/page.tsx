@@ -58,6 +58,16 @@ export default function LoginPage() {
     setUnblockState('idle');
   }
 
+  function getDeviceFingerprint(): string {
+    const key = 'aipt-device-fp';
+    let fp = window.localStorage.getItem(key);
+    if (!fp) {
+      fp = crypto.randomUUID();
+      window.localStorage.setItem(key, fp);
+    }
+    return fp;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (requestPending.current) return;
@@ -77,16 +87,24 @@ export default function LoginPage() {
     requestPending.current = true;
     setBusy(true);
 
+    const deviceFingerprint = getDeviceFingerprint();
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, password }),
+        body: JSON.stringify({ email: normalizedEmail, password, device_fingerprint: deviceFingerprint }),
       });
       const body = await response.json().catch(() => ({}));
 
       if (response.status === 429) {
         setServerError(body.error || 'Too many login attempts. Please wait before trying again.');
+        return;
+      }
+
+      // New device is waiting for approval from an existing logged-in device
+      if (response.ok && body.waiting && body.request_id) {
+        router.push(`/login/waiting?id=${body.request_id}`);
         return;
       }
 
