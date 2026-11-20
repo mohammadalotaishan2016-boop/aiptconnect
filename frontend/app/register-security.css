@@ -9,3 +9,30 @@
 @media(max-width:1000px){.register-page .auth-card{grid-template-columns:48% 52%}.register-page .login-panel{padding:24px 8%}.register-art{background-position:right center}}@media(max-width:700px){.register-page .auth-card{grid-template-columns:1fr}.register-art{display:none}.register-page .login-panel{padding:24px max(24px,8%)}.register-page .registration-tabs{grid-template-columns:1fr 1fr}}
 
 .register-page .field .dial-code{width:78px;flex:0 0 78px;border-right:1px solid #dce0ec;margin-right:12px;padding-right:8px}
+
+/* ── Picker shared ── */
+.picker-wrap{position:relative}
+.picker-trigger{display:flex;align-items:center;gap:5px;border:0;background:transparent;cursor:pointer;padding:0;font:12px Arial;color:#19213e;white-space:nowrap}
+.picker-trigger:focus-visible{outline:3px solid rgba(38,169,197,.2)}
+.picker-caret{font-size:9px;color:#7b86a4;margin-left:1px}
+.picker-flag{font-size:15px;line-height:1;flex-shrink:0}
+.picker-code{font-size:12px;font-weight:700;color:#19213e}
+.picker-name{font-size:12px;color:#3a4357;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker-placeholder{color:#9ba5b4;font-size:12px;flex:1}
+.picker-country-name{font-size:12px;color:#19213e;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.picker-dropdown{position:absolute;left:0;top:calc(100% + 4px);z-index:300;width:230px;border:1px solid #d0dce4;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.13);overflow:hidden}
+.picker-dropdown-full{width:100%;min-width:180px}
+.picker-search{display:block;width:100%;border:0;border-bottom:1px solid #e8edf2;padding:9px 12px;font:12px Arial;outline:0;box-sizing:border-box}
+.picker-list{max-height:190px;overflow-y:auto;overscroll-behavior:contain}
+.picker-option{display:flex;align-items:center;gap:7px;padding:7px 12px;cursor:pointer;font-size:12px}
+.picker-option:hover,.picker-option.selected{background:#f0f9fb}
+.picker-option.selected .picker-code,.picker-option.selected .picker-name{color:#0a8fab}
+/* Phone field */
+.register-page .phone-field{padding:0;display:flex;align-items:center}
+.phone-field .picker-wrap{padding:8px 10px 8px 12px;border-right:1px solid #dce0ec;flex-shrink:0}
+.phone-field input{flex:1;padding:8px 10px 8px 10px;border:0;outline:0;background:transparent;font:12px Arial;color:#19213e;min-height:22px}
+/* Country picker */
+.country-picker-wrap{width:100%}
+.country-trigger{width:100%;min-height:22px;text-align:left;justify-content:flex-start}
+/* Field-level error */
+.field-error{display:block;color:#b42318;font-size:11px;margin-top:3px}
