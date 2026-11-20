@@ -19,14 +19,25 @@ Deno.serve(async (request) => {
   if (!token || !supabaseUrl || !serviceRoleKey) return json({ error: "Authentication required." }, 401);
 
   const db = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
   const { data, error } = await db.auth.getUser(token);
   if (error || !data.user) return json({ error: "Authentication required." }, 401);
 
-  const { error: updateError } = await db
+  const userId = data.user.id;
+
+  // Reset failure counters for this user
+  const { error: resetError } = await db
     .from("profiles")
     .update({ failed_login_attempts: 0, locked_at: null })
-    .eq("id", data.user.id);
-  if (updateError) return json({ error: "Unable to unlock the account after password reset." }, 500);
+    .eq("id", userId);
+  if (resetError) return json({ error: "Unable to reset the account after password change." }, 500);
+
+  // If the account was locked, set it back to active (password reset proves identity)
+  await db
+    .from("profiles")
+    .update({ status: "active" })
+    .eq("id", userId)
+    .eq("status", "locked");
 
   return json({ success: true });
 });
