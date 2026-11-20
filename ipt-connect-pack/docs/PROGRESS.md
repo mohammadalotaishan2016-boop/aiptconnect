@@ -54,8 +54,29 @@
 - `cleanup-stale-client-invitations` — 0 2 * * *
 - `cleanup-expired-idempotency-keys` — 5 * * * *
 
+## Done (continued)
+- T1: app foundations initialized (2026-11-20)
+
+### T1 changes
+- **Login fix:** `.env.development.local` in both frontend and backend pointed to wrong project (`ebaduymzezrmqlzmobkq`); corrected to `davupzevvsngppcrynoj` — this was the source of "Unable to reach the project service" in local dev
+- Packages added: `@mui/material`, `@mui/icons-material`, `@emotion/react`, `@emotion/styled`, `@tanstack/react-query`, `react-hook-form`, `@hookform/resolvers`, `zod`, `@supabase/ssr`; `xml-js` removed
+- `src/lib/supabase/database.types.ts` — generated from live schema
+- `src/lib/supabase/browser.ts` — typed with `Database` generic
+- `src/lib/supabase/server.ts` — `createServerClient()` (cookie/anon) + `createAdminClient()` (service role)
+- `src/lib/theme.ts` — single MUI theme (#17a2b8, Times New Roman, black/white)
+- `src/components/Providers.tsx` — ThemeProvider + QueryClientProvider
+- `app/layout.tsx` — wrapped with `<Providers>`
+- `src/lib/api.ts` — `ApiResponse<T>`, `ok()`, `fail()`
+- `src/lib/guards.ts` — `requireAuth`, `requireRole`, `requireActiveStatus`, `requireTenant`
+- `src/lib/pagination.ts` — `paginationParams()`
+- `src/lib/schemas/index.ts` — common Zod schemas
+- `src/lib/auth/role-routing.ts` — removed old roles; reads `profiles.status` column
+- `tsconfig.json` — `@/*` path alias added
+- `app/error.tsx` + `app/global-error.tsx` — global error boundaries
+- Deleted: `out.txt`, `body.txt`, `artifacts/`
+
 ## Next
-- T1: User management UI / admin panel
+- T2a: Login page (status check, 5-attempt lockout, friendly error messages)
 - Future: drop legacy `approval_status`, `account_status` columns from profiles once all app code reads `profiles.status`
 - Run Supabase security and performance advisors
 
