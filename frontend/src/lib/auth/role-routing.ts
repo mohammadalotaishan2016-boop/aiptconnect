@@ -1,12 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-type ProfileRole = 'administrator' | 'client' | 'associate' | 'user';
+type ProfileRole = 'administrator' | 'client' | 'sub_administrator';
 
 const destinations: Record<ProfileRole, string> = {
   administrator: '/overview',
+  sub_administrator: '/overview',
   client: '/client-dashboard',
-  associate: '/user-dashboard',
-  user: '/user-dashboard',
 };
 
 export async function getRoleDestination(supabase: SupabaseClient) {
@@ -15,25 +14,27 @@ export async function getRoleDestination(supabase: SupabaseClient) {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, approval_status, account_status')
+    .select('role, status')
     .eq('id', userData.user.id)
     .single();
 
-  if (profileError || !profile || !(String(profile.role).toLowerCase() in destinations)) {
+  if (profileError || !profile || !(profile.role in destinations)) {
     throw new Error('Your account role is not configured. Please contact an administrator.');
   }
 
-  const role = String(profile.role).toLowerCase() as ProfileRole;
-  const approvalStatus = String(profile.approval_status || '').toLowerCase();
-  const accountStatus = String(profile.account_status || '').toLowerCase();
-  if (role !== 'administrator' && approvalStatus !== 'approved') {
-    await supabase.auth.signOut();
-    throw new Error('Your account is awaiting administrator approval.');
-  }
+  const role = profile.role as ProfileRole;
 
-  if (accountStatus === 'inactive') {
+  if (profile.status !== 'active') {
     await supabase.auth.signOut();
-    throw new Error('Your account is deactivated. Contact an administrator.');
+    const messages: Record<string, string> = {
+      pending: 'Your account is awaiting administrator approval.',
+      suspended: 'Your account has been suspended. Please contact support.',
+      deactivated: 'Your account is deactivated. Contact an administrator.',
+      locked: 'Your account is locked. Use Forgot Password or contact an administrator.',
+    };
+    throw new Error(
+      messages[profile.status as string] ?? 'Your account cannot log in. Please contact support.',
+    );
   }
 
   return destinations[role];

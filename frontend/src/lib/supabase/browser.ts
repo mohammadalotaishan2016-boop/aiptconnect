@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from './database.types';
 
-let browserClient: SupabaseClient | null | undefined;
+let browserClient: SupabaseClient<Database> | null | undefined;
 const FEE_SYNC_ACTIVITY_KEY = 'aipt-fee-sync-activity';
 
 export function setFeeSyncActivity(active: boolean) {
@@ -22,7 +23,7 @@ export function getSupabaseBrowserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  browserClient = url && key ? createClient(url, key) : null;
+  browserClient = url && key ? createClient<Database>(url, key) : null;
   return browserClient;
 }
 

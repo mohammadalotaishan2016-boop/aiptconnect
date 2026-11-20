@@ -30,6 +30,7 @@ import './client-reference.css';
 import './admin-reference.css';
 import './spreadsheet.css';
 import AdminAppShell from '../src/components/AdminAppShell';
+import Providers from '../src/components/Providers';
 
 export const metadata: Metadata = {
   title: 'AIP&T | Intellectual Property',
@@ -37,5 +38,17 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><head><meta charSet="utf-8" /><link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" /></head><body><AdminAppShell>{children}</AdminAppShell></body></html>;
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
+      <body>
+        <Providers>
+          <AdminAppShell>{children}</AdminAppShell>
+        </Providers>
+      </body>
+    </html>
+  );
 }
