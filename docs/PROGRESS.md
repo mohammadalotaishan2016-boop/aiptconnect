@@ -90,11 +90,32 @@
 
 ---
 
+## T4 — Reset/Forgot Password ✅ (committed `542b5d1`)
+**Branch**: `task/t4-reset-password`
+
+### What changed
+- `app/forgot-password/page.tsx` — cleaned up, added autoFocus
+- `app/forgot-password/verify-otp/page.tsx` — cleaned up, autoFocus first digit, clears sessionStorage on success
+- `app/change-password/page.tsx` — fixed 4 bugs: replaced `DashboardPreview` → `AuthArtwork`; fixed garbled eye-button chars → Show/Hide; added 2-rule strength list; added session guard (redirects to `/forgot-password` if no active recovery session)
+- `functions/reset-password/index.ts` — after resetting failure counters, also sets `status='active'` for locked accounts (password reset proves identity) — deployed to production
+
+### Role assignments (done outside T4 scope)
+- `mohammad.alotaishan2016@gmail.com` → role: **administrator** (was updated via admin API)
+- `info@aiptlaw.com` → role: **client** (was updated via admin API)
+
+### TypeScript check
+`npx tsc --noEmit` — 0 errors
+
+### Edge Function deploy
+`reset-password` redeployed (770 kB)
+
+---
+
 ## Open questions / decisions needed
 - None currently
 
 ## Next tasks
-- **T4**: Reset/forgot password
+- **T5**: Invitation flow (administrator invites user, starts as `active`)
 - **T5**: Invitation flow (administrator invites user, starts as `active`)
 - **T5**: Invitation flow (administrator invites user, starts as `active`)
 - **T6**: Admin pages, permissions, audit logs
