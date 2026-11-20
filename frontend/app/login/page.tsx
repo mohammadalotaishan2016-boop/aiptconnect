@@ -5,48 +5,27 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import './login.css';
-import {
-  fetchSupabaseFunction,
-  getSupabaseBrowserClient,
-} from '../../src/lib/supabase/browser';
+import { getSupabaseBrowserClient } from '../../src/lib/supabase/browser';
+import { getRoleDestination } from '../../src/lib/auth/role-routing';
 
 const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function getLoginErrorMessage(code?: string, message?: string) {
-  if (code === 'email_not_confirmed') {
-    return 'This account requires email confirmation. Disable Confirm email in Supabase Auth for password-only login.';
-  }
-
-  if (
-    code === 'over_request_rate_limit' ||
-    code === 'over_email_send_rate_limit'
-  ) {
-    return 'Too many attempts. Please wait a moment before trying again.';
-  }
-
-  if (code === 'invalid_credentials') {
-    return 'The email address or password is incorrect.';
-  }
-
-  if (code === 'otp_delivery_failed') {
-    return 'Your password was verified, but the login verification email could not be sent. Please contact support or try again later.';
-  }
-
-  return message || 'Unable to log in. Please try again.';
-}
+type Modal =
+  | { type: 'locked'; email: string }
+  | { type: 'invalid'; remaining: number | null }
+  | { type: 'status'; message: string };
 
 export default function LoginPage() {
   const router = useRouter();
   const requestPending = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [keepLogin, setKeepLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [serverError, setServerError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [pendingApproval, setPendingApproval] = useState(false);
-  const [loginModal, setLoginModal] = useState<{ type: 'locked' | 'invalid'; remaining: number | null } | null>(null);
+  const [modal, setModal] = useState<Modal | null>(null);
+  const [unblockState, setUnblockState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
     const message = window.sessionStorage.getItem('aipt-auth-message');
@@ -59,6 +38,26 @@ export default function LoginPage() {
   const emailError = submitted && !validEmail.test(email.trim().toLowerCase());
   const passwordError = submitted && password.length === 0;
 
+  async function requestUnblock(lockedEmail: string) {
+    if (unblockState === 'sending' || unblockState === 'sent') return;
+    setUnblockState('sending');
+    try {
+      await fetch('/api/auth/unblock-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockedEmail }),
+      });
+      setUnblockState('sent');
+    } catch {
+      setUnblockState('error');
+    }
+  }
+
+  function closeModal() {
+    setModal(null);
+    setUnblockState('idle');
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (requestPending.current) return;
@@ -67,7 +66,6 @@ export default function LoginPage() {
     setServerError('');
 
     const normalizedEmail = email.trim().toLowerCase();
-
     if (!validEmail.test(normalizedEmail) || password.length === 0) return;
 
     const supabase = getSupabaseBrowserClient();
@@ -80,57 +78,65 @@ export default function LoginPage() {
     setBusy(true);
 
     try {
-      const response = await fetchSupabaseFunction('login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password }),
       });
       const body = await response.json().catch(() => ({}));
 
-      if (response.ok && body.session && !body.otp_required) {
-        const { error: otpError } = await supabase.auth.signInWithOtp({
+      if (response.status === 429) {
+        setServerError(body.error || 'Too many login attempts. Please wait before trying again.');
+        return;
+      }
+
+      if (response.ok && body.ok) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
           email: normalizedEmail,
-          options: { shouldCreateUser: false },
+          password,
         });
-        if (otpError) throw otpError;
-        window.sessionStorage.setItem('aipt-login-otp-mode', 'supabase-email');
-        window.sessionStorage.setItem('aipt-login-otp-email', normalizedEmail);
-        window.sessionStorage.removeItem('aipt-login-otp-challenge');
-        router.push('/login/verify-otp');
+        if (signInError) {
+          setServerError('Sign-in failed. Please try again.');
+          return;
+        }
+        const destination = await getRoleDestination(supabase);
+        router.push(destination);
         return;
       }
 
-      if (!response.ok || !body.otp_required) {
-        if (response.status === 423 || body.code === 'account_locked') {
-          setLoginModal({ type: 'locked', remaining: 0 });
-          return;
-        }
-        if (
-          response.status === 403 &&
-          body.code === 'account_pending'
-        ) {
-          setPendingApproval(true);
-          return;
-        }
-        if (response.status === 401 && body.code === 'invalid_credentials') {
-          setLoginModal({ type: 'invalid', remaining: body.attempts_remaining == null ? null : Number(body.attempts_remaining) });
-          return;
-        }
-        setServerError(getLoginErrorMessage(body.code, body.error));
+      const code: string = body.code ?? '';
+
+      if (response.status === 423 || code === 'account_locked') {
+        setModal({ type: 'locked', email: normalizedEmail });
         return;
       }
 
-      if (!body.challenge_id) throw new Error('The login verification challenge was not created.');
-      window.sessionStorage.setItem('aipt-login-otp-mode', 'challenge');
-      window.sessionStorage.setItem('aipt-login-otp-challenge', body.challenge_id);
-      window.sessionStorage.setItem('aipt-login-otp-email', body.masked_email || 'your registered email');
-      router.push('/login/verify-otp');
+      if (response.status === 403) {
+        if (code === 'account_pending') {
+          setModal({ type: 'status', message: 'Your account is waiting for administrator approval. Please wait up to 24 hours while we validate your registration.' });
+          return;
+        }
+        if (code === 'account_suspended') {
+          setModal({ type: 'status', message: 'Your account has been suspended. Please contact the administrator for assistance.' });
+          return;
+        }
+        if (code === 'account_deactivated') {
+          setModal({ type: 'status', message: 'This account is deactivated. Please contact the administrator if you believe this is a mistake.' });
+          return;
+        }
+        setModal({ type: 'status', message: 'Your account cannot log in at this time. Please contact support.' });
+        return;
+      }
+
+      if (response.status === 401 && code === 'invalid_credentials') {
+        const remaining = body.attempts_remaining == null ? null : Number(body.attempts_remaining);
+        setModal({ type: 'invalid', remaining });
+        return;
+      }
+
+      setServerError(body.error || 'Unable to log in. Please try again.');
     } catch (caught) {
-      setServerError(
-        caught instanceof Error
-          ? caught.message
-          : 'Unable to determine your account role.',
-      );
+      setServerError(caught instanceof Error ? caught.message : 'Unable to log in. Please try again.');
     } finally {
       requestPending.current = false;
       setBusy(false);
@@ -171,9 +177,7 @@ export default function LoginPage() {
                 <b>!</b>
                 <span>
                   <strong>The email address you entered is wrong!</strong>
-                  <small>
-                    Please enter a valid email address (e.g., name@domain.com).
-                  </small>
+                  <small>Please enter a valid email address (e.g., name@domain.com).</small>
                 </span>
               </p>
             )}
@@ -205,33 +209,23 @@ export default function LoginPage() {
                 <b>!</b>
                 <span>
                   <strong>Password is required.</strong>
-                  <small>
-                    Enter the password already registered for this account.
-                  </small>
+                  <small>Enter the password already registered for this account.</small>
                 </span>
               </p>
             )}
 
             <div className="form-options">
-              <label className="check">
-                <input
-                  checked={keepLogin}
-                  onChange={(event) => setKeepLogin(event.target.checked)}
-                  type="checkbox"
-                />{' '}
-                <span>Remember me</span>
-              </label>
+              <span />
               <Link href="/forgot-password">Forgot Password?</Link>
             </div>
 
             <button className="primary-button" type="submit" disabled={busy}>
-              {busy ? 'Logging in...' : 'Login'}
+              {busy ? 'Logging in…' : 'Login'}
             </button>
 
             {((submitted && (emailError || passwordError)) || serverError) && (
               <p className="trouble">
-                {serverError ||
-                  'Having trouble? Please check your details and try again.'}
+                {serverError || 'Please check your details and try again.'}
               </p>
             )}
 
@@ -245,32 +239,108 @@ export default function LoginPage() {
 
         <AuthArtwork />
       </section>
-      {pendingApproval && (
+
+      {/* Account locked modal */}
+      {modal?.type === 'locked' && (
         <div
           className="approval-modal-backdrop"
           role="presentation"
-          onMouseDown={() => setPendingApproval(false)}
+          onMouseDown={closeModal}
+        >
+          <section
+            className="approval-modal login-locked-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="locked-title"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="approval-modal-icon">🔒</div>
+            <h2 id="locked-title">Your account has been locked</h2>
+            <p>
+              Your account was locked after five failed login attempts. You can
+              reset your password, or submit an unblock request for an
+              administrator to review.
+            </p>
+            {unblockState === 'sent' ? (
+              <p className="trouble" style={{ color: '#17a2b8' }}>
+                Unblock request sent. An administrator will review it shortly.
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="primary-button"
+                disabled={unblockState === 'sending'}
+                onClick={() => requestUnblock(modal.email)}
+              >
+                {unblockState === 'sending' ? 'Sending…' : 'Request unblock'}
+              </button>
+            )}
+            {unblockState === 'error' && (
+              <p className="trouble">Unable to send request. Please try again.</p>
+            )}
+            <div className="form-options" style={{ marginTop: '0.75rem' }}>
+              <Link href="/forgot-password" onClick={closeModal}>
+                Forgot Password?
+              </Link>
+              <button type="button" onClick={closeModal}>
+                Close
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Invalid credentials modal */}
+      {modal?.type === 'invalid' && (
+        <div
+          className="approval-modal-backdrop"
+          role="presentation"
+          onMouseDown={closeModal}
         >
           <section
             className="approval-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="approval-title"
-            onMouseDown={(event) => event.stopPropagation()}
+            aria-labelledby="invalid-title"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="approval-modal-icon">!</div>
+            <h2 id="invalid-title">Invalid credentials</h2>
+            <p>
+              {modal.remaining === null
+                ? 'The email address or password is incorrect.'
+                : `The email address or password is incorrect. You have ${modal.remaining} attempt${modal.remaining === 1 ? '' : 's'} remaining before your account is locked.`}
+            </p>
+            <button type="button" onClick={closeModal}>
+              Try again
+            </button>
+          </section>
+        </div>
+      )}
+
+      {/* Status modals (pending / suspended / deactivated / unavailable) */}
+      {modal?.type === 'status' && (
+        <div
+          className="approval-modal-backdrop"
+          role="presentation"
+          onMouseDown={closeModal}
+        >
+          <section
+            className="approval-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="status-title"
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="approval-modal-icon">⌛</div>
-            <h2 id="approval-title">Account review in progress</h2>
-            <p>
-              Your account still needs administrator approval. Please wait up to
-              24 hours while we validate your registration.
-            </p>
-            <button type="button" onClick={() => setPendingApproval(false)}>
+            <h2 id="status-title">Unable to log in</h2>
+            <p>{modal.message}</p>
+            <button type="button" onClick={closeModal}>
               Okay, I understand
             </button>
           </section>
         </div>
       )}
-      {loginModal && <div className="approval-modal-backdrop" role="presentation" onMouseDown={() => setLoginModal(null)}><section className={`approval-modal ${loginModal.type === 'locked' ? 'login-locked-modal' : ''}`} role="dialog" aria-modal="true" aria-labelledby="login-notice-title" onMouseDown={(event) => event.stopPropagation()}><div className="approval-modal-icon">{loginModal.type === 'locked' ? '🔒' : '!'}</div><h2 id="login-notice-title">{loginModal.type === 'locked' ? 'Your account has been locked' : 'Invalid credentials'}</h2><p>{loginModal.type === 'locked' ? 'Your account was locked after three failed attempts. Use Forgot Password to reset it or contact the administrator.' : loginModal.remaining === null ? 'The email address or password is incorrect. Administrator accounts are not locked after failed attempts.' : `The email address or password is incorrect. You have ${loginModal.remaining} attempt${loginModal.remaining === 1 ? '' : 's'} remaining before your account is locked.`}</p><button type="button" onClick={() => setLoginModal(null)}>{loginModal.type === 'locked' ? 'Close' : 'Try again'}</button></section></div>}
     </main>
   );
 }

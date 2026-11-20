@@ -6,7 +6,7 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-const MAX_FAILED_ATTEMPTS = 3;
+const MAX_FAILED_ATTEMPTS = 5;
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
@@ -37,7 +37,7 @@ Deno.serve(async (request) => {
     // Gate on unified status column (added in migration 202611190003)
     switch (profile?.status) {
       case "locked":
-        if (!isAdministrator) return json({ code: "account_locked", error: "This account is locked after three failed attempts. Use Forgot Password to reset it or contact an administrator.", attempts_remaining: 0 }, 423);
+        if (!isAdministrator) return json({ code: "account_locked", error: "This account is locked after five failed attempts. Use Forgot Password to reset it or contact an administrator.", attempts_remaining: 0 }, 423);
         break; // administrators bypass the lock and proceed to password check
       case "pending":
         return json({ code: "account_pending", error: "Your account is still awaiting administrator approval." }, 403);
@@ -64,7 +64,7 @@ Deno.serve(async (request) => {
         status: shouldLock ? "locked" : profile?.status,
         last_login_ip: ip,
       }).eq("id", authUserId);
-      return json({ code: shouldLock ? "account_locked" : "invalid_credentials", error: shouldLock ? "This account is locked after three failed attempts. Use Forgot Password to reset it or contact an administrator." : "The email address or password is incorrect.", attempts_remaining: remaining }, shouldLock ? 423 : 401);
+      return json({ code: shouldLock ? "account_locked" : "invalid_credentials", error: shouldLock ? "This account is locked after five failed attempts. Use Forgot Password to reset it or contact an administrator." : "The email address or password is incorrect.", attempts_remaining: remaining }, shouldLock ? 423 : 401);
     }
 
     await admin.from("profiles").update({ failed_login_attempts: 0, locked_at: null, last_login_at: new Date().toISOString(), last_login_ip: ip }).eq("id", authUserId);
