@@ -2,13 +2,11 @@
 import DataTransfer from '../../src/components/DataTransfer';
 import ActionIcon from '../../src/components/ActionIcon';
 import InviteClientUserModal from '../../src/components/InviteClientUserModal';
-
+import InviteUserModal from '../../src/components/InviteUserModal';
+import DeviceManagementPanel from '../../src/components/DeviceManagementPanel';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  fetchSupabaseFunction,
-  getSupabaseBrowserClient,
-} from '../../src/lib/supabase/browser';
+import { getSupabaseBrowserClient } from '../../src/lib/supabase/browser';
 
 type User = {
   id: string;
@@ -23,6 +21,7 @@ type User = {
   logo_url: string | null;
   ip: string;
   role: string;
+  max_devices: number;
   approval_status: 'pending' | 'approved' | 'rejected' | 'suspended';
   account_status: 'active' | 'inactive';
   failed_login_attempts: number;
@@ -39,7 +38,23 @@ type Tab =
   | 'suspended'
   | 'active'
   | 'inactive'
-  | 'locked';
+  | 'locked'
+  | 'invitations';
+
+type Invitation = {
+  id: string;
+  email: string;
+  role: string;
+  client_id: string | null;
+  client_name: string | null;
+  max_devices: number;
+  expires_at: string;
+  consumed_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  invited_by_name: string | null;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+};
 const formatDate = (value: string | null) =>
   value
     ? new Intl.DateTimeFormat('en-US', {
@@ -69,37 +84,61 @@ export default function UsersPage() {
   const [accountFilter, setAccountFilter] = useState('');
   const [securityFilter, setSecurityFilter] = useState('');
   const [reviewUser, setReviewUser] = useState<User | null>(null);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editRole, setEditRole] = useState('');
+  const [editMaxDevices, setEditMaxDevices] = useState(1);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [devicePanelUserId, setDevicePanelUserId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteUserOpen, setInviteUserOpen] = useState(false);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [invitationsLoading, setInvitationsLoading] = useState(false);
+  const [invitationBusy, setInvitationBusy] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const supabase = getSupabaseBrowserClient();
-      if (!supabase) throw Error('Supabase is not configured.');
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw Error('Please sign in.');
-      setCurrentUserId(session.user.id);
-      const response = await fetchSupabaseFunction('users', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user.id) setCurrentUserId(session.user.id);
+      }
+      const response = await fetch('/api/admin/users');
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw Error(body.error || 'Unable to load users.');
       setUsers(body as User[]);
       setError('');
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Unable to load users.',
-      );
+      setError(cause instanceof Error ? cause.message : 'Unable to load users.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadInvitations = useCallback(async () => {
+    setInvitationsLoading(true);
+    try {
+      const res = await fetch('/api/invitation/list');
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw Error(body.error || 'Unable to load invitations.');
+      setInvitations(body as Invitation[]);
+    } catch {
+      // non-fatal: tab just shows empty
+    } finally {
+      setInvitationsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
     const timer = window.setInterval(() => void load(), 30000);
     return () => window.clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (tab === 'invitations') void loadInvitations();
+  }, [tab, loadInvitations]);
+
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
     return users
@@ -162,18 +201,9 @@ export default function UsersPage() {
   ) => {
     setBusy(user.id);
     try {
-      const supabase = getSupabaseBrowserClient();
-      if (!supabase) throw Error('Supabase is not configured.');
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw Error('Please sign in.');
-      const response = await fetchSupabaseFunction(`users/${user.id}`, {
+      const response = await fetch(`/api/admin/users/${user.id}`, {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const body = await response.json().catch(() => ({}));
@@ -181,19 +211,55 @@ export default function UsersPage() {
       setNotice(payload.approval_status === 'approved' && body.email_delivered === false ? `${message} Approval email could not be delivered; check SES configuration.` : message);
       await load();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Unable to update user.',
-      );
+      setError(cause instanceof Error ? cause.message : 'Unable to update user.');
     } finally {
       setBusy(null);
     }
   };
+  const revokeInvitation = async (invId: string) => {
+    setInvitationBusy(invId);
+    try {
+      const res = await fetch('/api/invitation/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitation_id: invId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw Error(body.error || 'Unable to revoke invitation.');
+      setNotice('Invitation revoked.');
+      await loadInvitations();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to revoke invitation.');
+    } finally {
+      setInvitationBusy(null);
+    }
+  };
+
+  const resendInvitation = async (invId: string) => {
+    setInvitationBusy(invId);
+    try {
+      const res = await fetch('/api/invitation/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitation_id: invId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw Error(body.error || 'Unable to resend invitation.');
+      setNotice(body.email_delivered === false ? 'Invitation renewed but email could not be delivered. Check SES configuration.' : 'Invitation resent.');
+      await loadInvitations();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to resend invitation.');
+    } finally {
+      setInvitationBusy(null);
+    }
+  };
+
   const removeUser = async () => {
     if (!deleteUser || deleteUser.role === 'administrator' || !deleteUser.deletion_supported || deleteUser.deletion_policy !== 'non_admin_only' || busy || confirmEmail !== deleteUser.email) return;
     setBusy(deleteUser.id);
     setDeleteError('');
     try {
-      const response = await fetchSupabaseFunction(`users/${deleteUser.id}`, {
+      const response = await fetch(`/api/admin/users/${deleteUser.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force: forceDelete, confirm_email: confirmEmail }),
@@ -207,6 +273,37 @@ export default function UsersPage() {
     } catch (cause) {
       setDeleteError(cause instanceof Error ? cause.message : 'Unable to delete user.');
     } finally { setBusy(null); }
+  };
+  const openEdit = (user: User) => {
+    setEditUser(user);
+    setEditRole(user.role);
+    setEditMaxDevices(user.max_devices ?? 1);
+    setEditError('');
+  };
+  const saveEdit = async () => {
+    if (!editUser) return;
+    setEditBusy(true);
+    setEditError('');
+    try {
+      const payload: Record<string, unknown> = {};
+      if (editRole !== editUser.role) payload.role = editRole;
+      if (editMaxDevices !== (editUser.max_devices ?? 1)) payload.max_devices = editMaxDevices;
+      if (!Object.keys(payload).length) { setEditUser(null); return; }
+      const response = await fetch(`/api/admin/users/${editUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw Error(body.error || 'Unable to update user.');
+      setNotice('User updated.');
+      setEditUser(null);
+      await load();
+    } catch (cause) {
+      setEditError(cause instanceof Error ? cause.message : 'Unable to update user.');
+    } finally {
+      setEditBusy(false);
+    }
   };
   const transferColumns = [
     { key: 'id', label: 'User ID' }, { key: 'email', label: 'Email' }, { key: 'full_name', label: 'Full name' }, { key: 'company_name', label: 'Company' }, { key: 'role', label: 'Role' }, { key: 'approval_status', label: 'Approval' }, { key: 'account_status', label: 'Account' }, { key: 'registration_date', label: 'Registered' },
@@ -237,7 +334,7 @@ export default function UsersPage() {
         const changes: Record<string, string> = {};
         for (const field of ['full_name', 'company_name'] as const) if (row[field] && row[field] !== target[field]) changes[field] = row[field];
         if (Object.keys(changes).length) {
-          const response = await fetchSupabaseFunction('users/' + row.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'import_profile', confirm_email: row.email, ...changes }) });
+          const response = await fetch('/api/admin/users/' + row.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'import_profile', confirm_email: row.email, ...changes }) });
           const body = await response.json();
           if (!response.ok) throw Error(body.error || 'Profile update failed.');
           if (body.warning) throw Error(body.warning + ' Refresh and check this row before retrying.');
@@ -268,9 +365,10 @@ export default function UsersPage() {
     </button>
   );
   const stats = [
-    ['Total users', users.length, 'view'], ['Active', users.filter((user) => user.account_status === 'active').length, 'approve'],
-    ['Deactivated', users.filter((user) => user.account_status === 'inactive').length, 'cancel'], ['Suspended', users.filter((user) => user.approval_status === 'suspended').length, 'hide'],
-    ['Pending approval', users.filter((user) => user.approval_status === 'pending').length, 'view'], ['Approved', users.filter((user) => user.approval_status === 'approved').length, 'approve'], ['Locked', users.filter((user) => user.locked).length, 'hide'],
+    ['Total users', users.length, 'view'],
+    ['Pending approval', users.filter((user) => user.approval_status === 'pending').length, 'view'],
+    ['Suspended', users.filter((user) => user.approval_status === 'suspended').length, 'hide'],
+    ['Locked', users.filter((user) => user.locked).length, 'hide'],
   ] as const;
   return (
     <main className="procedure-page users-page">
@@ -289,7 +387,7 @@ export default function UsersPage() {
             <h1><span className="users-title-icon" aria-hidden="true"><ActionIcon name="view" /></span>Users</h1>
             <p>Review client access, approvals, and account security.</p>
           </div>
-          <div className="users-heading-actions"><a href="/clients" className="users-primary-link">Client List</a><button type="button" className="users-primary-link" onClick={() => setInviteOpen(true)}>Invite Client</button><button type="button" className="client-refresh" onClick={() => void load()} disabled={loading} data-action="refresh" title="Refresh"><ActionIcon name="refresh" /><span className="aipt-action-label">{loading ? 'Refreshing…' : 'Refresh'}</span></button></div>
+          <div className="users-heading-actions"><a href="/clients" className="users-secondary-link">Client List</a><button type="button" className="users-secondary-link" onClick={() => setInviteOpen(true)}>Invite Client</button><button type="button" className="users-primary-link" onClick={() => setInviteUserOpen(true)}>Invite User</button><button type="button" className="client-refresh" onClick={() => void load()} disabled={loading} data-action="refresh" title="Refresh"><ActionIcon name="refresh" /><span className="aipt-action-label">{loading ? 'Refreshing…' : 'Refresh'}</span></button></div>
         </div>
         <section className="users-stat-grid" aria-label="User account summary">{stats.map(([label, count, icon]) => <article className="users-stat-card" key={label}><span className="users-stat-icon" aria-hidden="true"><ActionIcon name={icon} /></span><div><span>{label}</span><b>{count}</b></div></article>)}</section>
         {notice && (
@@ -339,8 +437,81 @@ export default function UsersPage() {
               'Locked',
               users.filter((user) => user.locked).length,
             )}
+            {tabButton(
+              'invitations',
+              'Invitations',
+              invitations.filter((inv) => inv.status === 'pending').length,
+            )}
           </nav>
-          <div className="users-toolbar">
+          {tab === 'invitations' && (
+            <div className="invitations-panel">
+              <div className="users-toolbar">
+                <span className="inv-panel-title">User invitations</span>
+                <button type="button" className="users-primary-link" onClick={() => setInviteUserOpen(true)}>+ Invite User</button>
+                <button type="button" className="client-refresh" onClick={() => void loadInvitations()} disabled={invitationsLoading} title="Refresh"><ActionIcon name="refresh" /><span className="aipt-action-label">{invitationsLoading ? 'Loading…' : 'Refresh'}</span></button>
+              </div>
+              <div className="country-table-wrap">
+                <table className="users-table">
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Client</th>
+                      <th>Max devices</th>
+                      <th>Invited</th>
+                      <th>Expires</th>
+                      <th>Status</th>
+                      <th aria-label="Actions"><ActionIcon name="more" /></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invitationsLoading ? (
+                      <tr><td colSpan={8} className="country-state">Loading invitations...</td></tr>
+                    ) : invitations.length === 0 ? (
+                      <tr><td colSpan={8} className="country-state">No invitations yet. Use "Invite User" to create one.</td></tr>
+                    ) : invitations.map((inv) => (
+                      <tr key={inv.id}>
+                        <td>{inv.email}</td>
+                        <td>{inv.role === 'administrator' ? 'Administrator' : 'Client'}</td>
+                        <td>{inv.client_name ?? '—'}</td>
+                        <td>{inv.max_devices}</td>
+                        <td>{formatDate(inv.created_at)}</td>
+                        <td>{formatDate(inv.expires_at)}</td>
+                        <td>
+                          <span className={`statement-status ${inv.status}`}>
+                            {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
+                          </span>
+                        </td>
+                        <td>
+                          {inv.status === 'pending' && (
+                            <div className="user-actions">
+                              <button
+                                type="button"
+                                disabled={invitationBusy === inv.id}
+                                onClick={() => void resendInvitation(inv.id)}
+                                title="Resend invitation email"
+                              >
+                                Resend
+                              </button>
+                              <button
+                                type="button"
+                                disabled={invitationBusy === inv.id}
+                                onClick={() => void revokeInvitation(inv.id)}
+                                title="Revoke invitation"
+                              >
+                                Revoke
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {tab !== 'invitations' && (<><div className="users-toolbar">
             <label className="users-search-field" aria-label="Search users">
               <ActionIcon name="view" />
               <input
@@ -364,20 +535,19 @@ export default function UsersPage() {
                 <tr>
                   <th>#</th>
                   <th>{heading('Full name', 'name')}</th>
-                  <th>Assigned No.</th>
+                  <th>{heading('Email', 'email')}</th>
                   <th>{heading('Company', 'company')}</th>
-                  <th>Department</th>
-                  <th>Role/Position</th>
+                  <th>Role</th>
                   <th>{heading('Status', 'status')}</th>
-                  <th>Account Status</th>
-                  <th>{heading('Last Login', 'last')}</th>
-                  <th aria-label="Actions"><ActionIcon name="more" /></th>
+                  <th>Account</th>
+                  <th>{heading('Registered', 'registered')}</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="country-state">
+                    <td colSpan={9} className="country-state">
                       Loading users...
                     </td>
                   </tr>
@@ -389,9 +559,8 @@ export default function UsersPage() {
                         {user.logo_url ? <img className="user-logo" src={user.logo_url} alt="" /> : <span className="user-logo-placeholder">{user.full_name.slice(0, 1).toUpperCase() || '?'}</span>}
                         <b>{user.full_name || 'Unnamed user'}</b>
                       </td>
-                      <td>{user.client_assigned_id || '-'}</td>
+                      <td className="user-email-cell">{user.email}</td>
                       <td>{user.company_name || '-'}</td>
-                      <td>-</td>
                       <td>{user.role}</td>
                       <td>
                         <span
@@ -409,11 +578,13 @@ export default function UsersPage() {
                             : 'Deactivated'}
                         </span>
                       </td>
-                      <td>{formatDate(user.last_login_at)}</td>
+                      <td>{formatDate(user.registration_date)}</td>
                       <td>
                         <details className="user-action-menu"><summary aria-label={`Manage ${user.full_name || user.email}`}>Manage <span aria-hidden="true">⌄</span></summary><fieldset disabled={Boolean(busy)}>
                           <div className="user-actions">
                           <button type="button" onClick={() => setReviewUser(user)}>Review</button>
+                          <button type="button" onClick={() => setDevicePanelUserId(user.id)}>View Devices</button>
+                          {user.id !== currentUserId && <button type="button" onClick={() => openEdit(user)}>Edit</button>}
                           {user.role !== 'administrator' && <button type="button" disabled={Boolean(busy) || !user.deletion_supported || user.deletion_policy !== 'non_admin_only' || !currentUserId || user.id === currentUserId} onClick={() => { setDeleteUser(user); setForceDelete(true); setConfirmEmail(''); setDeleteError(''); }}><ActionIcon name="delete" />Force Delete</button>}
                           {user.approval_status !== 'approved' && (
                             <button
@@ -481,7 +652,7 @@ export default function UsersPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={10} className="country-state">
+                    <td colSpan={9} className="country-state">
                       No users match this filter.
                     </td>
                   </tr>
@@ -526,7 +697,7 @@ export default function UsersPage() {
                 ›
               </button>
             </div>
-          </footer>
+          </footer></>)}
         </section>
       </section>
       {deleteUser && <div className="company-verify-backdrop"><section className="company-verify-modal" role="dialog" aria-modal="true" aria-labelledby="delete-user-title">
@@ -538,7 +709,51 @@ export default function UsersPage() {
         <div className="user-actions"><button type="button" disabled={Boolean(busy)} onClick={() => setDeleteUser(null)}>Cancel</button><button type="button" disabled={Boolean(busy) || confirmEmail !== deleteUser.email} onClick={() => void removeUser()}>{busy ? 'Deleting…' : forceDelete ? 'Force Delete' : 'Delete'}</button></div>
       </section></div>}
       {reviewUser && <div className="company-verify-backdrop" onMouseDown={() => setReviewUser(null)}><section className="company-verify-modal" role="dialog" aria-modal="true" aria-labelledby="review-user-title" onMouseDown={(event) => event.stopPropagation()}><button type="button" className="company-verify-close" onClick={() => setReviewUser(null)} aria-label="Close">×</button><span>ACCOUNT REVIEW</span><h2 id="review-user-title">{reviewUser.full_name || 'Unnamed user'}</h2><p><b>Email:</b> {reviewUser.email}</p><p><b>Company:</b> {reviewUser.company_name || '-'}</p><p><b>Registration:</b> {formatDate(reviewUser.registration_date)}</p><p><b>Status:</b> {reviewUser.approval_status}</p><div className="user-actions">{reviewUser.approval_status !== 'approved' && <button onClick={() => { setReviewUser(null); void action(reviewUser, { approval_status: 'approved' }, 'User approved.'); }} data-action="approve" title="Approve"><ActionIcon name="approve" /><span className="aipt-action-label">Approve</span></button>}{reviewUser.approval_status !== 'rejected' && <button onClick={() => { setReviewUser(null); void action(reviewUser, { approval_status: 'rejected' }, 'User rejected.'); }}>Reject</button>}<button type="button" onClick={() => setReviewUser(null)} data-action="cancel" title="Close"><ActionIcon name="cancel" /><span className="aipt-action-label">Close</span></button></div></section></div>}
+      {devicePanelUserId && <DeviceManagementPanel userId={devicePanelUserId} onClose={() => setDevicePanelUserId(null)} canRevoke />}
       {inviteOpen && <InviteClientUserModal onClose={() => setInviteOpen(false)} onSent={(message) => { setNotice(message); void load(); }} />}
+      {inviteUserOpen && <InviteUserModal onClose={() => setInviteUserOpen(false)} onSent={(message) => { setNotice(message); setTab('invitations'); void loadInvitations(); }} />}
+      {editUser && (
+        <div className="company-verify-backdrop" onMouseDown={() => setEditUser(null)}>
+          <section className="company-verify-modal" role="dialog" aria-modal="true" aria-labelledby="edit-user-title" onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" className="company-verify-close" onClick={() => setEditUser(null)} aria-label="Close">×</button>
+            <span>EDIT USER</span>
+            <h2 id="edit-user-title">{editUser.full_name || editUser.email}</h2>
+            <p style={{ marginBottom: '16px', opacity: 0.6 }}>{editUser.email}</p>
+            <label style={{ display: 'block', marginBottom: '14px' }}>
+              <span style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Role</span>
+              <select
+                value={editRole}
+                onChange={(e) => setEditRole(e.target.value)}
+                disabled={editBusy}
+                style={{ width: '100%' }}
+              >
+                <option value="administrator">Administrator</option>
+                <option value="client">Client</option>
+                <option value="sub_administrator">Sub-administrator</option>
+              </select>
+            </label>
+            <label style={{ display: 'block', marginBottom: '16px' }}>
+              <span style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Max devices <small style={{ fontWeight: 400, opacity: 0.6 }}>(1–10)</small></span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={editMaxDevices}
+                onChange={(e) => setEditMaxDevices(Math.min(10, Math.max(1, Number(e.target.value))))}
+                disabled={editBusy}
+                style={{ width: '100%' }}
+              />
+            </label>
+            {editError && <p role="alert" className="country-page-error">{editError}</p>}
+            <div className="user-actions">
+              <button type="button" disabled={editBusy} onClick={() => setEditUser(null)}>Cancel</button>
+              <button type="button" disabled={editBusy} onClick={() => void saveEdit()}>
+                {editBusy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

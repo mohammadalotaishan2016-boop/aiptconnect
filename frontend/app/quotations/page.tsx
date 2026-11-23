@@ -37,6 +37,7 @@ type Client = {
   address: string;
   country_id: string;
   status: "Active" | "Inactive";
+  client_type?: string | null;
 };
 type Project = {
   id: string;
@@ -91,6 +92,7 @@ type Lookup = {
   state_fees: AddonFee[];
   aripo_country_ids: string[];
   vat_rates: Array<{ country_id: string; vat: number }>;
+  pricing_sheet?: Array<{ id: string; client_type: string; item_key: string; official_fee: number; attorney_fee: number; total_fee: number; currency: string }>;
 };
 type QuoteItem = {
   country_id: string;
@@ -257,7 +259,7 @@ export default function QuotationsPage() {
   const [saving, setSaving] = useState(false);
   const [verificationQr, setVerificationQr] = useState("");
 
-  const api = useCallback(async <T,>(path: string, init: RequestInit = {}) => {
+  const api = useCallback(async <T,>(path: string, init: RequestInit & { timeoutMs?: number } = {}) => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) throw Error("Supabase is not configured.");
     const session = (await supabase.auth.getSession()).data.session;
@@ -276,21 +278,64 @@ export default function QuotationsPage() {
     return body as T;
   }, []);
 
+  // Fee cache: on-demand fees fetched per country+category selection.
+  const [feeCache, setFeeCache] = useState<Map<string, Fee[]>>(new Map());
+  const [classRateCache, setClassRateCache] = useState<Map<string, ClassRate[]>>(new Map());
+  const [feeFetchInProgress, setFeeFetchInProgress] = useState(false);
+  const feeFetchRef = useRef(0);
+
   // Catalog data is independent of list filters and is fetched once per mount.
+  // All roles now use the fast lite lookup (reference data only). Fee data is
+  // fetched on-demand per country+category selection from materialized tables.
   const loadLookup = useCallback(async () => {
     setLookupLoading(true);
     try {
-      if (!lookupRequest.current) lookupRequest.current = api<Lookup>("quotations?lookup=true");
+      if (!lookupRequest.current) {
+        lookupRequest.current = api<Lookup>("quotations?lookup=lite");
+      }
       const data = await lookupRequest.current;
       setLookup({ ...emptyLookup, ...data });
       if (data.role === "client" && data.current_client_id) setClientId(data.current_client_id);
       setLookupError("");
     } catch (cause) {
       lookupRequest.current = null;
-      setLookupError(cause instanceof Error ? cause.message : "Unable to load fees.");
+      setLookupError(cause instanceof Error ? cause.message : "Unable to load quotation data.");
     } finally { setLookupLoading(false); }
   }, [api]);
   useEffect(() => { void loadLookup(); }, [loadLookup]);
+
+  // Fetch fees on-demand when country + category selection changes.
+  useEffect(() => {
+    if (!countryIds.length || !category || lookupLoading) return;
+    const request = ++feeFetchRef.current;
+    let cancelled = false;
+    (async () => {
+      setFeeFetchInProgress(true);
+      try {
+        const newFees = new Map(feeCache);
+        const newClassRates = new Map(classRateCache);
+        await Promise.all(countryIds.map(async (countryId) => {
+          const feeKey = `${countryId}|${category}`;
+          if (!newFees.has(feeKey)) {
+            const fees = await api<Fee[]>(`quotations?fee_lookup=true&country_id=${countryId}&category=${encodeURIComponent(category)}`);
+            if (cancelled) return;
+            newFees.set(feeKey, fees);
+          }
+          const classKey = countryId;
+          if (category === 'Trademark' && !newClassRates.has(classKey)) {
+            const rates = await api<ClassRate[]>(`quotations?class_rates=true&country_id=${countryId}`);
+            if (cancelled) return;
+            newClassRates.set(classKey, rates);
+          }
+        }));
+        if (cancelled || request !== feeFetchRef.current) return;
+        setFeeCache(newFees);
+        setClassRateCache(newClassRates);
+      } catch { /* fee fetch errors are shown via selectionFees issues */ }
+      finally { if (!cancelled && request === feeFetchRef.current) setFeeFetchInProgress(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [countryIds, category, lookupLoading, api]);
   useEffect(() => {
     const timer = window.setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 300);
     return () => window.clearTimeout(timer);
@@ -374,9 +419,12 @@ export default function QuotationsPage() {
         availableProcedures.some((procedure) => procedure.name === procedureName && procedure.id === item.procedure_id),
       ),
   );
+  // Build a combined fee list from the on-demand fee cache for the current selection.
+  const cachedFees = useMemo(() => countryIds.flatMap((countryId) => feeCache.get(`${countryId}|${category}`) ?? []), [countryIds, category, feeCache]);
+  const cachedClassRates = useMemo(() => countryIds.flatMap((countryId) => classRateCache.get(countryId) ?? []), [countryIds, classRateCache]);
   const selectedProceduresHaveWorkbookFees = countryIds.length > 0 && procedureNames.length > 0 &&
     countryIds.every((countryId) => procedureNames.every((procedureName) => {
-      const matches = lookup.fees.filter((fee) =>
+      const matches = cachedFees.filter((fee) =>
         fee.country_id === countryId && fee.category === category && fee.procedure_name === procedureName,
       );
       return matches.length === 1 && matches[0].available !== false && matches[0].currency === "USD" &&
@@ -388,9 +436,9 @@ export default function QuotationsPage() {
   const classTypeOptions = classTypeSelectionReady
     ? availableClassTypes(
       countryIds,
-      lookup.class_rates ?? [],
+      cachedClassRates,
       countryIds.filter((countryId) => procedureNames.every((procedureName) =>
-        lookup.fees.some((fee) => fee.country_id === countryId && fee.category === "Trademark" &&
+        cachedFees.some((fee) => fee.country_id === countryId && fee.category === "Trademark" &&
           fee.procedure_name === procedureName && fee.available !== false && fee.currency === "USD"),
       )),
       effectiveClassCount,
@@ -398,7 +446,7 @@ export default function QuotationsPage() {
     : [];
   useEffect(() => {
     if (classType && !classTypeOptions.includes(classType)) setClassType('');
-  }, [countryIds, category, lookup, procedureNames, effectiveClassCount, serviceSelectionConfirmed, classType]);
+  }, [countryIds, category, cachedFees, cachedClassRates, procedureNames, effectiveClassCount, serviceSelectionConfirmed, classType]);
   const validServiceSelection = serviceSelectionConfirmed && serviceOptions.some((service) => service.name === category);
   const validCountrySelection = countryIds.length > 0 && countryIds.every((id) => lookup.countries.some((country) => country.id === id));
   const validProcedureSelection = procedureNames.length > 0 && procedureNames.every((name) => availableProcedures.some((procedure) => procedure.name === name));
@@ -409,18 +457,18 @@ export default function QuotationsPage() {
       ? selectedClassNumbers.length === effectiveClassCount
       : selectedClassNumbers.length === 0)
   );
-  const selectionReady = !lookupLoading && Boolean(lookup.spreadsheet_revision) &&
+  const selectionReady = !lookupLoading && !feeFetchInProgress && Boolean(lookup.spreadsheet_revision) &&
     validServiceSelection && validCountrySelection && validProcedureSelection && validClassSelection;
   const selectionFees = selectionReady ? countryIds.flatMap((countryId) => procedureNames.map((procedureName) => {
-    const matches = lookup.fees.filter((fee) => fee.country_id === countryId && fee.category === category && fee.procedure_name === procedureName);
+    const matches = cachedFees.filter((fee) => fee.country_id === countryId && fee.category === category && fee.procedure_name === procedureName);
     const fee = matches.length === 1 ? matches[0] : null;
-    if (!fee) return { countryId, procedureName, fee: null, issue: matches.length > 1 ? 'Multiple matching procedure rates; resolve the fee data before quoting.' : 'No saved spreadsheet fee is available for this combination.' };
+    if (!fee) return { countryId, procedureName, fee: null, issue: matches.length > 1 ? 'Multiple matching procedure rates; resolve the fee data before quoting.' : feeFetchInProgress ? 'Loading fee data…' : 'No saved spreadsheet fee is available for this combination.' };
     try {
       if (category === 'Trademark') {
         if (!classType || !classTypeOptions.includes(classType)) throw Error('Select a type of class available for the selected countries.');
         if (classEntryMode === "specific" && selectedClassNumbers.length !== effectiveClassCount) throw Error('Select one class number for each class being priced.');
         if (classEntryMode === "count" && selectedClassNumbers.length) throw Error('Class numbers are not used when entering only a class count.');
-        const pricing = calculateClassPricing(fee, countryId, classType, effectiveClassCount, lookup.class_rates ?? []);
+        const pricing = calculateClassPricing(fee, countryId, classType, effectiveClassCount, cachedClassRates);
         return { countryId, procedureName, fee: { ...fee, ...pricing, class_pricing_rows: pricing.rows }, issue: '' };
       }
       if (fee.available === false || fee.currency !== 'USD' || ![fee.official_fee, fee.attorney_fee, fee.total_fee].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) throw Error(fee.issue || 'No complete saved spreadsheet fee is available for this combination.');
@@ -688,6 +736,10 @@ export default function QuotationsPage() {
       setError("Select a client before saving the invoice.");
       return;
     }
+    if (isClientRole && !client?.client_type) {
+      setError("Your account has no pricing type assigned. Contact your administrator.");
+      return;
+    }
     if (!client || !Number.isInteger(Number(client.assigned_id)) || Number(client.assigned_id) < 1) {
       setError("The selected client has no valid Business Identifier.");
       return;
@@ -811,7 +863,9 @@ export default function QuotationsPage() {
         }
         {clientView && <section className="client-fee-selection" aria-labelledby="client-fee-title">
           <h2 id="client-fee-title"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M2 3h20l-8 9v8l-4 2V12z" /></svg>Fee Selections</h2>
-          <form onSubmit={event => { event.preventDefault(); if (!validateFeeSelection()) return; setSelected(null); setCart([]); setInvoiceDate(today()); setDiscount(0); setError(""); if (generateFees()) setModal("form"); }}>
+          {client?.client_type && <div className="client-pricing-tier">Pricing tier: <strong>{client.client_type === 'chinese' ? 'Chinese' : client.client_type === 'non_chinese' ? 'Non Chinese' : client.client_type === 'direct' ? 'Direct' : client.client_type}</strong></div>}
+          {client && !client.client_type && <div className="client-pricing-tier is-warning">No pricing type assigned to your account. Contact your administrator to set your pricing tier before creating quotations.</div>}
+          <form onSubmit={event => { event.preventDefault(); if (!client?.client_type) { setError("Your account has no pricing type assigned. Contact your administrator."); return; } if (!validateFeeSelection()) return; setSelected(null); setCart([]); setInvoiceDate(today()); setDiscount(0); setError(""); if (generateFees()) setModal("form"); }}>
             <label className="client-service-field">Services / Project *<select aria-label="Services / Project" value={serviceSelectionConfirmed ? category : ""} disabled={lookupLoading} onChange={event => { setCategory(event.target.value as Category); setServiceSelectionConfirmed(true); setCountryIds([]); setProcedureNames([]); setRequirementIds([]); setClassType(""); setClassCount(1); setClassEntryMode("count"); setSelectedClassNumbers([]); setError(""); }}><option value="" disabled>Select Services / Project</option>{serviceOptions.map(service => <option key={service.id} value={service.name}>{service.name}</option>)}</select></label>
             <label className="client-country-field">Country *<select aria-label="Country" value={countryIds[0] ?? ""} disabled={!serviceSelectionConfirmed || lookupLoading} onChange={event => { setCountryIds(event.target.value ? [event.target.value] : []); setRequirementIds([]); setClassType(""); setSelectedClassNumbers([]); setError(""); }}><option value="">Select Country</option>{lookup.countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}</select></label>
             <div className="client-procedure-field"><span>Procedure * <small>(multiple allowed)</small></span><details ref={procedureDropdown}><summary>{!serviceSelectionConfirmed ? "Select service first" : procedureNames.length ? procedureNames.join(", ") : "Select Procedure"}</summary><div>{availableProcedures.map(procedure => <label key={procedure.id}><input type="checkbox" disabled={!serviceSelectionConfirmed} checked={procedureNames.includes(procedure.name)} onChange={event => { const checked = event.target.checked; setProcedureNames(current => checked ? [...current, procedure.name] : current.filter(name => name !== procedure.name)); setError(""); }} />{procedure.name}</label>)}</div></details></div>
@@ -886,7 +940,7 @@ export default function QuotationsPage() {
                 {loading && !rows.length ? (
                   <tr>
                     <td colSpan={10} className="country-state">
-                      Loading quotations...
+                      <span className="quotation-loading">Loading quotations...</span>
                     </td>
                   </tr>
                 ) : rows.length ? (
@@ -1479,6 +1533,8 @@ function InvoiceModal(props: any) {
                 />
               </label>
             </div>
+            {client && client.client_type && <div className="pricing-tier-info">Pricing tier: <strong>{client.client_type === 'chinese' ? 'Chinese' : client.client_type === 'non_chinese' ? 'Non Chinese' : client.client_type === 'direct' ? 'Direct' : client.client_type}</strong></div>}
+            {client && !client.client_type && <div className="pricing-tier-warning">This client has no pricing type assigned. Quotation pricing may be incomplete. Update the client record.</div>}
           </div>
           <div className="quotation-section">
             <div className="invoice-section-heading">

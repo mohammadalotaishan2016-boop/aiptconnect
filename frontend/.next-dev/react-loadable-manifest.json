@@ -1,4 +1,10 @@
 {
+  "app\\spreadsheet\\page.tsx -> exceljs": {
+    "id": "app\\spreadsheet\\page.tsx -> exceljs",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_exceljs_dist_exceljs_min_js.js"
+    ]
+  },
   "node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts": {
     "id": "node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts",
     "files": [
@@ -16,9 +22,5 @@
     "files": [
       "static/chunks/_app-pages-browser_src_components_ClientAutoTranslator_tsx.js"
     ]
-  },
-  "src\\lib\\poa-docx.ts -> jszip": {
-    "id": "src\\lib\\poa-docx.ts -> jszip",
-    "files": []
   }
 }

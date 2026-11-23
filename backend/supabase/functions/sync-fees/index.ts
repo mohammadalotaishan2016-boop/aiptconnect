@@ -3,7 +3,10 @@
 // Runs server-side, survives browser closure, handles interruptions with checkpoints
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createCircuitBreaker } from '../_shared/circuit-breaker.ts';
 import { canonicalCountry, importClassesSheet, importSheet, type ImportIssue, type ParsedClassRecord, type ParsedFeeRecord } from './importer.ts';
+
+const sheetsBreaker = createCircuitBreaker({ name: 'google-sheets', failureThreshold: 3, cooldownMs: 120_000, timeoutMs: 35_000 });
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -647,7 +650,7 @@ Deno.serve(async (request: Request) => {
       await logSyncEvent(db, syncRunId, 'SHEET_STARTED', `Processing sheet: ${sheetName}`);
 
       const rows = await withRetry(
-        () => readGoogleSheet(spreadsheetId, googleToken, sheetName),
+        () => sheetsBreaker.call(() => readGoogleSheet(spreadsheetId, googleToken, sheetName)),
         async (error, attempt) => {
           const message = error instanceof Error ? error.message : String(error);
           await logSyncEvent(db, syncRunId, 'RETRY_SCHEDULED', `Retrying read for ${sheetName}`, { attempt, error_message: message }, { sheet_name: sheetName, severity: 'warning' });

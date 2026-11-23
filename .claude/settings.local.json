@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx supabase *)",
+      "Bash(rm -f out.txt body.txt)",
+      "Bash(rm -rf artifacts/)",
+      "Bash(npm uninstall *)",
+      "Bash(npx tsc *)",
+      "Bash(psql --version)",
+      "Bash(git commit -m ' *)",
+      "Bash(git add *)",
+      "Bash(node -)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X OPTIONS \"https://davupzevvsngppcrynoj.supabase.co/functions/v1/users\" -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: GET\")",
+      "Bash(curl -s -w '\\\\n--- HTTP %{http_code} ---\\\\n' -X OPTIONS https://davupzevvsngppcrynoj.supabase.co/functions/v1/users -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: GET' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhdnVwemV2dnNuZ3BwY3J5bm9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjExMTMsImV4cCI6MjEwMjAzNzExM30.K_ysCmrsR21682tuNrKhgN4v7Z3dN4jQ5mdZXvsLQuU')",
+      "Bash(curl -si -X GET https://davupzevvsngppcrynoj.supabase.co/functions/v1/users -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhdnVwemV2dnNuZ3BwY3J5bm9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjExMTMsImV4cCI6MjEwMjAzNzExM30.K_ysCmrsR21682tuNrKhgN4v7Z3dN4jQ5mdZXvsLQuU')",
+      "Bash(curl -si -X OPTIONS https://davupzevvsngppcrynoj.supabase.co/functions/v1/users -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: authorization,apikey,content-type' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhdnVwemV2dnNuZ3BwY3J5bm9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjExMTMsImV4cCI6MjEwMjAzNzExM30.K_ysCmrsR21682tuNrKhgN4v7Z3dN4jQ5mdZXvsLQuU')",
+      "Bash(node -e \"const p = require\\('/d/aiptconnect/frontend/package.json'\\); console.log\\(p.dependencies?.next || p.devDependencies?.next\\)\")",
+      "Bash(node -e \"const p = require\\('d:/aiptconnect/frontend/package.json'\\); console.log\\(p.dependencies?.next || p.devDependencies?.next\\)\")",
+      "Bash(SUPABASE_DB_PASSWORD='Aramco3248169' npx supabase db push --db-url \"postgresql://postgres.davupzevvsngppcrynoj:Aramco3248169@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres\" --dry-run)",
+      "Bash(SUPABASE_DB_PASSWORD='Aramco3248169' npx supabase db push --db-url \"postgresql://postgres:Aramco3248169@db.davupzevvsngppcrynoj.supabase.co:5432/postgres\" --dry-run)",
+      "Bash(SUPABASE_DB_PASSWORD='Aramco3248169' npx supabase db push --linked --dry-run)",
+      "Bash(xargs grep *)",
+      "Bash(grep -ri \"SERVICE_ROLE\" frontend/.env*)",
+      "Bash(curl -s -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhdnVwemV2dnNuZ3BwY3J5bm9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ2MTExMywiZXhwIjoyMTAyMDM3MTEzfQ.3hiaDT1Yag-Ja0FZAS99JDRz0m4E1CaIIic-mwG7NZ8' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhdnVwemV2dnNuZ3BwY3J5bm9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ2MTExMywiZXhwIjoyMTAyMDM3MTEzfQ.3hiaDT1Yag-Ja0FZAS99JDRz0m4E1CaIIic-mwG7NZ8' 'https://davupzevvsngppcrynoj.supabase.co/rest/v1/devices?user_id=eq.6a3d0594-7386-42f1-a3c3-6c1293457842&select=id,device_id,device_name,device_type,browser,operating_system,user_agent,ip,status,last_seen_at,revoked_at,revoked_reason,created_at&order=created_at.desc')"
+    ]
+  }
+}

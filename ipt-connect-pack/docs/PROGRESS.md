@@ -75,10 +75,44 @@
 - `app/error.tsx` + `app/global-error.tsx` — global error boundaries
 - Deleted: `out.txt`, `body.txt`, `artifacts/`
 
+## Done (continued)
+- **T9a: Spreadsheet Pricing — Client-Type Group Selector** (branch: `task/t9a-spreadsheet-pricing`)
+  - Group selector dropdown (Chinese / Non Chinese / Direct) to left of tab bar
+  - 21 sheets total (7 base × 3 groups), each group independent data
+  - Old 7-sheet workbooks auto-migrate to Chinese group on load
+  - Missing group sheets auto-created (fill-missing pass in normalizeWorkbook)
+  - Font color tool with visible swatch indicator
+  - Add Sheet (＋) button per group
+  - Formula engine expanded: MIN, MAX, COUNT, ABS, ROUND, INT, MOD, POWER, IF
+  - Files: `frontend/app/spreadsheet/page.tsx`, `frontend/app/spreadsheet.css`
+  - Task file: `docs/tasks/T9a-spreadsheet.md`
+
+### T9a — Client-Type Groups
+
+| Group | Sheets |
+|---|---|
+| Chinese | Trademark(Chinese), Patent(Chinese), Design(Chinese), Copyright(Chinese), Up to 3 classes(Chinese), Up to 5 classes(Chinese), Multi-classes(Chinese) |
+| Non Chinese | Trademark(Non Chinese), Patent(Non Chinese), Design(Non Chinese), Copyright(Non Chinese), Up to 3 classes(Non Chinese), Up to 5 classes(Non Chinese), Multi-classes(Non Chinese) |
+| Direct | Trademark(Direct), Patent(Direct), Design(Direct), Copyright(Direct), Up to 3 classes(Direct), Up to 5 classes(Direct), Multi-classes(Direct) |
+
+## T3 update — Client Type auto-fill on registration
+- T3 task updated: registration form auto-fills **client_type** based on country selection
+- Chinese countries: CN, HK, MO, TW → **Chinese**
+- All other countries → **Non Chinese**
+- **Direct** only available when administrator creates/edits a user (not self-registration)
+- `client_type` stored on user profile, links to fee workbook pricing group (T9a)
+- Task file: `docs/tasks/T3-register.md`
+
 ## Next
+- **T10a: Client Device Management & Login Approval System** — task file: `docs/tasks/T10a-tenants-device-management.md`
+  - Backend infrastructure largely exists (devices, device_sessions, login_requests, approve_device_login RPC, login Edge Function)
+  - Needs: frontend `/clients` device columns + admin actions, login waiting/approval UI, client-side approve/deny flow
 - T2a: Login page (status check, 5-attempt lockout, friendly error messages)
+- T3: Registration with client_type auto-fill (Chinese / Non Chinese by country)
 - Future: drop legacy `approval_status`, `account_status` columns from profiles once all app code reads `profiles.status`
 - Run Supabase security and performance advisors
 
 ## Open questions / decisions
 - associate role flagged rows: 0 live records; audit_logs entry written if any appear in future
+- T3 client_type: needs `client_type` column added to `profiles` table (migration required when T3 starts)
+- T10a: max_devices=2 uses hard deny (no approval flow) — confirm this is intended or should also use approval

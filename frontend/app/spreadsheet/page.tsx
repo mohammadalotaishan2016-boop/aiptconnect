@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { getSupabaseBrowserClient } from '../../src/lib/supabase/browser';
+import { getSupabaseBrowserClient, fetchSupabaseFunction } from '../../src/lib/supabase/browser';
 
 type CellStyle = {
   bold?: boolean;
@@ -28,7 +28,10 @@ type CellPosition = { row: number; column: number };
 const ROW_COUNT = 100;
 const COLUMN_COUNT = 26;
 const DEFAULT_WIDTH = 112;
-const DEFAULT_FEE_SHEETS = [
+
+type ClientGroup = 'Chinese' | 'Non Chinese' | 'Direct';
+const CLIENT_GROUPS: ClientGroup[] = ['Chinese', 'Non Chinese', 'Direct'];
+const BASE_FEE_SHEETS = [
   'Trademark',
   'Patent',
   'Design',
@@ -38,16 +41,59 @@ const DEFAULT_FEE_SHEETS = [
   'Multi-classes',
 ];
 
+function groupSheetName(base: string, group: ClientGroup): string {
+  return `${base}(${group})`;
+}
+
+function sheetGroup(name: string): ClientGroup | null {
+  for (const group of CLIENT_GROUPS) {
+    if (name.endsWith(`(${group})`)) return group;
+  }
+  return null;
+}
+
+function allDefaultSheets(): { name: string; id: string }[] {
+  const sheets: { name: string; id: string }[] = [];
+  let index = 0;
+  for (const group of CLIENT_GROUPS) {
+    for (const base of BASE_FEE_SHEETS) {
+      index++;
+      sheets.push({ name: groupSheetName(base, group), id: `fee-sheet-${index}` });
+    }
+  }
+  return sheets;
+}
+
 function createSheet(name = 'Sheet1', id = crypto.randomUUID()): Sheet {
   return { id, name, cells: {}, types: {}, styles: {}, widths: {} };
 }
 
 function createWorkbook(): WorkbookState {
-  return { sheets: DEFAULT_FEE_SHEETS.map((name, index) => createSheet(name, `fee-sheet-${index + 1}`)) };
+  return { sheets: allDefaultSheets().map(({ name, id }) => createSheet(name, id)) };
 }
 
 function cloneWorkbook(workbook: WorkbookState): WorkbookState {
   return structuredClone(workbook);
+}
+
+/** Strip empty sheets and empty property bags before sending to Supabase.
+ *  normalizeWorkbook() restores them on load, so no data is lost. */
+function compactWorkbook(workbook: WorkbookState): WorkbookState {
+  const sheets = workbook.sheets
+    .filter((s) => Object.keys(s.cells).length > 0)
+    .map((s) => {
+      const compact: Record<string, unknown> = { id: s.id, name: s.name, cells: s.cells };
+      if (Object.keys(s.types).length) compact.types = s.types;
+      if (Object.keys(s.styles).length) compact.styles = s.styles;
+      if (Object.keys(s.widths).length) compact.widths = s.widths;
+      return compact as unknown as Sheet;
+    });
+  // Keep at least one sheet so the DB check constraint passes
+  if (!sheets.length) {
+    const first = workbook.sheets[0];
+    return { sheets: [{ id: first.id, name: first.name, cells: {}, types: {}, styles: {}, widths: {} }] };
+  }
+  return { sheets };
 }
 
 function columnName(column: number): string {
@@ -95,6 +141,31 @@ function normalizeWorkbook(value: unknown): WorkbookState | null {
       widths: sheet.widths && typeof sheet.widths === 'object' ? sheet.widths : {},
     });
   }
+  // Migrate old 7-sheet workbooks: treat them as Chinese group, add empty Non Chinese + Direct
+  const hasGroupSuffix = sheets.some((s) => sheetGroup(s.name) !== null);
+  if (!hasGroupSuffix) {
+    const migrated: Sheet[] = [];
+    for (const sheet of sheets) {
+      const base = BASE_FEE_SHEETS.find((b) => b.toLowerCase() === sheet.name.toLowerCase()) ?? sheet.name;
+      migrated.push({ ...sheet, name: groupSheetName(base, 'Chinese') });
+    }
+    for (const group of CLIENT_GROUPS.slice(1)) {
+      for (const base of BASE_FEE_SHEETS) {
+        migrated.push(createSheet(groupSheetName(base, group)));
+      }
+    }
+    return { sheets: migrated };
+  }
+  // Ensure every group has all 7 base sheets (fills missing groups after partial save)
+  const existing = new Set(sheets.map((s) => s.name));
+  const missing: Sheet[] = [];
+  for (const group of CLIENT_GROUPS) {
+    for (const base of BASE_FEE_SHEETS) {
+      const name = groupSheetName(base, group);
+      if (!existing.has(name)) missing.push(createSheet(name));
+    }
+  }
+  if (missing.length) return { sheets: [...sheets, ...missing] };
   return { sheets };
 }
 
@@ -149,8 +220,26 @@ function evaluateFormula(input: string, sheet: Sheet, resolving = new Set<string
     }
     if (/^[A-Z]+$/.test(token ?? '')) {
       const functionName = consume();
-      if (functionName !== 'SUM' && functionName !== 'AVERAGE') throw new Error('Unsupported function');
+      const RANGE_FUNCTIONS = ['SUM', 'AVERAGE', 'MIN', 'MAX', 'COUNT'];
+      const SCALAR_FUNCTIONS = ['ABS', 'ROUND', 'INT', 'MOD', 'POWER', 'IF'];
+      if (!RANGE_FUNCTIONS.includes(functionName) && !SCALAR_FUNCTIONS.includes(functionName)) throw new Error('Unsupported function');
       consume('(');
+      if (SCALAR_FUNCTIONS.includes(functionName)) {
+        const args: number[] = [];
+        while (peek() !== ')') {
+          args.push(parseAdditive());
+          if (peek() !== ',') break;
+          consume(',');
+        }
+        consume(')');
+        if (functionName === 'ABS') { if (args.length !== 1) throw new Error('ABS needs 1 arg'); return Math.abs(args[0]); }
+        if (functionName === 'INT') { if (args.length !== 1) throw new Error('INT needs 1 arg'); return Math.floor(args[0]); }
+        if (functionName === 'ROUND') { if (args.length < 1 || args.length > 2) throw new Error('ROUND needs 1-2 args'); return Number(args[0].toFixed(args[1] ?? 0)); }
+        if (functionName === 'MOD') { if (args.length !== 2 || args[1] === 0) throw new Error('MOD needs 2 args, divisor != 0'); return args[0] % args[1]; }
+        if (functionName === 'POWER') { if (args.length !== 2) throw new Error('POWER needs 2 args'); return Math.pow(args[0], args[1]); }
+        if (functionName === 'IF') { if (args.length !== 3) throw new Error('IF needs 3 args'); return args[0] !== 0 ? args[1] : args[2]; }
+        throw new Error('Unsupported function');
+      }
       const values: number[] = [];
       while (peek() !== ')') {
         const start = peek();
@@ -175,8 +264,12 @@ function evaluateFormula(input: string, sheet: Sheet, resolving = new Set<string
         consume(',');
       }
       consume(')');
-      if (functionName === 'AVERAGE' && !values.length) throw new Error('Empty average');
-      return functionName === 'SUM' ? values.reduce((sum, value) => sum + value, 0) : values.reduce((sum, value) => sum + value, 0) / values.length;
+      if (functionName === 'SUM') return values.reduce((sum, v) => sum + v, 0);
+      if (functionName === 'AVERAGE') { if (!values.length) throw new Error('Empty average'); return values.reduce((sum, v) => sum + v, 0) / values.length; }
+      if (functionName === 'MIN') { if (!values.length) throw new Error('Empty MIN'); return Math.min(...values); }
+      if (functionName === 'MAX') { if (!values.length) throw new Error('Empty MAX'); return Math.max(...values); }
+      if (functionName === 'COUNT') return values.filter((v) => Number.isFinite(v) && v !== 0).length;
+      throw new Error('Unsupported function');
     }
     throw new Error('Invalid formula');
   };
@@ -353,6 +446,7 @@ function WorksheetTabs({
   setActiveId,
   renameSheet,
   deleteSheet,
+  onAddSheet,
   renameError,
 }: {
   sheets: Sheet[];
@@ -360,6 +454,7 @@ function WorksheetTabs({
   setActiveId: (id: string) => void;
   renameSheet: (sheet: Sheet, name: string) => boolean;
   deleteSheet: (sheet: Sheet) => void;
+  onAddSheet: () => void;
   renameError: string;
 }) {
   const [editingId, setEditingId] = useState('');
@@ -382,6 +477,7 @@ function WorksheetTabs({
             {sheets.length > 1 && <button type="button" className="sheet-tab-delete" onClick={() => deleteSheet(sheet)} aria-label={`Delete ${sheet.name}`}>×</button>}
           </div>
         ))}
+        <button type="button" className="worksheet-tab-add" onClick={onAddSheet} title="Add new sheet">＋</button>
       </div>
       {renameError && <span className="spreadsheet-inline-error" role="alert">{renameError}</span>}
     </>
@@ -437,8 +533,143 @@ function AdminDeleteSheetModal({
   );
 }
 
+
+/* ── Pricing Sheet (structured fee table, 3 client types × 7 items) ── */
+
+type PricingClientType = 'chinese' | 'non_chinese' | 'direct';
+const PRICING_CLIENT_TYPES: PricingClientType[] = ['chinese', 'non_chinese', 'direct'];
+const PRICING_TYPE_LABELS: Record<PricingClientType, string> = { chinese: 'Chinese', non_chinese: 'Non Chinese', direct: 'Direct' };
+const PRICING_ITEM_KEYS = ['trademark', 'patent', 'design', 'copyright', 'up_to_3_classes', 'up_to_5_classes', 'multi_classes'] as const;
+const PRICING_ITEM_LABELS: Record<string, string> = {
+  trademark: 'Trademark', patent: 'Patent', design: 'Design', copyright: 'Copyright',
+  up_to_3_classes: 'Up to 3 classes', up_to_5_classes: 'Up to 5 classes', multi_classes: 'Multi-classes',
+};
+
+interface PricingRow {
+  id: string;
+  client_type: PricingClientType;
+  item_key: string;
+  official_fee: number;
+  attorney_fee: number;
+  total_fee: number;
+  currency: string;
+}
+
+function PricingSheet() {
+  const [rows, setRows] = useState<PricingRow[]>([]);
+  const [activeTab, setActiveTab] = useState<PricingClientType>('chinese');
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notification, setNotification] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const loadRows = useCallback(async () => {
+    try {
+      const response = await fetchSupabaseFunction('pricing-sheet');
+      if (!response.ok) throw new Error('Failed to load pricing data.');
+      const data: PricingRow[] = await response.json();
+      setRows(data);
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to load pricing data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadRows(); }, [loadRows]);
+
+  const tabRows = useMemo(
+    () => rows.filter((r) => r.client_type === activeTab).sort((a, b) => PRICING_ITEM_KEYS.indexOf(a.item_key as typeof PRICING_ITEM_KEYS[number]) - PRICING_ITEM_KEYS.indexOf(b.item_key as typeof PRICING_ITEM_KEYS[number])),
+    [rows, activeTab],
+  );
+
+  const updateField = (id: string, field: 'official_fee' | 'attorney_fee', raw: string) => {
+    const value = raw === '' ? 0 : Number(raw);
+    if (!Number.isFinite(value) || value < 0) return;
+    setRows((prev) => prev.map((r) => {
+      if (r.id !== id) return r;
+      const updated = { ...r, [field]: value };
+      updated.total_fee = Math.round((updated.official_fee + updated.attorney_fee) * 100) / 100;
+      return updated;
+    }));
+    setDirty((prev) => new Set(prev).add(id));
+  };
+
+  const save = async () => {
+    if (!dirty.size) return;
+    setSaving(true);
+    setError('');
+    try {
+      const dirtyRows = rows.filter((r) => dirty.has(r.id)).map(({ id, official_fee, attorney_fee, total_fee }) => ({ id, official_fee, attorney_fee, total_fee }));
+      const response = await fetchSupabaseFunction('pricing-sheet?batch=true', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: dirtyRows }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Save failed.');
+      }
+      setDirty(new Set());
+      setNotification('Pricing saved successfully.');
+      setTimeout(() => setNotification(''), 3000);
+      void loadRows();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <section className="pricing-sheet-section"><p>Loading pricing data…</p></section>;
+
+  return (
+    <section className="pricing-sheet-section">
+      <div className="pricing-sheet-header">
+        <div>
+          <h2>Official &amp; Attorney Fees</h2>
+          <p>Structured fee schedule grouped by client type</p>
+        </div>
+        <div className="pricing-sheet-actions">
+          <button type="button" className="pricing-sheet-save" onClick={() => void save()} disabled={!dirty.size || saving}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+      {notification && <div className="pricing-sheet-notification" role="status">{notification}</div>}
+      {error && <div className="pricing-sheet-error" role="alert">{error}</div>}
+      <div className="pricing-sheet-tabs" role="tablist" aria-label="Client type tabs">
+        {PRICING_CLIENT_TYPES.map((ct) => (
+          <button key={ct} type="button" role="tab" aria-selected={ct === activeTab} className={ct === activeTab ? 'is-active' : ''} onClick={() => setActiveTab(ct)}>
+            {PRICING_TYPE_LABELS[ct]}
+          </button>
+        ))}
+      </div>
+      <table className="pricing-sheet-table">
+        <thead>
+          <tr><th>Item</th><th>Official Fee</th><th>Attorney Fee</th><th>Total Fee</th></tr>
+        </thead>
+        <tbody>
+          {tabRows.map((row) => (
+            <tr key={row.id}>
+              <td className="pricing-item-label">{PRICING_ITEM_LABELS[row.item_key] ?? row.item_key}</td>
+              <td><input type="text" inputMode="decimal" value={row.official_fee} onChange={(e) => updateField(row.id, 'official_fee', e.target.value)} aria-label={`${PRICING_ITEM_LABELS[row.item_key]} official fee`} /></td>
+              <td><input type="text" inputMode="decimal" value={row.attorney_fee} onChange={(e) => updateField(row.id, 'attorney_fee', e.target.value)} aria-label={`${PRICING_ITEM_LABELS[row.item_key]} attorney fee`} /></td>
+              <td className="pricing-total-cell">{row.total_fee.toFixed(2)}</td>
+            </tr>
+          ))}
+          {tabRows.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: '#728399', padding: '16px' }}>No pricing data for this client type.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 export default function SpreadsheetPage() {
   const [workbook, setWorkbook] = useState<WorkbookState>(createWorkbook);
+  const [activeGroup, setActiveGroup] = useState<ClientGroup>('Chinese');
   const [activeId, setActiveId] = useState(() => workbook.sheets[0]?.id ?? '');
   const [databaseStatus, setDatabaseStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
@@ -471,7 +702,8 @@ export default function SpreadsheetPage() {
   const handledSaveAttemptRef = useRef(0);
   const saveImmediatelyRef = useRef(false);
   workbookRef.current = workbook;
-  const activeSheet = workbook.sheets.find((sheet) => sheet.id === activeId) ?? workbook.sheets[0];
+  const groupSheets = useMemo(() => workbook.sheets.filter((s) => s.name.endsWith(`(${activeGroup})`)), [workbook.sheets, activeGroup]);
+  const activeSheet = workbook.sheets.find((sheet) => sheet.id === activeId) ?? groupSheets[0] ?? workbook.sheets[0];
   const selectedAddress = cellAddress(selected.row, selected.column);
   const isSaveTimeout = saveError.toLowerCase().includes('upstream request timeout');
 
@@ -528,7 +760,7 @@ export default function SpreadsheetPage() {
             const supabase = getSupabaseBrowserClient();
             if (!supabase || revisionRef.current === null) throw new Error('Supabase is not connected. The workbook was not saved.');
             const { data, error } = await supabase.rpc('save_shared_spreadsheet', {
-              p_workbook: pending.workbook,
+              p_workbook: compactWorkbook(pending.workbook),
               p_expected_revision: revisionRef.current,
             });
             if (error) throw new Error(error.message);
@@ -537,6 +769,19 @@ export default function SpreadsheetPage() {
             const savedNewVersion = revision > revisionRef.current;
             revisionRef.current = revision;
             lastSavedRef.current = pending.serialized;
+            // Materialize fees in background after workbook revision change (one sheet per request to stay within edge compute limits)
+            if (savedNewVersion) {
+              const session = (await supabase.auth.getSession()).data.session;
+              if (session) {
+                const sheetCount = pending.workbook?.sheets?.length ?? 0;
+                for (let i = 0; i < sheetCount; i++) {
+                  fetchSupabaseFunction(`quotations?action=materialize&sheet=${i}`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+                  }).catch(() => { /* non-blocking */ });
+                }
+              }
+            }
             if (JSON.stringify(workbookRef.current) === pending.serialized) {
               setSaveStatus('saved');
               setSaveError('');
@@ -554,7 +799,7 @@ export default function SpreadsheetPage() {
         }
       };
       void savePending();
-    }, saveImmediatelyRef.current ? 0 : 500);
+    }, saveImmediatelyRef.current ? 0 : 2000);
     return () => window.clearTimeout(timer);
   }, [databaseStatus, saveAttempt, workbook]);
 
@@ -698,6 +943,22 @@ export default function SpreadsheetPage() {
     changeWorkbook((current) => ({ ...current, sheets: current.sheets.map((item) => item.id === sheet.id ? { ...item, name: trimmed } : item) }));
     return true;
   };
+
+  const addSheet = useCallback(() => {
+    const groupPrefix = `Sheet(${activeGroup})`;
+    const existing = workbook.sheets.filter((s) => s.name.startsWith('Sheet') && s.name.endsWith(`(${activeGroup})`));
+    let n = existing.length + 1;
+    let name = `${groupPrefix}`;
+    while (workbook.sheets.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
+      n++;
+      name = `Sheet${n}(${activeGroup})`;
+    }
+    const newSheet = createSheet(name);
+    changeWorkbook((current) => ({ ...current, sheets: [...current.sheets, newSheet] }));
+    setActiveId(newSheet.id);
+    setSelected({ row: 1, column: 1 });
+    setWidths({});
+  }, [activeGroup, workbook, changeWorkbook]);
 
   const requestDeleteSheet = (sheet: Sheet) => {
     if (workbook.sheets.length < 2) return;
@@ -962,13 +1223,14 @@ export default function SpreadsheetPage() {
 
   return (
     <main className="spreadsheet-page">
-      <div className="spreadsheet-title"><span className="spreadsheet-title-icon">▦</span><div><h1>Fees Spreadsheet</h1><p>Shared administrator fee workbook · autosaved to Supabase</p></div><span className={`spreadsheet-local-status is-${saveStatus}`} role={saveStatus === 'error' ? 'alert' : 'status'}>● {message || (saveStatus === 'saving' ? 'Saving to database…' : saveStatus === 'error' ? 'Database save failed' : 'Saved to database')}</span></div>
+      <div className="spreadsheet-title"><span className="spreadsheet-title-icon">▦</span><div><h1>Country-Level Fee Workbook</h1><p>Shared administrator fee workbook · autosaved to Supabase</p></div><span className={`spreadsheet-local-status is-${saveStatus}`} role={saveStatus === 'error' ? 'alert' : 'status'}>● {message || (saveStatus === 'saving' ? 'Saving to database…' : saveStatus === 'error' ? 'Database save failed' : 'Saved to database')}</span></div>
       {saveStatus === 'saving' && <div className="spreadsheet-upload-progress" role="progressbar" aria-label="Saving workbook to Supabase" aria-valuetext="Save in progress"><span /></div>}
       {saveNotification && <div className="spreadsheet-save-notification" role="status">{saveNotification}</div>}
       {saveStatus === 'error' && <div className="spreadsheet-save-error" role="alert"><span>{isSaveTimeout ? 'Supabase timed out while saving. The result may be uncertain; retrying the same workbook is safe and will not create a duplicate version.' : saveError}</span><button type="button" onClick={() => {
         if (saveError.toLowerCase().includes('changed in another session')) setLoadAttempt((attempt) => attempt + 1);
         else setSaveAttempt((attempt) => attempt + 1);
       }}>{saveError.toLowerCase().includes('changed in another session') ? 'Reload shared workbook' : isSaveTimeout ? 'Retry save safely' : 'Retry save'}</button></div>}
+      <PricingSheet />
       <SpreadsheetToolbar onUndo={undo} onRedo={redo} onImport={() => importInput.current?.click()} onExport={() => void exportWorkbook()} onSave={updateDatabase} isSaving={saveStatus === 'saving'} canUndo={history.undo.length > 0} canRedo={history.redo.length > 0} search={search} setSearch={setSearch} />
       <input ref={importInput} className="spreadsheet-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => void importWorkbook(event)} />
       <div className="spreadsheet-formatting-toolbar">
@@ -978,8 +1240,8 @@ export default function SpreadsheetPage() {
         <button type="button" onClick={() => setCellStyle('align', 'left')} aria-label="Align left">≡</button>
         <button type="button" onClick={() => setCellStyle('align', 'center')} aria-label="Align center">☷</button>
         <button type="button" onClick={() => setCellStyle('align', 'right')} aria-label="Align right">≣</button>
-        <label className="sheet-color-control" title="Text color">A<input type="color" value={style.color ?? '#172a46'} onChange={(event) => setCellStyle('color', event.target.value)} /></label>
-        <label className="sheet-color-control sheet-fill-control" title="Cell background">▱<input type="color" value={style.background ?? '#ffffff'} onChange={(event) => setCellStyle('background', event.target.value)} /></label>
+        <label className="sheet-color-control" title="Text color"><span>A<span className="sheet-color-swatch" style={{ background: style.color ?? '#172a46' }} /></span><input type="color" value={style.color ?? '#172a46'} onChange={(event) => setCellStyle('color', event.target.value)} /></label>
+        <label className="sheet-color-control sheet-fill-control" title="Cell background"><span>▱<span className="sheet-color-swatch" style={{ background: style.background ?? '#ffffff', border: '1px solid #dce6ec' }} /></span><input type="color" value={style.background ?? '#ffffff'} onChange={(event) => setCellStyle('background', event.target.value)} /></label>
         <span className="sheet-toolbar-divider" />
         <button type="button" onClick={() => insertDelete('row', 'insert')}>＋ Row</button>
         <button type="button" onClick={() => insertDelete('row', 'delete')}>− Row</button>
@@ -1016,7 +1278,18 @@ export default function SpreadsheetPage() {
         {search && <span className="spreadsheet-search-count">{searchResult ? `Match: ${searchResult}` : 'No matches'}</span>}
       </div>
       <SpreadsheetGrid sheet={activeSheet} selected={selected} setSelected={setSelected} editing={editing} setEditing={setEditing} editValue={editValue} setEditValue={setEditValue} commitEdit={() => commitCell(selectedAddress, editValue)} search={search} widths={widths} resizeColumn={resizeColumn} gridRef={gridRef} onKeyDown={handleGridKeyDown} />
-      <WorksheetTabs sheets={workbook.sheets} activeId={activeId} setActiveId={(id) => { setActiveId(id); setSelected({ row: 1, column: 1 }); setWidths({}); }} renameSheet={renameSheet} deleteSheet={requestDeleteSheet} renameError={renameError} />
+      <div className="spreadsheet-group-bar">
+        <label className="spreadsheet-group-label" htmlFor="client-group-select">Client Type</label>
+        <select id="client-group-select" className="spreadsheet-group-select" value={activeGroup} onChange={(event) => {
+          const group = event.target.value as ClientGroup;
+          setActiveGroup(group);
+          const firstOfGroup = workbook.sheets.find((s) => s.name.endsWith(`(${group})`));
+          if (firstOfGroup) { setActiveId(firstOfGroup.id); setSelected({ row: 1, column: 1 }); setWidths({}); }
+        }}>
+          {CLIENT_GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}
+        </select>
+        <WorksheetTabs sheets={groupSheets} activeId={activeId} setActiveId={(id) => { setActiveId(id); setSelected({ row: 1, column: 1 }); setWidths({}); }} renameSheet={renameSheet} deleteSheet={requestDeleteSheet} onAddSheet={addSheet} renameError={renameError} />
+      </div>
       <div className="spreadsheet-statusbar"><span>{activeSheet.name}</span><span>Cell {selectedAddress}</span><span>Shared with administrators · Supabase</span></div>
       {sheetPendingDelete && <AdminDeleteSheetModal
         sheetName={sheetPendingDelete.name}

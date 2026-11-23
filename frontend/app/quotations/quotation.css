@@ -396,3 +396,11 @@
 .invoice-dialog .invoice-cart-table td:nth-child(2) { min-width: 185px; white-space: normal; }
 .invoice-dialog .invoice-cart-table td:nth-child(4) { min-width: 110px; white-space: normal; }
 .invoice-dialog .invoice-cart-table td[rowspan] { vertical-align: top; padding-top: 14px; }
+.pricing-tier-info { margin-top:8px; padding:8px 14px; border:1px solid #b8dee5; border-radius:6px; background:#eef9fb; color:#098faa; font-size:12px; }
+.pricing-tier-info strong { color:#173554; }
+.pricing-tier-warning { margin-top:8px; padding:8px 14px; border:1px solid #f0c7cb; border-radius:6px; background:#fff5f5; color:#a52634; font-size:12px; }
+
+/* Loading spinner for quotation table */
+.quotation-loading { display: inline-flex; align-items: center; gap: 8px; color: #5a6a86; font-size: 12px; }
+.quotation-loading::before { content: ""; display: inline-block; width: 16px; height: 16px; border: 2px solid #d9deea; border-top-color: #5365d9; border-radius: 50%; animation: quote-spin .7s linear infinite; }
+@keyframes quote-spin { to { transform: rotate(360deg); } }

@@ -38,6 +38,24 @@
   width: 20px;
   height: 20px;
 }
+.client-pricing-tier {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 18px;
+  background: linear-gradient(110deg, #e0f8ff, #d4f5fb);
+  color: #007a94;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.client-pricing-tier strong {
+  color: #005f73;
+}
+.client-pricing-tier.is-warning {
+  background: linear-gradient(110deg, #fff8e1, #fff3cd);
+  color: #8a6d00;
+}
 .client-fee-selection form {
   display: grid;
   grid-template-columns: minmax(160px, 1.15fr) minmax(160px, 1.05fr) minmax(180px, 1.15fr) minmax(130px, 0.75fr) minmax(105px, 0.65fr) minmax(105px, 0.65fr);
@@ -1322,5 +1340,94 @@
 @media (min-width: 601px) and (max-width: 1023px) {
   .client-main:has(.client-quotation-page) .client-quotation-topbar {
     padding-left: 58px;
+  }
+}
+
+/* --- Client modal overrides (View, Delete, Success) --- */
+.client-quotation-page .quotation-backdrop {
+  background: rgba(8, 31, 55, .58);
+  backdrop-filter: blur(4px);
+}
+.client-quotation-page .quotation-dialog {
+  border-color: #b0eafa;
+}
+.client-quotation-page .quotation-dialog > header {
+  background: linear-gradient(110deg, #20abc2, #1798b6) !important;
+}
+.client-quotation-page .quotation-dialog > header h2 {
+  color: #fff;
+}
+.client-quotation-page .quotation-dialog > header p {
+  color: #d7f8ff;
+}
+.client-quotation-page .quotation-dialog > header button {
+  border-color: rgba(255, 255, 255, .3);
+  background: rgba(255, 255, 255, .12);
+}
+.client-quotation-page .quotation-dialog.compact > h2 {
+  color: #0e3d4f;
+}
+.client-quotation-page .quotation-dialog.compact > p {
+  color: #4a7a8c;
+}
+.client-quotation-page .quotation-details b {
+  color: #00a6c9;
+}
+.client-quotation-page .quotation-details p {
+  border-color: #d7f4fb;
+  color: #1a4a5c;
+}
+.client-quotation-page .modal-actions button.primary {
+  background: #00afd0 !important;
+  border-color: #00afd0 !important;
+  color: #fff;
+}
+.client-quotation-page .modal-actions button.primary:hover {
+  background: #009ab8 !important;
+}
+.client-quotation-page .modal-actions button:not(.primary):not(.danger) {
+  border-color: #a1e5f8;
+  color: #008eac;
+}
+.client-quotation-page .quotation-success .quotation-success-mark {
+  background: #e4faff;
+  color: #00afd0;
+}
+.client-quotation-page .quotation-success h2 {
+  color: #0e3d4f;
+}
+.client-quotation-page .quotation-success p {
+  color: #4a7a8c;
+}
+.client-quotation-page .quotation-success-status {
+  border-color: #b0eafa;
+  background: #f0fbff;
+}
+.client-quotation-page .quotation-success-status strong {
+  background: #fff4dc;
+  color: #8a5c0b;
+}
+
+/* --- Client loading spinner --- */
+.client-quotation-page .quotation-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #00a6c9;
+  font-size: 12px;
+}
+.client-quotation-page .quotation-loading::before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #b0eafa;
+  border-top-color: #00afd0;
+  border-radius: 50%;
+  animation: client-spin .7s linear infinite;
+}
+@keyframes client-spin {
+  to {
+    transform: rotate(360deg);
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getSupabaseBrowserClient } from '../../../src/lib/supabase/browser';
 import { getRoleDestination } from '../../../src/lib/auth/role-routing';
@@ -9,7 +9,7 @@ import Link from 'next/link';
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 60; // 5 min max
 
-export default function WaitingPage() {
+function WaitingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestId = searchParams.get('id') ?? '';
@@ -47,6 +47,15 @@ export default function WaitingPage() {
             refresh_token: body.refresh_token,
           });
           if (error) { setStatus('error'); return; }
+          // Set device fingerprint cookie for middleware session validation
+          const fp = window.localStorage.getItem('aipt-device-fp');
+          if (fp) {
+            await fetch('/api/auth/set-device-cookie', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fingerprint: fp }),
+            }).catch(() => undefined);
+          }
           setStatus('approved');
           const destination = await getRoleDestination(supabase);
           router.push(destination);
@@ -152,5 +161,13 @@ export default function WaitingPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function WaitingPage() {
+  return (
+    <Suspense>
+      <WaitingContent />
+    </Suspense>
   );
 }

@@ -1,5 +1,5 @@
 /* Shared brand, actions, pagination and dashboard page presentation. */
-:root{--primary-color:rgb(38,169,197);--primary-color-hover:#18869e;--primary-color-active:#126477;--primary-color-soft:#e7f7fa;--primary-color-border:#b7e3ec;--primary-color-focus:rgb(38 169 197 / 24%);--pagination-accent:rgb(38,169,197);--surface-border:#dce9ee}
+:root{--primary-color:#17a2b8;--primary-color-hover:#18869e;--primary-color-active:#126477;--primary-color-soft:#e7f7fa;--primary-color-border:#b7e3ec;--primary-color-focus:rgb(38 169 197 / 24%);--pagination-accent:rgb(38,169,197);--surface-border:#dce9ee}
 .aipt-action-icon{display:inline-block;width:18px!important;height:18px!important;flex:0 0 18px;vertical-align:middle;pointer-events:none}
 [data-action]{display:inline-flex!important;align-items:center;justify-content:center;gap:7px}
 :is(.admin-app-shell,.client-app-shell) [data-action]{border:1px solid var(--primary-color-border)!important;border-radius:8px;background:var(--primary-color-soft)!important;color:var(--primary-color-active)!important;box-shadow:none!important;min-height:36px;padding:8px 12px;cursor:pointer}
@@ -38,3 +38,8 @@
 @media(max-width:700px){:is(.requirement-page,.statement-page,.countries-page) .countries-heading{padding:24px 16px 16px}:is(.requirement-page,.statement-page,.countries-page) .country-table-card{margin:0 16px 20px}.requirement-toolbar{flex-wrap:wrap}.requirement-toolbar input{width:100%}.account-page{padding:20px 14px}.account-modal>header,.account-modal form{padding:22px 18px}.account-form-grid{grid-template-columns:1fr}.account-logo-field{flex-wrap:wrap}.account-logo-field input{max-width:100%}}
 
 .requirement-view-details{display:grid;grid-template-columns:110px minmax(0,1fr);gap:14px;padding:24px;margin:0;font-size:13px;line-height:1.6}.requirement-view-details dt{color:var(--primary-color-active);font-weight:700}.requirement-view-details dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Design-system font: Times New Roman across all admin pages */
+.admin-app-shell,.admin-app-shell *,.admin-dashboard-content,.admin-dashboard-content *{font-family:"Times New Roman",Times,serif!important}
+/* Exception: keep monospace in <code> and <pre> blocks */
+.admin-app-shell :is(code,pre),.admin-dashboard-content :is(code,pre){font-family:ui-monospace,SFMono-Regular,Menlo,monospace!important}

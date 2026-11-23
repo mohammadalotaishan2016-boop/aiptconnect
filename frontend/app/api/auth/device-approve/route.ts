@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, createAdminClient } from '../../../../src/lib/supabase/server';
+import { extractIdempotencyKey, checkIdempotencyKey, saveIdempotencyResult, idempotentResponse } from '../../../../src/lib/idempotency';
+
+const ROUTE = '/api/auth/device-approve';
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient();
@@ -8,56 +11,49 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const requestId = typeof body?.request_id === 'string' ? body.request_id : '';
+  const approverFingerprint = typeof body?.approver_fingerprint === 'string' ? body.approver_fingerprint : '';
   if (!requestId) return NextResponse.json({ error: 'request_id is required.' }, { status: 400 });
+  if (!approverFingerprint) return NextResponse.json({ error: 'approver_fingerprint is required.' }, { status: 400 });
 
   const admin = createAdminClient();
 
-  // Verify the login_request belongs to this user and is still pending
-  const { data: loginReq } = await admin
-    .from('login_requests')
-    .select('id, user_id, device_fingerprint, session_access_token, session_refresh_token, expires_at, status')
-    .eq('id', requestId)
-    .single();
-
-  if (!loginReq || loginReq.user_id !== user.id) {
-    return NextResponse.json({ error: 'Login request not found.' }, { status: 404 });
-  }
-  if (loginReq.status !== 'pending') {
-    return NextResponse.json({ error: 'This request has already been resolved.' }, { status: 409 });
-  }
-  if (new Date(loginReq.expires_at) < new Date()) {
-    await admin.from('login_requests').update({ status: 'expired', resolved_at: new Date().toISOString() }).eq('id', requestId);
-    return NextResponse.json({ error: 'This login request has expired.' }, { status: 410 });
+  // Idempotency check
+  const idempotencyKey = extractIdempotencyKey(req);
+  if (idempotencyKey) {
+    const cached = await checkIdempotencyKey(admin, idempotencyKey, ROUTE);
+    if (cached) return idempotentResponse(cached);
   }
 
-  // Revoke all existing active devices except the requesting fingerprint
-  await admin
-    .from('devices')
-    .update({ status: 'revoked', revoked_at: new Date().toISOString(), revoked_reason: 'New device approved' })
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .neq('device_id', loginReq.device_fingerprint);
+  // Atomic approval via RPC — handles validation, selective revocation,
+  // new device registration, session creation, and audit logging.
+  const { data: result, error } = await admin.rpc('approve_device_login', {
+    p_request_id: requestId,
+    p_approver_id: user.id,
+    p_approver_fingerprint: approverFingerprint,
+  });
 
-  // Register the new device
-  if (loginReq.device_fingerprint && loginReq.device_fingerprint !== 'unknown') {
-    await admin.from('devices').upsert(
-      {
-        user_id: user.id,
-        device_id: loginReq.device_fingerprint,
-        status: 'active',
-        last_seen_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,device_id', ignoreDuplicates: false },
+  if (error) {
+    console.error('approve_device_login RPC error:', error.message);
+    return NextResponse.json({ error: 'Failed to process approval.' }, { status: 500 });
+  }
+
+  // The RPC returns a jsonb object
+  const rpcResult = result as Record<string, unknown>;
+  if (rpcResult?.error) {
+    const code = rpcResult.code as string;
+    const statusMap: Record<string, number> = {
+      not_found: 404,
+      forbidden: 403,
+      already_resolved: 409,
+      expired: 410,
+    };
+    return NextResponse.json(
+      { error: rpcResult.error },
+      { status: statusMap[code] ?? 400 },
     );
   }
 
-  // Mark the request as approved
-  await admin
-    .from('login_requests')
-    .update({ status: 'approved', resolved_at: new Date().toISOString() })
-    .eq('id', requestId);
-
-  // Broadcast device_revoked so the existing device signs itself out immediately
+  // Broadcast device_revoked so the approving device signs itself out immediately
   try {
     const channel = admin.channel(`user-${user.id}`);
     await channel.send({
@@ -68,5 +64,8 @@ export async function POST(req: NextRequest) {
     await admin.removeChannel(channel);
   } catch { /* non-fatal */ }
 
+  if (idempotencyKey) {
+    await saveIdempotencyResult(admin, idempotencyKey, user.id, ROUTE, { body: { ok: true }, status: 200 });
+  }
   return NextResponse.json({ ok: true });
 }

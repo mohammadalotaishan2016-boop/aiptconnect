@@ -6,7 +6,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
-const clientTypes = new Set(['Corporate', 'Law Firm', 'Consultant', 'Individual']);
+const clientTypes = new Set(['chinese', 'non_chinese', 'direct']);
 const clientStatuses = new Set(['Active', 'Inactive']);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const clientSelect = 'id,assigned_id,company_name,fee_classification_id,email,phone,client_type,address,country_id,notes,status,created_at,updated_at,country:countries(id,name,abbreviation,flag_url),fee_classification:fee_classifications(id,description,color_indication)';
@@ -33,7 +33,7 @@ function validate(body: unknown) {
   if (company_name.length < 2) throw Error('Company name must contain at least 2 characters.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Error('Provide a valid email address.');
   if (phone.length < 3) throw Error('Provide a valid phone number.');
-  if (!clientTypes.has(client_type)) throw Error('Choose a valid client type.');
+  if (!clientTypes.has(client_type)) throw Error('Choose a valid client type (Chinese, Non Chinese, or Direct).');
   if (address.length < 3) throw Error('Provide the client address.');
   if (!country_id) throw Error('Select a country.');
   if (!clientStatuses.has(status)) throw Error('Choose Active or Inactive status.');
@@ -75,18 +75,32 @@ Deno.serve(async (request) => {
     }
     if (request.method === 'GET') {
       const page = Math.max(Number(url.searchParams.get('page') ?? 1), 1);
-      const pageSize = Math.min(Math.max(Number(url.searchParams.get('page_size') ?? 20), 1), 100);
-      const search = (url.searchParams.get('search') ?? '').trim();
-      const status = url.searchParams.get('status');
-      const sortFields: Record<string, string> = { assigned_id: 'assigned_id', company_name: 'company_name', email: 'email', client_type: 'client_type', status: 'status', created_at: 'created_at' };
+      const pageSize = Math.min(Math.max(Number(url.searchParams.get('page_size') ?? 10), 1), 100);
+      const search = (url.searchParams.get('search') ?? '').trim() || null;
+      const status = url.searchParams.get('status') || null;
+      const invitation = url.searchParams.get('invitation') || null;
+      const deviceUsage = url.searchParams.get('device_usage') || null;
+      const datePreset = url.searchParams.get('date_preset') || null;
+      const dateFrom = url.searchParams.get('date_from') || null;
+      const dateTo = url.searchParams.get('date_to') || null;
+      const sortFields: Record<string, string> = { assigned_id: 'assigned_id', company_name: 'company_name', email: 'email', client_type: 'client_type', status: 'status', created_at: 'created_at', max_devices: 'max_devices', registered_devices: 'registered_devices' };
       const sort = sortFields[url.searchParams.get('sort') ?? ''] ?? 'assigned_id';
-      const ascending = url.searchParams.get('direction') !== 'desc';
-      let query = db.from('clients').select(clientSelect, { count: 'exact' }).is('deleted_at', null).order(sort, { ascending });
-      if (search) query = query.or(`company_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
-      if (status && clientStatuses.has(status)) query = query.eq('status', status);
-      const { data, error, count } = await query.range((page - 1) * pageSize, page * pageSize - 1);
+      const direction = url.searchParams.get('direction') === 'desc' ? 'desc' : 'asc';
+      const { data: rpcResult, error } = await db.rpc('get_tenants_page', {
+        p_search: search,
+        p_status: status,
+        p_invitation: invitation,
+        p_device_usage: deviceUsage,
+        p_date_preset: datePreset,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_sort: sort,
+        p_direction: direction,
+        p_page: page,
+        p_page_size: pageSize,
+      });
       if (error) throw error;
-      return json({ data: data ?? [], total: count ?? 0, page, page_size: pageSize });
+      return json(rpcResult);
     }
     if (request.method === 'POST' && url.searchParams.get('mode') === 'import') {
       const body = await request.json();
@@ -111,9 +125,12 @@ Deno.serve(async (request) => {
       return json({ imported: data?.length ?? 0, data: data ?? [] }, 201);
     }
     if (request.method === 'POST') {
-      const payload = validate(await request.json());
+      const rawBody = await request.json();
+      const payload = validate(rawBody);
       await ensureReferences(db, payload);
-      const { data, error } = await db.from('clients').insert(payload).select(clientSelect).single();
+      const assignedId = typeof rawBody.assigned_id !== 'undefined' ? Math.floor(Number(rawBody.assigned_id)) : null;
+      const insertPayload = assignedId && assignedId > 0 ? { ...payload, assigned_id: assignedId } : payload;
+      const { data, error } = await db.from('clients').insert(insertPayload).select(clientSelect).single();
       if (error) throw error;
       await audit(db, user.id, 'create', data);
       return json(data, 201);
@@ -123,9 +140,12 @@ Deno.serve(async (request) => {
     if (beforeError) throw beforeError;
     if (!before) return json({ error: 'Client not found.' }, 404);
     if (request.method === 'PUT') {
-      const payload = validate(await request.json());
+      const rawBody = await request.json();
+      const payload = validate(rawBody);
       await ensureReferences(db, payload);
-      const { data, error } = await db.from('clients').update(payload).eq('id', id).is('deleted_at', null).select(clientSelect).single();
+      const assignedId = typeof rawBody.assigned_id !== 'undefined' ? Math.floor(Number(rawBody.assigned_id)) : undefined;
+      const updatePayload = assignedId && assignedId > 0 ? { ...payload, assigned_id: assignedId } : payload;
+      const { data, error } = await db.from('clients').update(updatePayload).eq('id', id).is('deleted_at', null).select(clientSelect).single();
       if (error) throw error;
       await audit(db, user.id, 'update', data, before);
       return json(data);

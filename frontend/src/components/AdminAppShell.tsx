@@ -32,6 +32,7 @@ const adminRoutes = new Set([
   '/customer-service',
   '/users',
   '/roles',
+  '/audit-logs',
   '/statements',
   '/poa',
   '/schedule-of-fees',

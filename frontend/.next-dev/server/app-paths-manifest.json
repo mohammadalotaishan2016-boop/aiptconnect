@@ -1,7 +1,8 @@
 {
-  "/api/poa/translate/route": "app/api/poa/translate/route.js",
-  "/login/verify-otp/page": "app/login/verify-otp/page.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/set-device-cookie/route": "app/api/auth/set-device-cookie/route.js",
+  "/api/admin/system-status/route": "app/api/admin/system-status/route.js",
   "/login/page": "app/login/page.js",
-  "/client-dashboard/page": "app/client-dashboard/page.js",
-  "/client-dashboard/poa/page": "app/client-dashboard/poa/page.js"
+  "/overview/page": "app/overview/page.js",
+  "/spreadsheet/page": "app/spreadsheet/page.js"
 }

@@ -19,7 +19,8 @@ type IconName =
   | 'notifications'
   | 'newsfeed'
   | 'documents'
-  | 'spreadsheet';
+  | 'spreadsheet'
+  | 'auditlogs';
 
 type NavigationItem = {
   href: string;
@@ -34,6 +35,7 @@ const navigation: NavigationItem[] = [
   { href: '/overview', label: 'Overview', icon: 'overview' },
   { href: '/projects', label: 'Projects', icon: 'projects' },
   { href: '/users', label: 'Users Registered', icon: 'clients' },
+  { href: '/clients', label: 'Tenants', icon: 'clients' },
   { href: '/countries', label: 'Countries', icon: 'countries' },
   { href: '/requirements', label: 'Requirements', icon: 'procedures' },
   { href: '/procedure', label: 'Procedure', icon: 'procedures' },
@@ -60,6 +62,7 @@ const navigation: NavigationItem[] = [
   { href: '/client-dashboard-cards', label: 'Client Dashboard Cards', icon: 'documents' },
   { href: '/video-tutorials', label: 'Video Tutorials', icon: 'documents' },
   { href: '/roles', label: 'Roles & Permissions', icon: 'clients' },
+  { href: '/audit-logs', label: 'Audit Logs', icon: 'auditlogs' },
 ];
 
 function Icon({ name }: { name: IconName }) {
@@ -156,6 +159,14 @@ function Icon({ name }: { name: IconName }) {
     return (
       <svg {...common}>
         <path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h5" />
+      </svg>
+    );
+  if (name === 'auditlogs')
+    return (
+      <svg {...common}>
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+        <rect x="9" y="3" width="6" height="4" rx="1" />
+        <path d="M9 12h6M9 16h4" />
       </svg>
     );
   return (

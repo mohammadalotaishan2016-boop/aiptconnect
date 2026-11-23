@@ -1,8 +1,8 @@
 .spreadsheet-page {
   --sheet-teal: #16a8c2;
   display: flex;
-  height: calc(100dvh - 94px);
   min-height: 430px;
+  max-height: calc(100dvh - 94px);
   flex-direction: column;
   margin: 8px 10px 12px;
   overflow: hidden;
@@ -38,7 +38,8 @@
 .sheet-font-name,.sheet-font-size { display:grid; place-items:center; height:29px; margin-right:4px; border:1px solid #dce6ec; border-radius:4px; color:#4b6178; font-size:11px; }
 .sheet-font-name { width:103px; }.sheet-font-size { width:47px; }
 .sheet-color-control { position:relative; min-width:31px; height:30px; font-weight:700; border-color:#e2e9ee; }
-.sheet-color-control input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.sheet-color-control input[type="color"] { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.sheet-color-swatch { display:block; width:16px; height:4px; border-radius:1px; margin-top:1px; }
 .sheet-fill-control { color:#c79812; }
 .sheet-toolbar-divider { height:24px; margin:0 5px; border-left:1px solid #e1eaf0; }
 .spreadsheet-formula-bar { display:flex; align-items:center; gap:9px; min-height:44px; padding:5px 12px; border-bottom:1px solid #dce6ed; }
@@ -48,7 +49,7 @@
 .spreadsheet-formula-bar input:focus { border-color:#40b9d0; box-shadow:0 0 0 2px #36b3ca20; }
 .formula-symbol { color:#557694; font:italic 600 14px Georgia,serif; }
 .spreadsheet-search-count { color:#738397; font-size:10px; white-space:nowrap; }
-.spreadsheet-grid-scroll { flex:1 1 auto; min-height:300px; overflow:auto; outline:0; overscroll-behavior:contain; background:#fff; }
+.spreadsheet-grid-scroll { flex:1 1 0%; min-height:200px; overflow:auto; outline:0; overscroll-behavior:contain; background:#fff; }
 .spreadsheet-grid { width:max-content; min-width:100%; table-layout:fixed; border-collapse:collapse; color:#274260; font-size:11px; }
 .spreadsheet-grid .sheet-row-number-column { width:37px; }
 .spreadsheet-grid thead { position:sticky; z-index:3; top:0; }
@@ -64,13 +65,19 @@
 .spreadsheet-grid td.is-search-match { background:#fff2c6; }
 .spreadsheet-grid td input { position:absolute; z-index:2; inset:0; width:100%; height:100%; border:0; outline:1px solid #1688ff; padding:0 5px; color:#253b51; font:11px Inter,"Segoe UI",Arial,sans-serif; }
 .column-resize-handle { position:absolute; z-index:1; top:0; right:-3px; width:7px; height:100%; cursor:col-resize; touch-action:none; }
-.worksheet-tabs { display:flex; align-items:stretch; min-height:39px; overflow-x:auto; border-top:1px solid #dce6ed; background:#f7fafc; }
+.spreadsheet-group-bar { display:flex; align-items:stretch; border-top:1px solid #dce6ed; background:#f7fafc; }
+.spreadsheet-group-label { display:grid; place-items:center; padding:0 10px; color:#405872; font:600 11px Inter,"Segoe UI",Arial,sans-serif; white-space:nowrap; border-right:1px solid #e5edf1; background:#f0f7f9; }
+.spreadsheet-group-select { height:39px; min-width:130px; border:0; border-right:1px solid #e5edf1; padding:0 12px; background:#fff; color:#098ba7; font:600 12px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; outline:0; appearance:auto; }
+.spreadsheet-group-select:focus { background:#eef9fb; }
+.worksheet-tabs { display:flex; align-items:stretch; min-height:39px; overflow-x:auto; background:#f7fafc; flex:1; }
 .worksheet-tab { position:relative; display:flex; align-items:stretch; border-right:1px solid #e5edf1; }
 .worksheet-tab > button:first-child { min-width:75px; padding:0 16px; border:0; border-bottom:2px solid transparent; background:transparent; color:#60758a; font:500 11px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; }
 .worksheet-tab > input { width:110px; height:27px; align-self:center; margin:0 7px; border:1px solid #16a8c2; border-radius:4px; outline:0; padding:0 7px; color:#263e57; font:500 11px Inter,"Segoe UI",Arial,sans-serif; }
 .worksheet-tab.is-active > button:first-child { border-bottom-color:#0eacc5; background:#fff; color:#098ba7; font-weight:700; }
 .worksheet-tab .sheet-tab-delete { display:none; position:absolute; top:2px; right:1px; width:17px; height:17px; border:0; border-radius:50%; background:#e8eff3; color:#506a7d; font-size:13px; line-height:1; cursor:pointer; }
 .worksheet-tab:hover .sheet-tab-delete { display:block; }
+.worksheet-tab-add { display:grid; place-items:center; width:32px; min-width:32px; border:0; background:transparent; color:#60758a; font-size:16px; cursor:pointer; }
+.worksheet-tab-add:hover { background:#eef9fb; color:#098faa; }
 .spreadsheet-statusbar { display:flex; justify-content:space-between; gap:10px; padding:6px 12px; border-top:1px solid #e3ebf0; background:#fbfcfd; color:#8291a0; font-size:10px; }
 .spreadsheet-local-status.is-saving { color:#9a6a08; }
 .spreadsheet-local-status.is-error,.spreadsheet-inline-error { color:#bb2d3b; }
@@ -108,5 +115,36 @@
   .spreadsheet-title { padding:10px; }.spreadsheet-title p { display:none; }.spreadsheet-local-status { font-size:9px; }
   .spreadsheet-toolbar button { padding:0 6px; }.spreadsheet-toolbar button span { font-size:10px; }
   .sheet-font-name { width:80px; }.spreadsheet-formatting-toolbar { max-height:none; }
-  .spreadsheet-grid-scroll { min-height:250px; }.spreadsheet-statusbar span:last-child { display:none; }
+  .spreadsheet-grid-scroll { min-height:150px; }.spreadsheet-statusbar span:last-child { display:none; }
+  .spreadsheet-group-bar { flex-wrap:wrap; }
+  .spreadsheet-group-select { min-width:100px; font-size:11px; }
+}
+
+/* ─── Pricing Sheet (grouped by client type) ──── */
+.pricing-sheet-section { flex:0 0 auto; max-height:50vh; overflow-y:auto; padding:16px 18px; border-bottom:2px solid #d7e5ee; background:#f9fcfd; }
+.pricing-sheet-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+.pricing-sheet-header h2 { margin:0; color:#173554; font-size:17px; font-weight:700; font-family:"Times New Roman",serif; }
+.pricing-sheet-header p { margin:3px 0 0; color:#728399; font-size:11px; }
+.pricing-sheet-actions { display:flex; gap:6px; }
+.pricing-sheet-actions button { min-height:32px; border:1px solid #d3dfe7; border-radius:5px; padding:0 12px; background:#fff; color:#34536d; font:600 11px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; white-space:nowrap; }
+.pricing-sheet-actions button:hover { border-color:#c9eaf0; background:#eef9fb; color:#098faa; }
+.pricing-sheet-save { background:#17a2b8!important; color:#fff!important; border-color:#17a2b8!important; }
+.pricing-sheet-save:hover { background:#128a9e!important; }
+.pricing-sheet-save:disabled { opacity:.5; cursor:default; }
+.pricing-sheet-notification { margin-bottom:8px; padding:8px 14px; border:1px solid #a7dfc6; border-radius:6px; background:#effbf5; color:#176c48; font-size:12px; }
+.pricing-sheet-error { color:#a52634; }
+.pricing-sheet-tabs { display:flex; gap:0; margin-bottom:10px; border-bottom:2px solid #e5edf3; }
+.pricing-sheet-tabs button { min-height:36px; padding:0 20px; border:0; border-bottom:3px solid transparent; background:transparent; color:#60758a; font:600 12px Inter,"Segoe UI",Arial,sans-serif; cursor:pointer; transition:border-color .15s,color .15s; }
+.pricing-sheet-tabs button:hover { color:#098faa; }
+.pricing-sheet-tabs button.is-active { border-bottom-color:#17a2b8; color:#17a2b8; font-weight:700; }
+.pricing-sheet-table { width:100%; border-collapse:collapse; font-size:12px; }
+.pricing-sheet-table th { text-align:left; padding:8px 10px; background:#f3f7fa; border:1px solid #dce8f1; color:#405872; font-weight:600; font-size:11px; }
+.pricing-sheet-table td { padding:4px 6px; border:1px solid #dce8f1; }
+.pricing-sheet-table td input { width:100%; height:30px; border:1px solid #dce6ec; border-radius:4px; padding:0 8px; color:#263e57; font:12px Inter,"Segoe UI",Arial,sans-serif; text-align:right; }
+.pricing-sheet-table td input:focus { border-color:#17a2b8; outline:2px solid rgba(23,162,184,.15); }
+.pricing-item-label { font-weight:600; color:#173554; white-space:nowrap; min-width:140px; }
+.pricing-total-cell { text-align:right; padding-right:16px!important; color:#173554; font-weight:600; }
+@media(max-width:600px) {
+  .pricing-sheet-header { flex-direction:column; align-items:flex-start; }
+  .pricing-sheet-tabs button { padding:0 12px; font-size:11px; }
 }

@@ -1,16 +1,20 @@
 {
   "pages": {
+    "/global-error": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/global-error.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/client-dashboard/poa/page": [
+    "/error": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/client-dashboard/poa/page.css",
-      "static/chunks/app/client-dashboard/poa/page.js"
+      "static/chunks/app/error.js"
     ],
     "/page": [
       "static/chunks/webpack.js",
@@ -23,20 +27,30 @@
       "static/css/app/login/page.css",
       "static/chunks/app/login/page.js"
     ],
-    "/login/verify-otp/page": [
+    "/api/auth/login/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/login/verify-otp/page.js"
+      "static/chunks/app/api/auth/login/route.js"
     ],
-    "/client-dashboard/page": [
+    "/api/auth/set-device-cookie/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/client-dashboard/page.js"
+      "static/chunks/app/api/auth/set-device-cookie/route.js"
     ],
-    "/api/poa/translate/route": [
+    "/overview/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/poa/translate/route.js"
+      "static/chunks/app/overview/page.js"
+    ],
+    "/api/admin/system-status/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/system-status/route.js"
+    ],
+    "/spreadsheet/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/spreadsheet/page.js"
     ]
   }
 }

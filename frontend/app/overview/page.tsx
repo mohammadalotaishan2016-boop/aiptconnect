@@ -1,6 +1,7 @@
 'use client';
 import TablePagination from '../../src/components/TablePagination';
 import ActionIcon from '../../src/components/ActionIcon';
+import SystemStatusCard from '../../src/components/SystemStatusCard';
 
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -281,6 +282,8 @@ export default function Overview() {
         <button type="button" className="overview-button overview-button-primary" onClick={exportData} disabled={!summary || loading}><Icon name="download" /> Export data</button>
       </div>
     </header>
+
+    <SystemStatusCard />
 
     {error && <section className="overview-message overview-message-error" role="alert"><b>Dashboard data could not be loaded.</b><span>{error}</span><button type="button" onClick={() => void loadSummary()}>Try again</button></section>}
 

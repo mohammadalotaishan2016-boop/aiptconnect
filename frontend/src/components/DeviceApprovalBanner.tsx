@@ -7,6 +7,10 @@ interface PendingRequest {
   request_id: string;
   user_agent: string | null;
   ip: string | null;
+  device_name: string | null;
+  device_type: string | null;
+  browser: string | null;
+  operating_system: string | null;
   created_at: string;
 }
 
@@ -50,10 +54,14 @@ export default function DeviceApprovalBanner({ userId }: Props) {
     if (!pending || busy) return;
     setBusy(true);
     try {
+      const payload: Record<string, string> = { request_id: pending.request_id };
+      if (action === 'approve') {
+        payload.approver_fingerprint = localStorage.getItem('aipt-device-fp') ?? '';
+      }
       await fetch(`/api/auth/device-${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id: pending.request_id }),
+        body: JSON.stringify(payload),
       });
       setResolved(true);
       setPending(null);
@@ -94,10 +102,23 @@ export default function DeviceApprovalBanner({ userId }: Props) {
       </strong>
       <p style={{ margin: '0 0 0.25rem' }}>
         <span style={{ color: '#555' }}>Device:</span>{' '}
-        {pending.user_agent
-          ? pending.user_agent.slice(0, 60) + (pending.user_agent.length > 60 ? '…' : '')
-          : 'Unknown device'}
+        {pending.device_name || 'Unknown device'}
       </p>
+      {pending.device_type && pending.device_type !== 'Unknown' && (
+        <p style={{ margin: '0 0 0.25rem' }}>
+          <span style={{ color: '#555' }}>Type:</span> {pending.device_type}
+        </p>
+      )}
+      {pending.browser && pending.browser !== 'Unknown Browser' && (
+        <p style={{ margin: '0 0 0.25rem' }}>
+          <span style={{ color: '#555' }}>Browser:</span> {pending.browser}
+        </p>
+      )}
+      {pending.operating_system && pending.operating_system !== 'Unknown OS' && (
+        <p style={{ margin: '0 0 0.25rem' }}>
+          <span style={{ color: '#555' }}>OS:</span> {pending.operating_system}
+        </p>
+      )}
       {pending.ip && (
         <p style={{ margin: '0 0 0.25rem' }}>
           <span style={{ color: '#555' }}>IP:</span> {String(pending.ip)}

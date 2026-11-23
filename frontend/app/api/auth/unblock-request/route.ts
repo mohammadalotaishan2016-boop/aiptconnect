@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '../../../../src/lib/supabase/server';
+import { strictLimiter, getClientIp, rateLimitResponse } from '../../../../src/lib/rate-limit';
+import { createLogger, getRequestId } from '../../../../src/lib/logger';
+import { recordRequest, recordRateLimitHit } from '../../../../src/lib/metrics';
+
+const ROUTE = '/api/auth/unblock-request';
 
 // Always return 200 regardless of outcome — never leak whether an email exists.
 const genericSuccess = () => NextResponse.json({ ok: true });
 
 export async function POST(req: NextRequest) {
+  const log = createLogger({ requestId: getRequestId(req), route: ROUTE });
+  const { limited, retryAfter } = strictLimiter.check(getClientIp(req));
+  if (limited) {
+    recordRateLimitHit(ROUTE);
+    log.warn('rate_limited');
+    return rateLimitResponse(retryAfter);
+  }
+  recordRequest(ROUTE);
+
   try {
     const body = await req.json().catch(() => ({}));
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';

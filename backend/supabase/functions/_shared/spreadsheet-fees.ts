@@ -157,6 +157,14 @@ function normalized(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+/** Extract client-type suffix from sheet names like "Trademark(Chinese)" or "Up to 3 classes(Non Chinese)". */
+function parseSheetClientType(sheetName: string): { base: string; clientType: string | null } {
+  const match = sheetName.match(/^(.+?)\s*\(\s*(Chinese|Non\s*Chinese|Direct)\s*\)\s*$/i);
+  if (!match) return { base: sheetName, clientType: null };
+  const raw = match[2].toLowerCase().replace(/\s+/g, '_');
+  return { base: match[1].trim(), clientType: raw };
+}
+
 function categoryForSheet(value: string): string | null {
   const name = normalized(value);
   if (name === 'trademark') return 'Trademark';
@@ -202,7 +210,7 @@ function validPrice(official: number | undefined, attorney: number | undefined, 
   };
 }
 
-export function parseSpreadsheetPricing(workbook: unknown, countries: Country[], procedures: Procedure[]): SpreadsheetPricing {
+export function parseSpreadsheetPricing(workbook: unknown, countries: Country[], procedures: Procedure[], clientType?: string | null): SpreadsheetPricing {
   if (!workbook || typeof workbook !== 'object' || !('sheets' in workbook) || !Array.isArray(workbook.sheets)) {
     throw new Error('The saved fee workbook is invalid.');
   }
@@ -216,9 +224,13 @@ export function parseSpreadsheetPricing(workbook: unknown, countries: Country[],
 
   for (const sheet of sheets) {
     if (!sheet || typeof sheet.name !== 'string' || !sheet.cells || typeof sheet.cells !== 'object') continue;
+    const { base, clientType: sheetClientType } = parseSheetClientType(sheet.name);
+    // When a clientType is requested, only use tabs for that type.
+    // When no clientType (admin/generic), only use generic tabs (no suffix).
+    if (clientType ? sheetClientType !== clientType : sheetClientType !== null) continue;
     const rows = sheetRows(sheet);
-    const category = categoryForSheet(sheet.name);
-    const classType = classTypeForSheet(sheet.name);
+    const category = categoryForSheet(base);
+    const classType = classTypeForSheet(base);
     if (category) {
       const imported = importSheet(category, rows);
       for (const record of imported.records) {

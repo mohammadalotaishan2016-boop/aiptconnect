@@ -1,1 +1,0 @@
-{"error":"No sheets with data found. Verify sheet tabs exist and contain headers."}

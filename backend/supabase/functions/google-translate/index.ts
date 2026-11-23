@@ -1,4 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createCircuitBreaker } from '../_shared/circuit-breaker.ts';
+
+const translateBreaker = createCircuitBreaker({ name: 'google-translate', failureThreshold: 5, cooldownMs: 60_000, timeoutMs: 10_000 });
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -70,11 +73,11 @@ Deno.serve(async (request) => {
 
     const endpoint = new URL('https://translation.googleapis.com/language/translate/v2');
     endpoint.searchParams.set('key', googleApiKey);
-    const response = await fetch(endpoint, {
+    const response = await translateBreaker.call(() => fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: texts, target, format: 'text' }),
-    });
+    }));
     const result = await response.json().catch(() => ({})) as GoogleTranslationResponse;
     const translations = result.data?.translations;
     if (!response.ok || !Array.isArray(translations) || translations.length !== texts.length ||

@@ -117,6 +117,12 @@ export default function LoginPage() {
           setServerError('Sign-in failed. Please try again.');
           return;
         }
+        // Set the device fingerprint as an httpOnly cookie for middleware validation
+        await fetch('/api/auth/set-device-cookie', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fingerprint: deviceFingerprint }),
+        }).catch(() => undefined);
         const destination = await getRoleDestination(supabase);
         router.push(destination);
         return;
@@ -130,6 +136,10 @@ export default function LoginPage() {
       }
 
       if (response.status === 403) {
+        if (code === 'device_limit_hard') {
+          setModal({ type: 'status', message: 'You have reached your maximum device limit. Please log out from an existing device or contact an administrator.' });
+          return;
+        }
         if (code === 'account_pending') {
           setModal({ type: 'status', message: 'Your account is waiting for administrator approval. Please wait up to 24 hours while we validate your registration.' });
           return;

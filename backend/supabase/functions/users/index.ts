@@ -1,11 +1,17 @@
 ﻿import { createClient } from "npm:@supabase/supabase-js@2";
-import { GetObjectCommand, S3Client } from "https://esm.sh/@aws-sdk/client-s3@3.637.0?target=deno&bundle";
-import { getSignedUrl } from "https://esm.sh/@aws-sdk/s3-request-presigner@3.637.0?target=deno&bundle";
-import { SESv2Client, SendEmailCommand } from "https://esm.sh/@aws-sdk/client-sesv2@3.637.0?target=deno&bundle";
+import { GetObjectCommand, S3Client } from "npm:@aws-sdk/client-s3@3";
+import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner@3";
+import { SESv2Client, SendEmailCommand } from "npm:@aws-sdk/client-sesv2@3";
+import { createCircuitBreaker } from "../_shared/circuit-breaker.ts";
+
+const sesBreaker = createCircuitBreaker({ name: "ses-users", failureThreshold: 3, cooldownMs: 60_000, timeoutMs: 15_000 });
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info", "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-const s3 = new S3Client({ region: Deno.env.get("AWS_REGION") ?? "eu-north-1", credentials: { accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID")!, secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY")! } });
+
+function getS3Client() {
+  return new S3Client({ region: Deno.env.get("AWS_REGION") ?? "eu-north-1", credentials: { accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") ?? "", secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "" } });
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] ?? character));
@@ -19,10 +25,10 @@ async function sendApprovalEmail(email: string, clientName: string, companyName:
   const region = Deno.env.get("AWS_SES_REGION") || Deno.env.get("AWS_REGION") || "eu-north-1";
   const loginUrl = `${(Deno.env.get("APP_URL") || "http://localhost:3000").replace(/\/$/, "")}/login`;
   const ses = new SESv2Client({ region, credentials: { accessKeyId, secretAccessKey } });
-  await ses.send(new SendEmailCommand({ FromEmailAddress: from, Destination: { ToAddresses: [email] }, Content: { Simple: {
+  await sesBreaker.call(() => ses.send(new SendEmailCommand({ FromEmailAddress: from, Destination: { ToAddresses: [email] }, Content: { Simple: {
     Subject: { Data: "Your Client Account Has Been Approved", Charset: "UTF-8" },
     Body: { Html: { Data: `<p>Dear ${escapeHtml(clientName)},</p><p>Congratulations! Your account for <strong>${escapeHtml(companyName)}</strong> has been reviewed and approved.</p><p>Account Email: <strong>${escapeHtml(email)}</strong></p><p><a href='${loginUrl}'>Login to Your Account</a></p>`, Charset: "UTF-8" } },
-  } } }));
+  } } })));
 }
 
 async function authenticate(request: Request) {
@@ -30,8 +36,8 @@ async function authenticate(request: Request) {
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: { user } } = token ? await db.auth.getUser(token) : { data: { user: null } };
   if (!user) return { db, user: null, error: json({ error: "Authentication is required." }, 401) };
-  const { data: profile } = await db.from("profiles").select("role,approval_status,account_status").eq("id", user.id).single();
-  if (profile?.role !== "administrator" || profile.account_status === "inactive" || (profile.approval_status && profile.approval_status !== "approved")) return { db, user: null, error: json({ error: "Administrator access is required." }, 403) };
+  const { data: profile } = await db.from("profiles").select("role,status").eq("id", user.id).single();
+  if (profile?.role !== "administrator" || profile.status !== "active") return { db, user: null, error: json({ error: "Administrator access is required." }, 403) };
   return { db, user, error: null };
 }
 
@@ -98,15 +104,19 @@ Deno.serve(async (request) => {
       }
       const profiles = [];
       for (let offset = 0; ; offset += 1000) {
-        const result = await db.from("profiles").select("id,full_name,company_name,logo_url,role,approval_status,approved_at,approved_by,reviewed_at,reviewed_by,account_status,failed_login_attempts,locked_at,last_login_ip,last_login_at,created_at,client_id,client:clients(id,assigned_id,company_name)").order("id").range(offset, offset + 999);
+        const result = await db.from("profiles").select("id,full_name,company_name,logo_url,role,max_devices,approval_status,approved_at,approved_by,reviewed_at,reviewed_by,account_status,failed_login_attempts,locked_at,last_login_ip,last_login_at,created_at,client_id,client:clients(id,assigned_id,company_name)").order("id").range(offset, offset + 999);
         if (result.error) throw result.error;
         profiles.push(...result.data);
         if (result.data.length < 1000) break;
       }
       const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+      const s3 = getS3Client();
       return json(await Promise.all(authUsers.map(async (user) => {
         const profile = profileMap.get(user.id);
         const logoKey = profile?.logo_url ?? null;
+        const logoUrl = logoKey?.startsWith("logo_company/")
+          ? await getSignedUrl(s3, new GetObjectCommand({ Bucket: Deno.env.get("AWS_S3_BUCKET") ?? "aiptuploaddocument", Key: logoKey }), { expiresIn: 300 }).catch(() => null)
+          : null;
         return {
           id: user.id,
           deletion_supported: true,
@@ -117,9 +127,10 @@ Deno.serve(async (request) => {
           company_name: (Array.isArray(profile?.client) ? profile.client[0]?.company_name : profile?.client?.company_name) ?? profile?.company_name ?? user.user_metadata?.company_name ?? "",
           client_id: profile?.client_id ?? null,
           client_assigned_id: (Array.isArray(profile?.client) ? profile.client[0]?.assigned_id : profile?.client?.assigned_id) ?? null,
-          logo_url: logoKey?.startsWith("logo_company/") ? await getSignedUrl(s3, new GetObjectCommand({ Bucket: Deno.env.get("AWS_S3_BUCKET") ?? "aiptuploaddocument", Key: logoKey }), { expiresIn: 300 }) : null,
+          logo_url: logoUrl,
           ip: profile?.last_login_ip ?? "-",
           role: profile?.role ?? "client",
+          max_devices: profile?.max_devices ?? 1,
           approval_status: profile?.approval_status ?? "pending",
           registration_date: profile?.created_at ?? user.created_at,
           approved_at: profile?.approved_at ?? null,
@@ -164,13 +175,33 @@ Deno.serve(async (request) => {
         return json({ updated: true, user: saved.data, warning: audit.error ? 'Profile saved, but the audit entry could not be saved.' : null });
       }
       if (id === user.id && (body.account_status === 'inactive' || ['pending', 'rejected', 'suspended'].includes(body.approval_status))) return json({ error: 'You cannot revoke your own administrator access.' }, 409);
-      if (Object.keys(body).some((key) => !['approval_status', 'account_status', 'unlock'].includes(key))) return json({ error: 'Unsupported account update.' }, 400);
+      if (id === user.id && (body.role !== undefined || body.max_devices !== undefined)) return json({ error: 'You cannot change your own role or max devices.' }, 409);
+      if (Object.keys(body).some((key) => !['approval_status', 'account_status', 'unlock', 'role', 'max_devices'].includes(key))) return json({ error: 'Unsupported account update.' }, 400);
       const updates: Record<string, unknown> = {};
       let approvedClientId: string | null = null;
+
+      // role / max_devices — fetch before_data for audit
+      let roleMaxBefore: Record<string, unknown> = {};
+      if (body.role !== undefined || body.max_devices !== undefined) {
+        const { data: before } = await db.from('profiles').select('role,max_devices').eq('id', id).maybeSingle();
+        if (before) roleMaxBefore = { role: before.role, max_devices: before.max_devices };
+      }
+      if (body.role !== undefined) {
+        const allowedRoles = ['administrator', 'client', 'sub_administrator'];
+        if (!allowedRoles.includes(String(body.role))) return json({ error: 'Role must be administrator, client, or sub_administrator.' }, 400);
+        updates.role = String(body.role);
+      }
+      if (body.max_devices !== undefined) {
+        const md = Math.round(Number(body.max_devices));
+        if (isNaN(md) || md < 1 || md > 10) return json({ error: 'Max devices must be an integer between 1 and 10.' }, 400);
+        updates.max_devices = md;
+      }
+
       if (body.approval_status === 'approved') {
         approvedClientId = await ensureClientForApprovedUser(db, id, user.id);
         updates.client_id = approvedClientId;
         updates.account_status = 'active';
+        updates.status = 'active';
         updates.approved_at = new Date().toISOString();
         updates.approved_by = user.id;
       }
@@ -178,14 +209,22 @@ Deno.serve(async (request) => {
         updates.approval_status = body.approval_status;
         updates.reviewed_at = new Date().toISOString();
         updates.reviewed_by = user.id;
-        if (body.approval_status === "rejected" || body.approval_status === "suspended") updates.account_status = "inactive";
+        if (body.approval_status === "rejected") { updates.account_status = "inactive"; updates.status = "deactivated"; }
+        if (body.approval_status === "suspended") { updates.account_status = "inactive"; updates.status = "suspended"; }
       }
-      if (body.unlock === true) { updates.locked_at = null; updates.failed_login_attempts = 0; }
-      if (body.account_status === "active" || body.account_status === "inactive") updates.account_status = body.account_status;
+      if (body.unlock === true) { updates.locked_at = null; updates.failed_login_attempts = 0; updates.status = 'active'; }
+      if (body.account_status === "active" || body.account_status === "inactive") {
+        updates.account_status = body.account_status;
+        updates.status = body.account_status === "active" ? "active" : "deactivated";
+      }
       if (!Object.keys(updates).length) return json({ error: 'No valid account changes were supplied.' }, 400);
-      const { data, error: updateError } = await db.from("profiles").update(updates).eq("id", id).select("id,full_name,company_name,logo_url,role,approval_status,approved_at,approved_by,reviewed_at,reviewed_by,account_status,failed_login_attempts,locked_at,last_login_ip,last_login_at,client_id").single();
+      const { data, error: updateError } = await db.from("profiles").update(updates).eq("id", id).select("id,full_name,company_name,logo_url,role,max_devices,approval_status,approved_at,approved_by,reviewed_at,reviewed_by,account_status,failed_login_attempts,locked_at,last_login_ip,last_login_at,client_id").single();
       if (updateError) throw updateError;
-      const auditResult = await db.from("audit_logs").insert({ actor_id: user.id, entity_type: "user_account", entity_id: id, action: "update", before_data: null, after_data: { approval_status: data.approval_status, account_status: data.account_status, client_id: data.client_id } });
+      const auditBefore = Object.keys(roleMaxBefore).length ? roleMaxBefore : null;
+      const auditAfter: Record<string, unknown> = { approval_status: data.approval_status, account_status: data.account_status, client_id: data.client_id };
+      if (body.role !== undefined) auditAfter.role = data.role;
+      if (body.max_devices !== undefined) auditAfter.max_devices = data.max_devices;
+      const auditResult = await db.from("audit_logs").insert({ actor_id: user.id, entity_type: "user_account", entity_id: id, action: "update", before_data: auditBefore, after_data: auditAfter });
       if (auditResult.error) throw auditResult.error;
       let emailDelivered: boolean | null = null;
       if (body.approval_status === "approved" && approvedClientId) {

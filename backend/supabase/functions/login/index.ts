@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { parseUserAgent } from "../_shared/parse-user-agent.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -7,6 +8,13 @@ const cors = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 const MAX_FAILED_ATTEMPTS = 5;
+
+function structuredLog(level: "info" | "warn" | "error", action: string, extra?: Record<string, unknown>) {
+  const entry = { timestamp: new Date().toISOString(), level, action, ...extra };
+  const output = JSON.stringify(entry);
+  if (level === "error") console.error(output);
+  else console.log(output);
+}
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
@@ -22,6 +30,7 @@ Deno.serve(async (request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  const loginStart = Date.now();
   try {
     const body = await request.json();
     const { email, password, device_fingerprint } = body;
@@ -50,7 +59,7 @@ Deno.serve(async (request) => {
 
     const { data: profile } = await admin
       .from("profiles")
-      .select("id,role,status,failed_login_attempts,max_devices")
+      .select("id,role,status,failed_login_attempts,max_devices,client_id")
       .eq("id", authUserId)
       .single();
     const isAdministrator = profile?.role === "administrator";
@@ -58,12 +67,15 @@ Deno.serve(async (request) => {
     switch (profile?.status) {
       case "locked":
         if (!isAdministrator) {
+          structuredLog("warn", "login_blocked", { userId: authUserId, reason: "account_locked", durationMs: Date.now() - loginStart });
           return json({ code: "account_locked", error: "This account is locked after five failed attempts. Use Forgot Password to reset it or contact an administrator.", attempts_remaining: 0 }, 423);
         }
         break;
       case "pending":
+        structuredLog("warn", "login_blocked", { userId: authUserId, reason: "account_pending", durationMs: Date.now() - loginStart });
         return json({ code: "account_pending", error: "Your account is still awaiting administrator approval." }, 403);
       case "suspended":
+        structuredLog("warn", "login_blocked", { userId: authUserId, reason: "account_suspended", durationMs: Date.now() - loginStart });
         return json({ code: "account_suspended", error: "Your account has been suspended. Please contact support." }, 403);
       case "deactivated":
         return json({ code: "account_deactivated", error: "This account is deactivated. Contact an administrator." }, 403);
@@ -91,6 +103,7 @@ Deno.serve(async (request) => {
         status: shouldLock ? "locked" : profile?.status,
         last_login_ip: ip,
       }).eq("id", authUserId);
+      structuredLog("warn", "login_password_failed", { userId: authUserId, attempts, locked: shouldLock, durationMs: Date.now() - loginStart });
       return json({
         code: shouldLock ? "account_locked" : "invalid_credentials",
         error: shouldLock
@@ -110,6 +123,7 @@ Deno.serve(async (request) => {
 
     // ── Device limit check ─────────────────────────────────────────────────────
     const maxDevices: number = profile?.max_devices ?? 1;
+    const parsedUA = parseUserAgent(userAgent);
 
     // Count active devices (excluding the current fingerprint if already registered)
     const { count: activeCount } = await admin
@@ -125,19 +139,37 @@ Deno.serve(async (request) => {
     const foreignActiveCount = (activeCount ?? 0) - Number(fingerprintExists > 0);
 
     if (foreignActiveCount < maxDevices || isAdministrator) {
-      // Under limit — register / refresh this device
+      // Under limit — register / refresh this device and create a device_session
+      let deviceRow: { id: string } | null = null;
       if (fingerprint) {
-        await admin.from("devices").upsert(
+        const { data: upserted } = await admin.from("devices").upsert(
           {
             user_id: authUserId,
+            tenant_id: profile?.client_id ?? null,
             device_id: fingerprint,
             user_agent: userAgent,
             ip,
+            device_name: parsedUA.device_name,
+            device_type: parsedUA.device_type,
+            browser: parsedUA.browser,
+            operating_system: parsedUA.operating_system,
             status: "active",
             last_seen_at: new Date().toISOString(),
           },
           { onConflict: "user_id,device_id", ignoreDuplicates: false },
-        );
+        ).select("id").single();
+        deviceRow = upserted;
+      }
+
+      // Create a device_session linking this device to the auth session
+      if (deviceRow) {
+        await admin.from("device_sessions").insert({
+          device_id: deviceRow.id,
+          user_id: authUserId,
+          auth_session_id: null, // set later by the client via set-device-cookie
+          status: "active",
+          last_active_at: new Date().toISOString(),
+        });
       }
 
       // Sign out the pending passwordVerifier session so it doesn't linger
@@ -145,10 +177,70 @@ Deno.serve(async (request) => {
         await admin.auth.admin.signOut(result.data.session.access_token);
       }
 
+      structuredLog("info", "login_success", { userId: authUserId, fingerprint: fingerprint.slice(0, 8), durationMs: Date.now() - loginStart });
       return json({ ok: true, email: normalizedEmail });
     }
 
-    // ── Over limit — create a login_request ───────────────────────────────────
+    // ── Over limit — apply per-limit policy ───────────────────────────────────
+
+    // Max 2: hard deny — no approval flow
+    if (maxDevices === 2) {
+      if (result.data.session) {
+        await admin.auth.admin.signOut(result.data.session.access_token);
+      }
+      return json({
+        denied: true,
+        code: "device_limit_hard",
+        error: "You have reached your maximum device limit. Please log out from an existing device or contact an administrator.",
+      }, 403);
+    }
+
+    // Max 1 or Max 3+: approval flow
+    // Recovery: if no other active device can approve, allow direct login
+    const { count: otherActiveCount } = await admin
+      .from("devices")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", authUserId)
+      .eq("status", "active")
+      .neq("device_id", fingerprint || "__none__");
+
+    if ((otherActiveCount ?? 0) === 0) {
+      // No active device to approve — allow direct login (recovery path)
+      let deviceRow: { id: string } | null = null;
+      if (fingerprint) {
+        const { data: upserted } = await admin.from("devices").upsert(
+          {
+            user_id: authUserId,
+            tenant_id: profile?.client_id ?? null,
+            device_id: fingerprint,
+            user_agent: userAgent,
+            ip,
+            device_name: parsedUA.device_name,
+            device_type: parsedUA.device_type,
+            browser: parsedUA.browser,
+            operating_system: parsedUA.operating_system,
+            status: "active",
+            last_seen_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,device_id", ignoreDuplicates: false },
+        ).select("id").single();
+        deviceRow = upserted;
+      }
+      if (deviceRow) {
+        await admin.from("device_sessions").insert({
+          device_id: deviceRow.id,
+          user_id: authUserId,
+          status: "active",
+          last_active_at: new Date().toISOString(),
+        });
+      }
+      if (result.data.session) {
+        await admin.auth.admin.signOut(result.data.session.access_token);
+      }
+      structuredLog("info", "login_recovery_success", { userId: authUserId, reason: "no_active_approver", durationMs: Date.now() - loginStart });
+      return json({ ok: true, email: normalizedEmail });
+    }
+
     // Reuse an existing pending request for the same fingerprint (idempotent)
     const existingRequest = fingerprint
       ? await admin
@@ -192,6 +284,10 @@ Deno.serve(async (request) => {
           request_id: loginReq.id,
           user_agent: userAgent,
           ip,
+          device_name: parsedUA.device_name,
+          device_type: parsedUA.device_type,
+          browser: parsedUA.browser,
+          operating_system: parsedUA.operating_system,
           created_at: new Date().toISOString(),
         },
       });
@@ -202,7 +298,8 @@ Deno.serve(async (request) => {
 
     return json({ waiting: true, request_id: loginReq.id });
   } catch (cause) {
-    console.error("Login request failed", cause instanceof Error ? cause.message : "Unknown error");
-    return json({ error: "Unable to complete login verification." }, 500);
+    const msg = cause instanceof Error ? cause.message : "Unknown error";
+    structuredLog("error", "login_error", { error: msg, durationMs: Date.now() - loginStart });
+    return json({ error: msg || "Unable to complete login verification." }, 500);
   }
 });

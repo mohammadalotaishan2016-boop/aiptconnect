@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       audit_logs: {
@@ -138,7 +163,9 @@ export type Database = {
           email: string
           expires_at: string
           id: string
+          invitation_message: string | null
           invited_by: string
+          max_devices: number
           membership_role: string
           revoked_at: string | null
           token_hash: string
@@ -152,7 +179,9 @@ export type Database = {
           email: string
           expires_at: string
           id?: string
+          invitation_message?: string | null
           invited_by: string
+          max_devices?: number
           membership_role?: string
           revoked_at?: string | null
           token_hash: string
@@ -166,7 +195,9 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
+          invitation_message?: string | null
           invited_by?: string
+          max_devices?: number
           membership_role?: string
           revoked_at?: string | null
           token_hash?: string
@@ -348,11 +379,11 @@ export type Database = {
       }
       clients: {
         Row: {
-          address: string
+          address: string | null
           assigned_id: number
-          client_type: string
+          client_type: string | null
           company_name: string
-          country_id: string
+          country_id: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -360,17 +391,17 @@ export type Database = {
           fee_classification_id: string | null
           id: string
           notes: string
-          phone: string
+          phone: string | null
           status: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
-          address: string
+          address?: string | null
           assigned_id?: number
-          client_type: string
+          client_type?: string | null
           company_name: string
-          country_id: string
+          country_id?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -378,17 +409,17 @@ export type Database = {
           fee_classification_id?: string | null
           id?: string
           notes?: string
-          phone: string
+          phone?: string | null
           status?: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
-          address?: string
+          address?: string | null
           assigned_id?: number
-          client_type?: string
+          client_type?: string | null
           company_name?: string
-          country_id?: string
+          country_id?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -396,7 +427,7 @@ export type Database = {
           fee_classification_id?: string | null
           id?: string
           notes?: string
-          phone?: string
+          phone?: string | null
           status?: string
           updated_at?: string
           updated_by?: string | null
@@ -651,14 +682,72 @@ export type Database = {
           },
         ]
       }
+      device_sessions: {
+        Row: {
+          auth_session_id: string | null
+          created_at: string
+          device_id: string
+          id: string
+          last_active_at: string
+          revoked_at: string | null
+          revoked_reason: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth_session_id?: string | null
+          created_at?: string
+          device_id: string
+          id?: string
+          last_active_at?: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth_session_id?: string | null
+          created_at?: string
+          device_id?: string
+          id?: string
+          last_active_at?: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_sessions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       devices: {
         Row: {
+          browser: string | null
           created_at: string
           created_by: string | null
           device_id: string
+          device_name: string | null
+          device_type: string | null
           id: string
           ip: unknown
           last_seen_at: string
+          operating_system: string | null
           revoked_at: string | null
           revoked_reason: string | null
           status: string
@@ -669,12 +758,16 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          browser?: string | null
           created_at?: string
           created_by?: string | null
           device_id: string
+          device_name?: string | null
+          device_type?: string | null
           id?: string
           ip?: unknown
           last_seen_at?: string
+          operating_system?: string | null
           revoked_at?: string | null
           revoked_reason?: string | null
           status?: string
@@ -685,12 +778,16 @@ export type Database = {
           user_id: string
         }
         Update: {
+          browser?: string | null
           created_at?: string
           created_by?: string | null
           device_id?: string
+          device_name?: string | null
+          device_type?: string | null
           id?: string
           ip?: unknown
           last_seen_at?: string
+          operating_system?: string | null
           revoked_at?: string | null
           revoked_reason?: string | null
           status?: string
@@ -1648,6 +1745,7 @@ export type Database = {
       }
       login_requests: {
         Row: {
+          approved_by_device_id: string | null
           created_at: string
           device_fingerprint: string
           expires_at: string
@@ -1661,6 +1759,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          approved_by_device_id?: string | null
           created_at?: string
           device_fingerprint: string
           expires_at?: string
@@ -1674,6 +1773,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          approved_by_device_id?: string | null
           created_at?: string
           device_fingerprint?: string
           expires_at?: string
@@ -2932,6 +3032,71 @@ export type Database = {
           },
         ]
       }
+      user_invitations: {
+        Row: {
+          claimed_by: string | null
+          client_id: string | null
+          consumed_at: string | null
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          id: string
+          invitation_message: string | null
+          invited_by: string
+          max_devices: number
+          revoked_at: string | null
+          role: string
+          token_hash: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          claimed_by?: string | null
+          client_id?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          invitation_message?: string | null
+          invited_by: string
+          max_devices?: number
+          revoked_at?: string | null
+          role: string
+          token_hash: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          claimed_by?: string | null
+          client_id?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          invitation_message?: string | null
+          invited_by?: string
+          max_devices?: number
+          revoked_at?: string | null
+          role?: string
+          token_hash?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_invitations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vat_rates: {
         Row: {
           country_id: string
@@ -3008,6 +3173,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_device_login: {
+        Args: {
+          p_approver_fingerprint: string
+          p_approver_id: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       approve_existing_client_registration: {
         Args: {
           p_administrator_id: string
@@ -3045,6 +3218,22 @@ export type Database = {
         Returns: Json
       }
       find_auth_user_id_by_email: { Args: { p_email: string }; Returns: string }
+      get_tenants_page: {
+        Args: {
+          p_date_from?: string
+          p_date_preset?: string
+          p_date_to?: string
+          p_device_usage?: string
+          p_direction?: string
+          p_invitation?: string
+          p_page?: number
+          p_page_size?: number
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       list_client_permission_targets: {
         Args: { p_page?: number; p_page_size?: number; p_search?: string }
         Returns: {
@@ -3251,6 +3440,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

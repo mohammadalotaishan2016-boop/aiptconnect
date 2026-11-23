@@ -21,20 +21,47 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] ?? character));
 }
 
-async function sendInvitation(clientName: string, email: string, companyName: string, invitationCode: string) {
+async function sendInvitation(opts: {
+  companyName: string;
+  email: string;
+  invitationCode: string;
+  maxDevices: number;
+  expiresAt: string;
+  invitationMessage: string | null;
+}) {
   const region = Deno.env.get("AWS_SES_REGION") || Deno.env.get("AWS_REGION") || "eu-north-1";
   const accessKeyId = Deno.env.get("AWS_SES_ACCESS_KEY_ID") || Deno.env.get("AWS_ACCESS_KEY_ID");
   const secretAccessKey = Deno.env.get("AWS_SES_SECRET_ACCESS_KEY") || Deno.env.get("AWS_SECRET_ACCESS_KEY");
   const from = Deno.env.get("SES_FROM_EMAIL");
   if (!accessKeyId || !secretAccessKey || !from) throw Error("Company invitation email is not configured.");
+  const appUrl = Deno.env.get("APP_URL")?.replace(/\/$/, "");
+  if (!appUrl) throw Error("APP_URL is not configured. Cannot generate invitation link.");
   const ses = new SESv2Client({ region, credentials: { accessKeyId, secretAccessKey } });
-  const safeCompanyName = escapeHtml(companyName);
-  const safeClientName = escapeHtml(clientName);
-  const appUrl = (Deno.env.get("APP_URL") || "http://localhost:3000").replace(/\/$/, "");
-  const invitationUrl = `${appUrl}/join?token=${encodeURIComponent(invitationCode)}`;
-  await ses.send(new SendEmailCommand({ FromEmailAddress: from, Destination: { ToAddresses: [email] }, Content: { Simple: {
-    Subject: { Data: "You Are Invited to Join AIP&T", Charset: "UTF-8" },
-    Body: { Html: { Data: `<h2>You are invited to join AIP&amp;T</h2><p>Dear ${safeClientName},</p><p>An administrator invited the registered client account for <strong>${safeCompanyName}</strong>.</p><p>Registered email: <strong>${escapeHtml(email)}</strong></p><p><a href='${invitationUrl}'>Join Application</a></p><p>Invitation code:</p><p><strong>${invitationCode}</strong></p><p>This invitation expires in 72 hours. Do not forward this email or share the code.</p>`, Charset: "UTF-8" } },
+  const invitationUrl = `${appUrl}/join?token=${encodeURIComponent(opts.invitationCode)}`;
+  const expirationDate = new Date(opts.expiresAt).toLocaleDateString("en-US", {
+    year: "numeric", month: "long", day: "numeric",
+  });
+  const messageLine = opts.invitationMessage
+    ? `<p><strong>Invitation Message:</strong></p><p>${escapeHtml(opts.invitationMessage)}</p>`
+    : "";
+  const registrationUrl = `${appUrl}/register?token=${encodeURIComponent(opts.invitationCode)}`;
+  await ses.send(new SendEmailCommand({ FromEmailAddress: from, Destination: { ToAddresses: [opts.email] }, Content: { Simple: {
+    Subject: { Data: "AIAPAIT – Verify Your Company Invitation", Charset: "UTF-8" },
+    Body: { Html: { Data: `
+<p>Hello,</p>
+<p>You have been invited to join the AIP&amp;T Management System.</p>
+<p><strong>Company:</strong> ${escapeHtml(opts.companyName)}</p>
+<p><strong>Email:</strong> ${escapeHtml(opts.email)}</p>
+<p><strong>Maximum Allowed Devices:</strong> ${opts.maxDevices}</p>
+${messageLine}
+<p><strong>Verify Your Company Invitation:</strong></p>
+<p><a href="${invitationUrl}" style="display:inline-block;padding:12px 24px;background:#17a2b8;color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;">VERIFY COMPANY INVITATION &amp; REGISTER</a></p>
+<p><strong>Registration URL:</strong><br/><a href="${registrationUrl}">${escapeHtml(registrationUrl)}</a></p>
+<p>Please complete your registration by verifying your invitation and setting your password.</p>
+<p>Your account will be activated and associated with your assigned company after successful registration.</p>
+<p><strong>Invitation Expiration:</strong> ${expirationDate}</p>
+<p>Best regards,<br/>Aiapait Administration Team</p>
+    `.trim(), Charset: "UTF-8" } },
   } } }));
 }
 function randomToken() {
@@ -90,7 +117,7 @@ Deno.serve(async (request) => {
       const clients = [];
       for (let offset = 0; ; offset += 500) {
         const { data: batch, error } = await db.from("clients")
-          .select("id,assigned_id,company_name,email,status")
+          .select("id,assigned_id,company_name,email,status,created_at")
           .is("deleted_at", null).order("assigned_id").range(offset, offset + 499);
         if (error) throw error;
         clients.push(...(batch ?? []));
@@ -103,7 +130,7 @@ Deno.serve(async (request) => {
           const validEmail = emailPattern.test(email);
           const [authLookup, linkedProfile, activeInvitation] = await Promise.all([
             validEmail ? db.rpc("find_auth_user_id_by_email", { p_email: email }) : Promise.resolve({ data: null, error: null }),
-            db.from("profiles").select("id").eq("client_id", client.id).limit(1).maybeSingle(),
+            db.from("profiles").select("id,max_devices").eq("client_id", client.id).limit(1).maybeSingle(),
             db.from("client_invitations").select("id,expires_at").eq("client_id", client.id)
               .is("consumed_at", null).is("revoked_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
           ]);
@@ -114,7 +141,7 @@ Deno.serve(async (request) => {
             : client.status !== "Active" ? "inactive"
             : !validEmail ? "invalid_email"
             : "not_invited";
-          return { ...client, email, invitation_status, eligible: invitation_status === "not_invited" };
+          return { ...client, email, invitation_status, eligible: invitation_status === "not_invited", max_devices: linkedProfile.data?.max_devices ?? null };
         }));
         records.push(...batch);
       }
@@ -122,20 +149,40 @@ Deno.serve(async (request) => {
     }
 
     if (action === "create_invitation") {
-      const clientId = String(body.client_id ?? "");
       const isAdministrator = profile?.role === "administrator";
       if (!isAdministrator) return json({ error: "Administrator access is required." }, 403);
-      const { data: client } = await db.from("clients").select("company_name,email,status").eq("id", clientId).is("deleted_at", null).maybeSingle();
-      if (!client) return json({ error: "Client not found." }, 404);
-      if (client.status !== "Active") return json({ error: "Only active companies can receive user invitations." }, 409);
-      const email = String(client.email ?? "").trim().toLowerCase();
-      if (!emailPattern.test(email)) return json({ error: "This client does not have a valid registered email address." }, 409);
+
+      const clientName = String(body.client_name ?? "").trim();
+      const companyName = String(body.company ?? "").trim();
+      const email = String(body.email ?? "").trim().toLowerCase();
+      const maxDevices = Math.min(10, Math.max(1, Number(body.max_devices ?? 1)));
+      const invitationMessage: string | null = body.invitation_message ? String(body.invitation_message).trim() : null;
+
+      if (clientName.length < 2) return json({ error: "Client name must contain at least 2 characters." }, 400);
+      if (companyName.length < 2) return json({ error: "Company name must contain at least 2 characters." }, 400);
+      if (!emailPattern.test(email)) return json({ error: "Provide a valid email address." }, 400);
+
+      // Check client name uniqueness
+      const { data: existingClient } = await db.from("clients").select("id").ilike("company_name", clientName).is("deleted_at", null).maybeSingle();
+      if (existingClient) return json({ error: "A client with this name already exists." }, 409);
+
+      // Check if email already has an account
       const authLookup = await db.rpc("find_auth_user_id_by_email", { p_email: email });
       if (authLookup.error) throw authLookup.error;
-      const linkedProfile = await db.from("profiles").select("id").eq("client_id", clientId).limit(1).maybeSingle();
-      if (linkedProfile.error) throw linkedProfile.error;
-      if (authLookup.data || linkedProfile.data) return json({ code: "account_exists", error: "This client already has an account. No invitation was sent." }, 409);
-      const existingInvitation = await db.from("client_invitations").select("id,expires_at").eq("client_id", clientId).is("consumed_at", null).is("revoked_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (authLookup.data) return json({ code: "account_exists", error: "This email already has an account. No invitation was sent." }, 409);
+
+      // Auto-generate next assigned_id
+      const { data: maxRow } = await db.from("clients").select("assigned_id").order("assigned_id", { ascending: false }).limit(1).maybeSingle();
+      const nextAssignedId = (maxRow?.assigned_id ?? 0) + 1;
+
+      // Create new client record
+      const { data: newClient, error: clientError } = await db.from("clients").insert({
+        assigned_id: nextAssignedId, company_name: clientName, email, status: "Active", notes: "", created_by: user.id,
+      }).select("id,company_name").single();
+      if (clientError) throw clientError;
+
+      // Check for existing active invitation for this new client
+      const existingInvitation = await db.from("client_invitations").select("id,expires_at").eq("client_id", newClient.id).is("consumed_at", null).is("revoked_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (existingInvitation.error) throw existingInvitation.error;
       if (existingInvitation.data && new Date(existingInvitation.data.expires_at) > new Date()) {
         return json({ code: "invitation_exists", error: "This client already has an active invitation." }, 409);
@@ -144,16 +191,18 @@ Deno.serve(async (request) => {
         const revoked = await db.from("client_invitations").update({ revoked_at: new Date().toISOString() }).eq("id", existingInvitation.data.id).is("revoked_at", null);
         if (revoked.error) throw revoked.error;
       }
+
       const invitationCode = randomToken();
-      const { data: invitation, error } = await db.from("client_invitations").insert({
-        client_id: clientId, email, token_hash: await sha256(invitationCode), membership_role: "company_admin",
-        expires_at: new Date(Date.now() + 72 * 60 * 60_000).toISOString(), invited_by: user.id,
+      const expiresAt = new Date(Date.now() + 72 * 60 * 60_000).toISOString();
+      const { data: invitation, error: invError } = await db.from("client_invitations").insert({
+        client_id: newClient.id, email, token_hash: await sha256(invitationCode), membership_role: "company_admin",
+        expires_at: expiresAt, invited_by: user.id, max_devices: maxDevices, invitation_message: invitationMessage,
       }).select("id,expires_at").single();
-      if (error) throw error;
-      try { await sendInvitation(client.company_name, email, client.company_name, invitationCode); } catch (cause) { await db.from("client_invitations").delete().eq("id", invitation.id); throw cause; }
-      const auditResult = await db.from("audit_logs").insert({ actor_id: user.id, entity_type: "client_invitation", entity_id: invitation.id, action: "create", before_data: null, after_data: { client_id: clientId, email, membership_role: "company_admin", expires_at: invitation.expires_at, delivered: true } });
+      if (invError) throw invError;
+      try { await sendInvitation({ companyName: companyName || clientName, email, invitationCode, maxDevices, expiresAt, invitationMessage }); } catch (cause) { await db.from("client_invitations").delete().eq("id", invitation.id); throw cause; }
+      const auditResult = await db.from("audit_logs").insert({ actor_id: user.id, entity_type: "client_invitation", entity_id: invitation.id, action: "create", before_data: null, after_data: { client_id: newClient.id, client_name: clientName, email, membership_role: "company_admin", expires_at: invitation.expires_at, delivered: true } });
       if (auditResult.error) throw auditResult.error;
-      return json({ invitation_id: invitation.id, expires_at: invitation.expires_at, delivered: true }, 201);
+      return json({ invitation_id: invitation.id, client_id: newClient.id, expires_at: invitation.expires_at, delivered: true }, 201);
     }
 
     return json({ error: "Unsupported action." }, 400);

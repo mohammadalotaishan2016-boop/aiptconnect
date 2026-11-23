@@ -1,6 +1,7 @@
 'use client';
 import TablePagination from '../../src/components/TablePagination';
 import ActionIcon from '../../src/components/ActionIcon';
+import TenantFilters, { TenantFilterState, emptyFilters } from '../../src/components/TenantFilters';
 
 
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +9,8 @@ import { getSupabaseBrowserClient } from "../../src/lib/supabase/browser";
 import { createApplicationTimelineReport } from "../../src/lib/application-timeline-report";
 import InviteClientUserModal from "../../src/components/InviteClientUserModal";
 import ClientDataActions from "../../src/components/ClientDataActions";
+import DeviceManagementPanel from "../../src/components/DeviceManagementPanel";
+import { Device, DEVICE_TYPE_ICONS, formatDeviceDate, deviceStatusBadge } from "../../src/lib/device-utils";
 import { BulkClient, collectAllClients, deleteClientBatch } from "../../src/lib/client-bulk-delete";
 
 type Country = {
@@ -24,7 +27,7 @@ type FeeClassification = {
 };
 
 type ClientStatus = "Active" | "Inactive";
-type ClientType = "Corporate" | "Law Firm" | "Consultant" | "Individual";
+type ClientType = "chinese" | "non_chinese" | "direct";
 
 type Client = {
   id: string;
@@ -33,13 +36,25 @@ type Client = {
   fee_classification_id: string | null;
   email: string;
   phone: string;
-  client_type: ClientType;
+  client_type: ClientType | null;
   address: string;
   country_id: string;
   notes: string;
   status: ClientStatus;
+  created_at: string;
   country: Country | null;
   fee_classification: FeeClassification | null;
+  profile_id: string | null;
+  max_devices: number | null;
+  registered_devices: number;
+  invitation_eligibility: string;
+};
+
+type TenantSummary = {
+  total: number;
+  active: number;
+  eligible: number;
+  pending: number;
 };
 
 type Service = {
@@ -90,9 +105,11 @@ type ListResponse<T> = {
   total: number;
   page: number;
   page_size?: number;
+  summary?: TenantSummary;
 };
 
 type ClientDraft = {
+  assigned_id: string;
   company_name: string;
   fee_classification_id: string;
   email: string;
@@ -161,7 +178,12 @@ type MatterTab = "trademark" | "patent" | "design" | "copyright" | "other";
 type ClientModalMode = "add" | "edit" | null;
 type MatterModalMode = "add" | "edit" | "view" | null;
 
-const clientTypes: ClientType[] = ["Corporate", "Law Firm", "Consultant", "Individual"];
+const clientTypes: Array<{ value: ClientType; label: string }> = [
+  { value: "chinese", label: "Chinese" },
+  { value: "non_chinese", label: "Non Chinese" },
+  { value: "direct", label: "Direct" },
+];
+const clientTypeLabel = (value: string | null) => clientTypes.find((item) => item.value === value)?.label ?? "Not assigned";
 const clientStatuses: ClientStatus[] = ["Active", "Inactive"];
 const matterTabs: Array<{ id: MatterTab; label: string }> = [
   { id: "trademark", label: "Trademark" },
@@ -179,11 +201,12 @@ const TIMELINE_MAX_FILE_COUNT = 10;
 const TIMELINE_MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024;
 
 const emptyClientDraft = (): ClientDraft => ({
+  assigned_id: "",
   company_name: "",
   fee_classification_id: "",
   email: "",
   phone: "",
-  client_type: "Corporate",
+  client_type: "chinese",
   address: "",
   country_id: "",
   notes: "",
@@ -223,11 +246,12 @@ const emptyTimelineDraft = (matter: Matter): TimelineDraft => ({
 
 function clientToDraft(client: Client): ClientDraft {
   return {
+    assigned_id: String(client.assigned_id),
     company_name: client.company_name,
     fee_classification_id: client.fee_classification_id ?? "",
     email: client.email,
     phone: client.phone,
-    client_type: client.client_type,
+    client_type: client.client_type ?? "chinese",
     address: client.address,
     country_id: client.country_id,
     notes: client.notes,
@@ -276,8 +300,225 @@ function initials(name: string) {
 
 function formatDate(value: string | null) {
   if (!value) return "-";
-  const date = new Date(`${value}T00:00:00`);
+  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
+const invitationLabels: Record<string, string> = {
+  eligible: "Eligible",
+  account_exists: "Account Exists",
+  invitation_pending: "Pending",
+  invitation_expired: "Expired",
+  invitation_revoked: "Revoked",
+  mismatch: "Mismatch",
+  inactive: "Inactive",
+  invalid_email: "Invalid Email",
+};
+
+function InvitationBadge({ status }: { status: string }) {
+  return <span className={`invitation-badge ${status}`}>{invitationLabels[status] ?? status}</span>;
+}
+
+function MaxDevicesCell({ profileId, value, onSaved }: { profileId: string | null; value: number | null; onSaved: (next: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? 1);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!profileId) return <span className="muted-cell">{value ?? "-"}</span>;
+
+  const save = async () => {
+    if (draft === value) { setEditing(false); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/users/${profileId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ max_devices: draft }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw Error(body.error ?? "Failed to update max devices.");
+      onSaved(draft);
+      setEditing(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Update failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button type="button" className="max-devices-edit" onClick={() => { setDraft(value ?? 1); setEditing(true); setError(""); }} title="Click to edit max devices">
+        {value ?? 1} <span className="max-devices-pencil">&#9998;</span>
+      </button>
+    );
+  }
+
+  return (
+    <span className="max-devices-inline">
+      <select value={draft} onChange={(e) => setDraft(Number(e.target.value))} disabled={saving} autoFocus>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
+      <button type="button" onClick={() => void save()} disabled={saving} className="max-devices-save" title="Save">{saving ? "..." : "Save"}</button>
+      <button type="button" onClick={() => setEditing(false)} disabled={saving} className="max-devices-cancel" title="Cancel">x</button>
+      {error && <span className="max-devices-error" title={error}>!</span>}
+    </span>
+  );
+}
+
+function RegisteredDevicesCell({ profileId, count, onOpenFullPanel, onCountChanged }: {
+  profileId: string | null;
+  count: number;
+  onOpenFullPanel: () => void;
+  onCountChanged: (next: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  if (!profileId) return <span className="reg-devices-trigger-plain">{count}</span>;
+
+  const fetchDevices = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/admin/devices?user_id=${profileId}`);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? 'Failed to load devices.');
+      setDevices(body.devices ?? []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load devices.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const dropW = 400;
+      const dropH = 380;
+      let top = rect.bottom + 4;
+      let left = Math.min(rect.left, window.innerWidth - dropW - 16);
+      if (left < 8) left = 8;
+      if (top + dropH > window.innerHeight) top = Math.max(8, rect.top - dropH - 4);
+      setPos({ top, left });
+    }
+    setOpen(true);
+    void fetchDevices();
+  };
+
+  const revokeDevice = async (deviceDbId: string) => {
+    if (revoking) return;
+    setRevoking(deviceDbId);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: deviceDbId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? 'Failed to revoke device.');
+      await fetchDevices();
+      const activeCount = (await fetch(`/api/admin/devices?user_id=${profileId}`).then(r => r.json())).devices?.filter((d: Device) => d.status === 'active').length ?? 0;
+      onCountChanged(activeCount);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to revoke device.');
+    } finally {
+      setRevoking(null);
+    }
+  };
+
+  /* eslint-disable react-hooks/rules-of-hooks */
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+          triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const handleScroll = () => setOpen(false);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    const scrollEl = document.querySelector('.clients-table-scroll');
+    scrollEl?.addEventListener('scroll', handleScroll);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+      scrollEl?.removeEventListener('scroll', handleScroll);
+    };
+  }, [open]);
+  /* eslint-enable react-hooks/rules-of-hooks */
+
+  const activeDevices = devices.filter(d => d.status === 'active');
+  const revokedDevices = devices.filter(d => d.status === 'revoked');
+
+  return (
+    <>
+      <button type="button" ref={triggerRef} className="reg-devices-trigger" onClick={toggle}>
+        {count}<span className="reg-devices-caret">{open ? '\u25B4' : '\u25BE'}</span>
+      </button>
+      {open && (
+        <div ref={dropdownRef} className="reg-devices-dropdown" style={{ top: pos.top, left: pos.left }}>
+          <div className="reg-devices-header">
+            <b>Registered Devices ({activeDevices.length})</b>
+            <button type="button" onClick={() => setOpen(false)} style={{ border: 0, background: 'none', fontSize: '16px', cursor: 'pointer' }}>✕</button>
+          </div>
+          {error && <div className="reg-devices-error">{error}</div>}
+          {loading && <div className="reg-devices-loading">Loading devices...</div>}
+          {!loading && devices.length === 0 && <div className="reg-devices-empty">No devices registered.</div>}
+          {!loading && activeDevices.map(d => {
+            const badge = deviceStatusBadge(d.status);
+            return (
+              <div key={d.id} className="reg-devices-item">
+                <span className="reg-devices-icon">{DEVICE_TYPE_ICONS[d.device_type ?? 'Unknown'] ?? DEVICE_TYPE_ICONS.Unknown}</span>
+                <div className="reg-devices-info">
+                  <div className="reg-devices-name">{d.device_name || d.device_id.slice(0, 12) + '...'}</div>
+                  <div className="reg-devices-meta">{d.browser || '-'} / {d.operating_system || '-'} &middot; {formatDeviceDate(d.last_seen_at)}</div>
+                </div>
+                <span className="reg-devices-status" style={badge}>{d.status}</span>
+                <button type="button" className="reg-devices-revoke" disabled={revoking === d.id} onClick={() => void revokeDevice(d.id)}>
+                  {revoking === d.id ? '...' : 'Revoke'}
+                </button>
+              </div>
+            );
+          })}
+          {!loading && revokedDevices.length > 0 && (
+            <>
+              <div style={{ color: '#666', fontSize: '12px', fontWeight: 700, padding: '6px 4px 2px', marginTop: '4px' }}>Revoked</div>
+              {revokedDevices.map(d => {
+                const badge = deviceStatusBadge(d.status);
+                return (
+                  <div key={d.id} className="reg-devices-item" style={{ opacity: 0.6 }}>
+                    <span className="reg-devices-icon">{DEVICE_TYPE_ICONS[d.device_type ?? 'Unknown'] ?? DEVICE_TYPE_ICONS.Unknown}</span>
+                    <div className="reg-devices-info">
+                      <div className="reg-devices-name">{d.device_name || d.device_id.slice(0, 12) + '...'}</div>
+                      <div className="reg-devices-meta">{d.browser || '-'} / {d.operating_system || '-'} &middot; {d.revoked_reason || 'Revoked'}</div>
+                    </div>
+                    <span className="reg-devices-status" style={badge}>{d.status}</span>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          <div className="reg-devices-footer">
+            <button type="button" onClick={() => { setOpen(false); onOpenFullPanel(); }}>View All Details</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function formatFileSize(value: number) {
@@ -327,7 +568,7 @@ function MatterImage({ path }: { path: string | null }) {
 }
 
 export default function ClientsPage() {
-  const [CLIENT_PAGE_SIZE,setClientPageSize]=useState(20);
+  const [CLIENT_PAGE_SIZE,setClientPageSize]=useState(10);
   const [MATTER_PAGE_SIZE,setMatterPageSize]=useState(20);
   const [clients, setClients] = useState<Client[]>([]);
   const [clientPage, setClientPage] = useState(1);
@@ -341,7 +582,11 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [notice, setNotice] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [filters, setFilters] = useState<TenantFilterState>(emptyFilters);
+  const [summary, setSummary] = useState<TenantSummary>({ total: 0, active: 0, eligible: 0, pending: 0 });
   const [clientModalMode, setClientModalMode] = useState<ClientModalMode>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [clientDraft, setClientDraft] = useState<ClientDraft>(emptyClientDraft);
@@ -350,6 +595,7 @@ export default function ClientsPage() {
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [devicePanelUserId, setDevicePanelUserId] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkClients, setBulkClients] = useState<BulkClient[]>([]);
   const [bulkPreparing, setBulkPreparing] = useState(false);
@@ -444,6 +690,12 @@ export default function ClientsPage() {
     try {
       const clientParams = new URLSearchParams({ page: String(clientPage), page_size: String(CLIENT_PAGE_SIZE) });
       if (search.trim()) clientParams.set("search", search.trim());
+      if (filters.status) clientParams.set("status", filters.status);
+      if (filters.invitation) clientParams.set("invitation", filters.invitation);
+      if (filters.device_usage) clientParams.set("device_usage", filters.device_usage);
+      if (filters.date_preset) clientParams.set("date_preset", filters.date_preset);
+      if (filters.date_from) clientParams.set("date_from", filters.date_from);
+      if (filters.date_to) clientParams.set("date_to", filters.date_to);
       clientParams.set("sort", clientSort.field);
       clientParams.set("direction", clientSort.direction);
       const [clientResult, countryResult, classificationResult, serviceResult, procedureResult] = await Promise.all([
@@ -455,6 +707,7 @@ export default function ClientsPage() {
       ]);
       setClients(clientResult.data ?? []);
       setClientTotal(clientResult.total ?? 0);
+      if (clientResult.summary) setSummary(clientResult.summary);
       setCountries(countryResult ?? []);
       setClassifications(classificationResult ?? []);
       setServices(serviceResult.data ?? []);
@@ -464,7 +717,7 @@ export default function ClientsPage() {
     } finally {
       setLoading(false);
     }
-  }, [clientPage, clientRefreshKey, clientSort, request, search, CLIENT_PAGE_SIZE]);
+  }, [clientPage, clientRefreshKey, clientSort, request, search, filters, CLIENT_PAGE_SIZE]);
 
   const sortClients = (field: string) => {
     setClientSort((current) => current.field === field
@@ -585,7 +838,9 @@ export default function ClientsPage() {
     setSavingClient(true);
     setClientFormError("");
     try {
-      const payload = { ...clientDraft, fee_classification_id: clientDraft.fee_classification_id || null };
+      const { assigned_id: rawAssignedId, ...restDraft } = clientDraft;
+      const assignedId = rawAssignedId ? Math.floor(Number(rawAssignedId)) : undefined;
+      const payload = { ...restDraft, fee_classification_id: restDraft.fee_classification_id || null, ...(assignedId && assignedId > 0 ? { assigned_id: assignedId } : {}) };
       const saved = await request<Client>("clients", clientModalMode === "edit" && editingClient ? `/${editingClient.id}` : "", {
         method: clientModalMode === "edit" ? "PUT" : "POST",
         body: JSON.stringify(payload),
@@ -914,7 +1169,7 @@ export default function ClientsPage() {
     setTimelineReportError("");
     try {
       const { bytes, fileName } = await createApplicationTimelineReport({
-        client,
+        client: { ...client, client_type: client.client_type ?? "Not assigned" },
         application: matter,
         timeline: entries,
         generatedAt: new Date(),
@@ -952,36 +1207,54 @@ export default function ClientsPage() {
         {notice && <div className="client-notice" role="status">{notice}<button type="button" aria-label="Dismiss notification" onClick={() => setNotice("")}>x</button></div>}
         {pageError && <div className="client-page-error" role="alert">{pageError}<button type="button" onClick={() => void loadPageData()}>Retry</button></div>}
 
+        <div className="tenant-summary-cards">
+          <div className="summary-card"><span className="summary-value">{summary.total}</span><span className="summary-label">Total Tenants</span></div>
+          <div className="summary-card active"><span className="summary-value">{summary.active}</span><span className="summary-label">Active</span></div>
+          <div className="summary-card eligible"><span className="summary-value">{summary.eligible}</span><span className="summary-label">Eligible for Invitation</span></div>
+          <div className="summary-card pending"><span className="summary-value">{summary.pending}</span><span className="summary-label">Pending Invitations</span></div>
+        </div>
+
         <section className="clients-table-card">
           <header>
-            <div><h2>Tenants Table Data</h2><p>{loading ? "Loading client records..." : `${clientTotal} total client${clientTotal === 1 ? "" : "s"}`}</p></div>
-            <label className="table-tools"><span aria-hidden="true">Search</span><input value={search} onChange={(event) => { setSearch(event.target.value); setClientPage(1); }} placeholder="Search clients..." /></label>
+            <div><h2>Tenants Table Data</h2><p>{loading ? "Loading client records..." : `${clientTotal} total tenant${clientTotal === 1 ? "" : "s"}`}</p></div>
+            <label className="table-tools"><span aria-hidden="true">Search</span><input value={searchInput} onChange={(event) => { const v = event.target.value; setSearchInput(v); clearTimeout(searchTimer.current); searchTimer.current = setTimeout(() => { setSearch(v); setClientPage(1); }, 300); }} placeholder="Search by Client ID, Company Name, or Email..." />{searchInput && <button type="button" className="search-clear" onClick={() => { setSearchInput(""); setSearch(""); setClientPage(1); }} aria-label="Clear search">x</button>}</label>
           </header>
+          <TenantFilters filters={filters} onChange={(next) => { setFilters(next); setClientPage(1); }} onReset={() => { setFilters(emptyFilters); setClientPage(1); }} loading={loading} />
           <div className="clients-table-scroll">
-            <table className="clients-table">
-              <thead><tr><th><button type="button" className="table-sort" onClick={() => sortClients("assigned_id")} aria-label={`Sort by Assigned ID${clientSortLabel("assigned_id")}`}>Assigned ID {clientSort.field === "assigned_id" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th><th><button type="button" className="table-sort" onClick={() => sortClients("company_name")} aria-label={`Sort by Company Name${clientSortLabel("company_name")}`}>Company Name {clientSort.field === "company_name" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th><th>Classification of Fees</th><th><button type="button" className="table-sort" onClick={() => sortClients("email")} aria-label={`Sort by Email${clientSortLabel("email")}`}>Email {clientSort.field === "email" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th><th>Phone</th><th><button type="button" className="table-sort" onClick={() => sortClients("client_type")} aria-label={`Sort by Type${clientSortLabel("client_type")}`}>Type {clientSort.field === "client_type" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th><th>Address</th><th>Country</th><th>Notes</th><th><button type="button" className="table-sort" onClick={() => sortClients("status")} aria-label={`Sort by Status${clientSortLabel("status")}`}>Status {clientSort.field === "status" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th><th>Actions</th></tr></thead>
+            <table className="clients-table tenant-table">
+              <thead><tr>
+                <th><button type="button" className="table-sort" onClick={() => sortClients("assigned_id")} aria-label={`Sort by Client ID${clientSortLabel("assigned_id")}`}>Client ID {clientSort.field === "assigned_id" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th>
+                <th><button type="button" className="table-sort" onClick={() => sortClients("company_name")} aria-label={`Sort by Company${clientSortLabel("company_name")}`}>Company {clientSort.field === "company_name" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th>
+                <th><button type="button" className="table-sort" onClick={() => sortClients("email")} aria-label={`Sort by Registered Email${clientSortLabel("email")}`}>Registered Email {clientSort.field === "email" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th>
+                <th><button type="button" className="table-sort" onClick={() => sortClients("created_at")} aria-label={`Sort by Date Registered${clientSortLabel("created_at")}`}>Date Registered {clientSort.field === "created_at" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th>
+                <th><button type="button" className="table-sort" onClick={() => sortClients("max_devices")} aria-label={`Sort by Max Devices${clientSortLabel("max_devices")}`}>Max Devices {clientSort.field === "max_devices" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th>
+                <th><button type="button" className="table-sort" onClick={() => sortClients("registered_devices")} aria-label={`Sort by Registered Devices${clientSortLabel("registered_devices")}`}>Registered Devices {clientSort.field === "registered_devices" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th>
+                <th><button type="button" className="table-sort" onClick={() => sortClients("status")} aria-label={`Sort by Status${clientSortLabel("status")}`}>Status {clientSort.field === "status" ? (clientSort.direction === "asc" ? "^" : "v") : ""}</button></th>
+                <th>Invitation Eligibility</th>
+                <th>Actions</th>
+              </tr></thead>
               <tbody>
-                {loading ? <tr><td colSpan={11} className="client-table-state">Loading clients...</td></tr> : clients.length ? clients.map((client) => (
+                {loading ? <tr><td colSpan={9} className="client-table-state">Loading tenants...</td></tr> : clients.length ? clients.map((client) => (
                   <tr key={client.id}>
                     <td className="assigned-id">{client.assigned_id}</td>
                     <td><button type="button" className="client-name-button" onClick={() => void openRelatedData(client)}><span className="client-initials">{initials(client.company_name)}</span>{client.company_name}</button></td>
-                    <td>{client.fee_classification ? <span className="fee-pill" style={{ "--fee-color": client.fee_classification.color_indication } as React.CSSProperties}>{client.fee_classification.description}</span> : <span className="muted-cell">Not assigned</span>}</td>
                     <td>{client.email}</td>
-                    <td>{client.phone}</td>
-                    <td><span className={`client-type ${client.client_type.toLowerCase().replace(/\s+/g, "-")}`}>{client.client_type}</span></td>
-                    <td className="address-cell">{client.address}</td>
-                    <td><span className="country-cell"><CountryFlag country={client.country} compact />{client.country?.name ?? "-"}</span></td>
-                    <td className="notes-cell">{client.notes || "-"}</td>
+                    <td>{formatDate(client.created_at)}</td>
+                    <td><MaxDevicesCell profileId={client.profile_id} value={client.max_devices} onSaved={(next) => setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, max_devices: next } : c))} /></td>
+                    <td><RegisteredDevicesCell profileId={client.profile_id} count={client.registered_devices ?? 0} onOpenFullPanel={() => client.profile_id && setDevicePanelUserId(client.profile_id)} onCountChanged={(next) => setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, registered_devices: next } : c))} /></td>
                     <td><StatusBadge status={client.status} /></td>
+                    <td><InvitationBadge status={client.invitation_eligibility} /></td>
                     <td><div className="client-row-actions"><button type="button" onClick={() => void openRelatedData(client)} data-action="view" data-icon-only="true" title="View"><ActionIcon name="view" /><span className="aipt-action-label">View</span></button><button type="button" onClick={() => openClientModal("edit", client)} data-action="edit" data-icon-only="true" title="Edit"><ActionIcon name="edit" /><span className="aipt-action-label">Edit</span></button><button type="button" className="danger" onClick={() => { setDeleteError(""); setDeletingClient(client); }} disabled={deleting} data-action="delete" aria-label={`Delete ${client.company_name}`} title="Delete Client"><ActionIcon name="delete" /><span className="aipt-action-label">Delete</span></button></div></td>
                   </tr>
-                )) : <tr><td colSpan={11} className="client-table-state">No clients match your search.</td></tr>}
+                )) : <tr><td colSpan={9} className="client-table-state">No tenants match your search and filters.</td></tr>}
               </tbody>
             </table>
           </div>
-          <TablePagination page={clientPage} pageSize={CLIENT_PAGE_SIZE} total={clientTotal} onPageChange={setClientPage} onPageSizeChange={setClientPageSize} loading={loading} />
+          <TablePagination page={clientPage} pageSize={CLIENT_PAGE_SIZE} total={clientTotal} onPageChange={setClientPage} onPageSizeChange={setClientPageSize} loading={loading} pageSizeOptions={[10, 25, 50, 100]} />
         </section>
       </section>
+
+      {devicePanelUserId && <DeviceManagementPanel userId={devicePanelUserId} onClose={() => setDevicePanelUserId(null)} canRevoke />}
 
       {inviteClientUserOpen && <InviteClientUserModal onClose={() => setInviteClientUserOpen(false)} onSent={setNotice} />}
 
@@ -1107,10 +1380,10 @@ function ClientEditor({ mode, client, draft, countries, classifications, pending
   return <Modal className="client-editor-modal"><form className="client-form" onSubmit={onSave}>
     <header className="client-modal-heading"><div><span className="modal-kicker">Tenant RECORD</span><h2>{mode === "add" ? "Add New Client" : "Edit Client"}</h2><p>{mode === "add" ? "Create an accurate client profile before adding applications." : "Update this client profile and keep the related applications intact."}</p></div><button type="button" className="modal-close" onClick={onClose} aria-label="Close">x</button></header>
     <section className="client-form-section"><h3>Client identity</h3><div className="client-form-grid">
-      <FormField label="Assigned ID"><input value={client ? String(client.assigned_id) : "Generated automatically"} readOnly aria-readonly="true" /></FormField>
+      <FormField label="Assigned ID"><input type="number" min="1" value={draft.assigned_id} onChange={(event) => update("assigned_id", event.target.value)} placeholder={mode === "add" ? "Auto-generated if empty" : ""} /></FormField>
       <FormField label="Company Name" required><input autoFocus value={draft.company_name} onChange={(event) => update("company_name", event.target.value)} maxLength={255} required /></FormField>
       <FormField label="Classification of Fees"><select value={draft.fee_classification_id} onChange={(event) => update("fee_classification_id", event.target.value)}><option value="">Not assigned</option>{classifications.map((item) => <option key={item.id} value={item.id}>{item.description}</option>)}</select></FormField>
-      <FormField label="Type" required><select value={draft.client_type} onChange={(event) => update("client_type", event.target.value as ClientType)}>{clientTypes.map((item) => <option key={item}>{item}</option>)}</select></FormField>
+      <FormField label="Type" required><select value={draft.client_type} onChange={(event) => update("client_type", event.target.value as ClientType)}>{clientTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></FormField>
     </div></section>
     <section className="client-form-section"><h3>Contact and location</h3><div className="client-form-grid">
       <FormField label="Email" required><input type="email" value={draft.email} onChange={(event) => update("email", event.target.value)} maxLength={320} required /></FormField>

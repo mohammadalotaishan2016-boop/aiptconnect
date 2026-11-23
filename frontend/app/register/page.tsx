@@ -46,7 +46,7 @@ function DialCodePicker({ value, onChange }: { value: string; onChange: (code: s
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return COUNTRIES.filter((c) => c.dialCode.includes(q) || c.name.toLowerCase().includes(q)).slice(0, 60);
+    return COUNTRIES.filter((c) => c.dialCode.includes(q) || c.name.toLowerCase().includes(q));
   }, [search]);
 
   const selected = COUNTRIES.find((c) => c.dialCode === value) ?? COUNTRIES[0];
@@ -111,7 +111,7 @@ function CountrySelect({ value, onChange }: { value: string; onChange: (iso2: st
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return COUNTRIES.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 60);
+    return COUNTRIES.filter((c) => c.name.toLowerCase().includes(q));
   }, [search]);
 
   const selected = COUNTRIES.find((c) => c.iso2 === value);
