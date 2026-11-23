@@ -18,3 +18,7 @@ frontend/.next/
 
 # Next.js development output
 frontend/.next-dev/
+
+# Next.js build output and cache
+frontend/.next-build/
+
