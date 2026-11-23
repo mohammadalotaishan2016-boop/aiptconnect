@@ -2,7 +2,10 @@
 importtant/*.json
 importtant/*.csv
 backend/.env
+backend/.env.*
+!backend/.env.example
 frontend/.env.local
+frontend/.env*.local
 
 # Local dependencies and generated output
 node_modules/
