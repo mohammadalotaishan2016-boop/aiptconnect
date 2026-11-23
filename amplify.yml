@@ -6,6 +6,9 @@ applications:
       phases:
         preBuild:
           commands:
+            - nvm use 22
+            - node --version
+            - npm --version
             - npm ci
         build:
           commands:
