@@ -534,139 +534,6 @@ function AdminDeleteSheetModal({
 }
 
 
-/* ── Pricing Sheet (structured fee table, 3 client types × 7 items) ── */
-
-type PricingClientType = 'chinese' | 'non_chinese' | 'direct';
-const PRICING_CLIENT_TYPES: PricingClientType[] = ['chinese', 'non_chinese', 'direct'];
-const PRICING_TYPE_LABELS: Record<PricingClientType, string> = { chinese: 'Chinese', non_chinese: 'Non Chinese', direct: 'Direct' };
-const PRICING_ITEM_KEYS = ['trademark', 'patent', 'design', 'copyright', 'up_to_3_classes', 'up_to_5_classes', 'multi_classes'] as const;
-const PRICING_ITEM_LABELS: Record<string, string> = {
-  trademark: 'Trademark', patent: 'Patent', design: 'Design', copyright: 'Copyright',
-  up_to_3_classes: 'Up to 3 classes', up_to_5_classes: 'Up to 5 classes', multi_classes: 'Multi-classes',
-};
-
-interface PricingRow {
-  id: string;
-  client_type: PricingClientType;
-  item_key: string;
-  official_fee: number;
-  attorney_fee: number;
-  total_fee: number;
-  currency: string;
-}
-
-function PricingSheet() {
-  const [rows, setRows] = useState<PricingRow[]>([]);
-  const [activeTab, setActiveTab] = useState<PricingClientType>('chinese');
-  const [dirty, setDirty] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [notification, setNotification] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  const loadRows = useCallback(async () => {
-    try {
-      const response = await fetchSupabaseFunction('pricing-sheet');
-      if (!response.ok) throw new Error('Failed to load pricing data.');
-      const data: PricingRow[] = await response.json();
-      setRows(data);
-      setError('');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to load pricing data.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void loadRows(); }, [loadRows]);
-
-  const tabRows = useMemo(
-    () => rows.filter((r) => r.client_type === activeTab).sort((a, b) => PRICING_ITEM_KEYS.indexOf(a.item_key as typeof PRICING_ITEM_KEYS[number]) - PRICING_ITEM_KEYS.indexOf(b.item_key as typeof PRICING_ITEM_KEYS[number])),
-    [rows, activeTab],
-  );
-
-  const updateField = (id: string, field: 'official_fee' | 'attorney_fee', raw: string) => {
-    const value = raw === '' ? 0 : Number(raw);
-    if (!Number.isFinite(value) || value < 0) return;
-    setRows((prev) => prev.map((r) => {
-      if (r.id !== id) return r;
-      const updated = { ...r, [field]: value };
-      updated.total_fee = Math.round((updated.official_fee + updated.attorney_fee) * 100) / 100;
-      return updated;
-    }));
-    setDirty((prev) => new Set(prev).add(id));
-  };
-
-  const save = async () => {
-    if (!dirty.size) return;
-    setSaving(true);
-    setError('');
-    try {
-      const dirtyRows = rows.filter((r) => dirty.has(r.id)).map(({ id, official_fee, attorney_fee, total_fee }) => ({ id, official_fee, attorney_fee, total_fee }));
-      const response = await fetchSupabaseFunction('pricing-sheet?batch=true', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: dirtyRows }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || 'Save failed.');
-      }
-      setDirty(new Set());
-      setNotification('Pricing saved successfully.');
-      setTimeout(() => setNotification(''), 3000);
-      void loadRows();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Save failed.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) return <section className="pricing-sheet-section"><p>Loading pricing data…</p></section>;
-
-  return (
-    <section className="pricing-sheet-section">
-      <div className="pricing-sheet-header">
-        <div>
-          <h2>Official &amp; Attorney Fees</h2>
-          <p>Structured fee schedule grouped by client type</p>
-        </div>
-        <div className="pricing-sheet-actions">
-          <button type="button" className="pricing-sheet-save" onClick={() => void save()} disabled={!dirty.size || saving}>
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-      {notification && <div className="pricing-sheet-notification" role="status">{notification}</div>}
-      {error && <div className="pricing-sheet-error" role="alert">{error}</div>}
-      <div className="pricing-sheet-tabs" role="tablist" aria-label="Client type tabs">
-        {PRICING_CLIENT_TYPES.map((ct) => (
-          <button key={ct} type="button" role="tab" aria-selected={ct === activeTab} className={ct === activeTab ? 'is-active' : ''} onClick={() => setActiveTab(ct)}>
-            {PRICING_TYPE_LABELS[ct]}
-          </button>
-        ))}
-      </div>
-      <table className="pricing-sheet-table">
-        <thead>
-          <tr><th>Item</th><th>Official Fee</th><th>Attorney Fee</th><th>Total Fee</th></tr>
-        </thead>
-        <tbody>
-          {tabRows.map((row) => (
-            <tr key={row.id}>
-              <td className="pricing-item-label">{PRICING_ITEM_LABELS[row.item_key] ?? row.item_key}</td>
-              <td><input type="text" inputMode="decimal" value={row.official_fee} onChange={(e) => updateField(row.id, 'official_fee', e.target.value)} aria-label={`${PRICING_ITEM_LABELS[row.item_key]} official fee`} /></td>
-              <td><input type="text" inputMode="decimal" value={row.attorney_fee} onChange={(e) => updateField(row.id, 'attorney_fee', e.target.value)} aria-label={`${PRICING_ITEM_LABELS[row.item_key]} attorney fee`} /></td>
-              <td className="pricing-total-cell">{row.total_fee.toFixed(2)}</td>
-            </tr>
-          ))}
-          {tabRows.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: '#728399', padding: '16px' }}>No pricing data for this client type.</td></tr>}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
 export default function SpreadsheetPage() {
   const [workbook, setWorkbook] = useState<WorkbookState>(createWorkbook);
   const [activeGroup, setActiveGroup] = useState<ClientGroup>('Chinese');
@@ -1223,14 +1090,17 @@ export default function SpreadsheetPage() {
 
   return (
     <main className="spreadsheet-page">
-      <div className="spreadsheet-title"><span className="spreadsheet-title-icon">▦</span><div><h1>Country-Level Fee Workbook</h1><p>Shared administrator fee workbook · autosaved to Supabase</p></div><span className={`spreadsheet-local-status is-${saveStatus}`} role={saveStatus === 'error' ? 'alert' : 'status'}>● {message || (saveStatus === 'saving' ? 'Saving to database…' : saveStatus === 'error' ? 'Database save failed' : 'Saved to database')}</span></div>
+      <div className="spreadsheet-title">
+        <span className="spreadsheet-title-icon">▦</span>
+        <div>
+          <h1>Country-Level Fee Workbook</h1>
+          <p>Shared administrator fee workbook · autosaved to Supabase</p></div><span className={`spreadsheet-local-status is-${saveStatus}`} role={saveStatus === 'error' ? 'alert' : 'status'}>● {message || (saveStatus === 'saving' ? 'Saving to database…' : saveStatus === 'error' ? 'Database save failed' : 'Saved to database')}</span></div>
       {saveStatus === 'saving' && <div className="spreadsheet-upload-progress" role="progressbar" aria-label="Saving workbook to Supabase" aria-valuetext="Save in progress"><span /></div>}
       {saveNotification && <div className="spreadsheet-save-notification" role="status">{saveNotification}</div>}
       {saveStatus === 'error' && <div className="spreadsheet-save-error" role="alert"><span>{isSaveTimeout ? 'Supabase timed out while saving. The result may be uncertain; retrying the same workbook is safe and will not create a duplicate version.' : saveError}</span><button type="button" onClick={() => {
         if (saveError.toLowerCase().includes('changed in another session')) setLoadAttempt((attempt) => attempt + 1);
         else setSaveAttempt((attempt) => attempt + 1);
       }}>{saveError.toLowerCase().includes('changed in another session') ? 'Reload shared workbook' : isSaveTimeout ? 'Retry save safely' : 'Retry save'}</button></div>}
-      <PricingSheet />
       <SpreadsheetToolbar onUndo={undo} onRedo={redo} onImport={() => importInput.current?.click()} onExport={() => void exportWorkbook()} onSave={updateDatabase} isSaving={saveStatus === 'saving'} canUndo={history.undo.length > 0} canRedo={history.redo.length > 0} search={search} setSearch={setSearch} />
       <input ref={importInput} className="spreadsheet-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => void importWorkbook(event)} />
       <div className="spreadsheet-formatting-toolbar">
