@@ -14,12 +14,12 @@ const ClientAutoTranslator = dynamic(() => import('./ClientAutoTranslator'), { s
 
 const ClientIdentity = createContext({ name: 'Client', email: '' });
 export const useClientIdentity = () => useContext(ClientIdentity);
-type ClientShellText = { welcome: string; back: string; controls: string; checking: string; denied: string; rights: string; service: string; logout: string; update: string; password: string };
+type ClientShellText = { welcome: string; back: string; controls: string; checking: string; denied: string; rights: string; service: string; customerService: string; logout: string; update: string; password: string };
 const shellTranslations: Record<DashboardLanguage, ClientShellText> = {
-  en: { welcome: 'Welcome,', back: 'Back to dashboard', controls: 'Dashboard controls', checking: 'Checking client access...', denied: 'Client access is required.', rights: 'Â© AIP&T. All rights reserved.', service: 'Intellectual Property Services', logout: 'Logout', update: 'Update client information', password: 'Update password' },
-  ar: { welcome: 'Ù…Ø±Ø­Ø¨Ø§Ù‹ØŒ', back: 'Ø§Ù„Ø¹ÙˆØ¯Ø© Ø¥Ù„Ù‰ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…', controls: 'Ø¹Ù†Ø§ØµØ± Ø§Ù„ØªØ­ÙƒÙ… ÙÙŠ Ù„ÙˆØ­Ø© Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª', checking: 'Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† ÙˆØµÙˆÙ„ Ø§Ù„Ø¹Ù…ÙŠÙ„...', denied: 'ÙŠÙ„Ø²Ù… Ø§Ù„ÙˆØµÙˆÙ„ ÙƒØ¹Ù…ÙŠÙ„.', rights: 'Â© AIP&T. Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø­Ù‚ÙˆÙ‚ Ù…Ø­ÙÙˆØ¸Ø©.', service: 'Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ù…Ù„ÙƒÙŠØ© Ø§Ù„ÙÙƒØ±ÙŠØ©', logout: 'ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬', update: 'ØªØ­Ø¯ÙŠØ« Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„', password: 'ØªØ­Ø¯ÙŠØ« ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±' },
-  fil: { welcome: 'Maligayang pagdating,', back: 'Bumalik sa dashboard', controls: 'Mga kontrol ng dashboard', checking: 'Sinusuri ang access ng kliyente...', denied: 'Kinakailangan ang access ng kliyente.', rights: 'Â© AIP&T. Nakalaan ang lahat ng karapatan.', service: 'Mga Serbisyo sa Intelektuwal na Ari-arian', logout: 'Mag-log out', update: 'I-update ang impormasyon ng kliyente', password: 'I-update ang password' },
-  zh: { welcome: 'æ¬¢è¿Žï¼Œ', back: 'è¿”å›žä»ªè¡¨æ¿', controls: 'ä»ªè¡¨æ¿æŽ§åˆ¶', checking: 'æ­£åœ¨æ£€æŸ¥å®¢æˆ·è®¿é—®æƒé™...', denied: 'éœ€è¦å®¢æˆ·è®¿é—®æƒé™ã€‚', rights: 'Â© AIP&T. ä¿ç•™æ‰€æœ‰æƒåˆ©ã€‚', service: 'çŸ¥è¯†äº§æƒæœåŠ¡', logout: 'é€€å‡ºç™»å½•', update: 'æ›´æ–°å®¢æˆ·ä¿¡æ¯', password: 'æ›´æ–°å¯†ç ' },
+  en: { welcome: 'Welcome,', back: 'Back to dashboard', controls: 'Dashboard controls', checking: 'Checking client access...', denied: 'Client access is required.', rights: 'Â© AIP&T. All rights reserved.', service: 'Intellectual Property Services', customerService: 'Customer Service', logout: 'Logout', update: 'Update client information', password: 'Update password' },
+  ar: { welcome: 'Ù…Ø±Ø­Ø¨Ø§Ù‹ØŒ', back: 'Ø§Ù„Ø¹ÙˆØ¯Ø© Ø¥Ù„Ù‰ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…', controls: 'Ø¹Ù†Ø§ØµØ± Ø§Ù„ØªØ­ÙƒÙ… ÙÙŠ Ù„ÙˆØ­Ø© Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª', checking: 'Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† ÙˆØµÙˆÙ„ Ø§Ù„Ø¹Ù…ÙŠÙ„...', denied: 'ÙŠÙ„Ø²Ù… Ø§Ù„ÙˆØµÙˆÙ„ ÙƒØ¹Ù…ÙŠÙ„.', rights: 'Â© AIP&T. Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø­Ù‚ÙˆÙ‚ Ù…Ø­ÙÙˆØ¸Ø©.', service: 'Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ù…Ù„ÙƒÙŠØ© Ø§Ù„ÙÙƒØ±ÙŠØ©', customerService: 'خدمة العملاء', logout: 'ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬', update: 'ØªØ­Ø¯ÙŠØ« Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„', password: 'ØªØ­Ø¯ÙŠØ« ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±' },
+  fil: { welcome: 'Maligayang pagdating,', back: 'Bumalik sa dashboard', controls: 'Mga kontrol ng dashboard', checking: 'Sinusuri ang access ng kliyente...', denied: 'Kinakailangan ang access ng kliyente.', rights: 'Â© AIP&T. Nakalaan ang lahat ng karapatan.', service: 'Mga Serbisyo sa Intelektuwal na Ari-arian', customerService: 'Serbisyo sa Customer', logout: 'Mag-log out', update: 'I-update ang impormasyon ng kliyente', password: 'I-update ang password' },
+  zh: { welcome: 'æ¬¢è¿Žï¼Œ', back: 'è¿”å›žä»ªè¡¨æ¿', controls: 'ä»ªè¡¨æ¿æŽ§åˆ¶', checking: 'æ­£åœ¨æ£€æŸ¥å®¢æˆ·è®¿é—®æƒé™...', denied: 'éœ€è¦å®¢æˆ·è®¿é—®æƒé™ã€‚', rights: 'Â© AIP&T. ä¿ç•™æ‰€æœ‰æƒåˆ©ã€‚', service: 'çŸ¥è¯†äº§æƒæœåŠ¡', customerService: '客户服务', logout: 'é€€å‡ºç™»å½•', update: 'æ›´æ–°å®¢æˆ·ä¿¡æ¯', password: 'æ›´æ–°å¯†ç ' },
 };
 const readableDashboardRoutes: Record<string, string> = {
   '/client-dashboard/schedule-of-fees': 'schedule-of-fees',
@@ -29,7 +29,7 @@ const readableDashboardRoutes: Record<string, string> = {
   '/client-dashboard/poa': 'poa',
   '/client-dashboard/projects': 'projects',
   '/client-dashboard/notifications': 'notifications',
-  '/client-dashboard/customer-service': 'customer-service',
+  '/client-dashboard/doa': 'doa',
 };
 type CardRouteGate = { pathname: string; state: 'checking' | 'allowed' | 'blocked' };
 
@@ -40,7 +40,10 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   const [name, setName] = useState('Client');
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
-  const [accessState, setAccessState] = useState<'checking' | 'allowed' | 'denied'>('checking');
+  const [accessState, setAccessState] = useState<'checking' | 'allowed' | 'denied'>(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('aipt-client-access-ok') === '1') return 'allowed';
+    return 'checking';
+  });
   const [language, setLanguage] = useState<DashboardLanguage>('en');
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [cardRouteGate, setCardRouteGate] = useState<CardRouteGate>({ pathname: '', state: 'checking' });
@@ -61,11 +64,13 @@ export default function ClientShell({ children }: { children: React.ReactNode })
       const status = String(profile?.status || '').toLowerCase();
       if (role !== 'client' || status !== 'active' || !profile?.client_id || !authenticatedEmail || linkedEmail !== authenticatedEmail) {
         setAccessState('denied');
+        window.sessionStorage.removeItem('aipt-client-access-ok');
         await supabase.auth.signOut();
         window.sessionStorage.setItem('aipt-auth-message', 'This account is not approved or its registered client email is not correctly linked.');
         router.replace('/login');
         return;
       }
+      window.sessionStorage.setItem('aipt-client-access-ok', '1');
       setAccessState('allowed');
     });
   }, [router]);
@@ -148,6 +153,10 @@ export default function ClientShell({ children }: { children: React.ReactNode })
         <h1 className="client-home-welcome" dir={language === 'ar' ? 'rtl' : 'ltr'}><span>{shellText.welcome}</span><strong>{name}</strong></h1>
         <div className="client-home-account">
           <ClientDashboardLanguageSelector />
+          <Link href="/client-dashboard/customer-service" className="client-home-service-btn" aria-label={shellText.customerService}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" /></svg>
+            <span>{shellText.customerService}</span>
+          </Link>
           <span className="client-home-header-divider" aria-hidden="true" />
           <AccountMenu
             name={name}

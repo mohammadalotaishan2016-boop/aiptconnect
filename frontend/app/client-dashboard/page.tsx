@@ -11,7 +11,7 @@ const destinations: { key: string; label: string; href: string }[] = [
   { key: 'poa', label: 'POA', href: '/client-dashboard/poa' },
   { key: 'projects', label: 'Project', href: '/client-dashboard/projects' },
   { key: 'notifications', label: 'News Feed', href: '/client-dashboard/notifications' },
-  { key: 'customer-service', label: 'Customer Service', href: '/client-dashboard/customer-service' },
+  { key: 'doa', label: 'DOA', href: '/client-dashboard/doa' },
 ];
 const displayLabels: Record<string, string> = {
   quotations: 'Quotations',
@@ -21,7 +21,7 @@ const displayLabels: Record<string, string> = {
   poa: 'Power of Attorney',
   projects: 'Your Projects',
   notifications: 'News Feed',
-  'customer-service': 'Customer Service',
+  doa: 'Deed of Assignment',
 };
 type TutorialLink = { card_key: string; title: string; url: string };
 type CardAvailability = { card_key: string; is_available: boolean; coming_soon: boolean };
@@ -35,7 +35,6 @@ const cardUpdateSources: Array<{ key: string; path: string; pagePath?: (page: nu
   { key: 'poa', path: 'poa', getItems: body => readDataArray(body), dateFields: ['last_modified', 'updated_at', 'created_at'] },
   { key: 'projects', path: 'projects?page=1&page_size=100', pagePath: page => `projects?page=${page}&page_size=100`, getItems: body => readDataArray(body), dateFields: ['created_at', 'updated_at'] },
   { key: 'notifications', path: 'notifications', getItems: body => readArray(body), dateFields: ['created_at', 'updated_at'] },
-  { key: 'customer-service', path: 'customer-service', getItems: body => readNamedArray(body, 'tickets'), dateFields: ['created_at', 'updated_at'] },
 ];
 
 function readArray(body: unknown): UpdateItem[] {
@@ -95,7 +94,7 @@ export default function ClientDashboardPage() {
         const session = (await supabase.auth.getSession()).data.session;
         if (!session) throw new Error('Please sign in to view client updates.');
         const readResponse = await fetchSupabaseFunction('client-updates', { headers: { Authorization: `Bearer ${session.access_token}` } });
-        const readBody: unknown = await readResponse.json();
+        const readBody: unknown = await readResponse.json().catch(() => ({}));
         if (!readResponse.ok) {
           const message = readBody && typeof readBody === 'object' && 'error' in readBody ? String(readBody.error) : 'Unable to load update status.';
           throw new Error(message);
@@ -111,7 +110,7 @@ export default function ClientDashboardPage() {
             let total = 0;
             do {
               const response = await fetchSupabaseFunction(source.pagePath ? source.pagePath(page) : source.path, { headers: { Authorization: `Bearer ${session.access_token}` } });
-              const body: unknown = await response.json();
+              const body: unknown = await response.json().catch(() => ({}));
               if (!response.ok) {
                 const message = body && typeof body === 'object' && 'error' in body ? String(body.error) : 'Unable to check for updates.';
                 throw new Error(message);
@@ -154,12 +153,13 @@ export default function ClientDashboardPage() {
         loading = false;
       }
     };
-    void loadCardUpdates();
+    const startDelay = window.setTimeout(() => void loadCardUpdates(), 3000);
     const timer = window.setInterval(() => void loadCardUpdates(), 60_000);
     window.addEventListener('focus', loadCardUpdates);
     window.addEventListener('aipt-client-dashboard-update-read', loadCardUpdates);
     return () => {
       active = false;
+      window.clearTimeout(startDelay);
       window.clearInterval(timer);
       window.removeEventListener('focus', loadCardUpdates);
       window.removeEventListener('aipt-client-dashboard-update-read', loadCardUpdates);
@@ -170,9 +170,9 @@ export default function ClientDashboardPage() {
     const loadTutorials = async () => {
       try {
         const response = await fetchSupabaseFunction('video-tutorials?client=true', { signal: controller.signal });
-        const body = await response.json();
+        const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error('Unable to load tutorials.');
-        if (!Array.isArray(body.data)) throw new Error('The tutorials service returned invalid data.');
+        if (!body || !Array.isArray(body.data)) throw new Error('The tutorials service returned invalid data.');
         if (!controller.signal.aborted) setTutorials(Object.fromEntries(body.data.map((item: TutorialLink) => [item.card_key, item])));
       } catch (cause) {
         if (controller.signal.aborted) return;
@@ -186,9 +186,9 @@ export default function ClientDashboardPage() {
     const loadCardSettings = async () => {
       try {
         const response = await fetchSupabaseFunction('video-tutorials?availability=true', { signal: controller.signal });
-        const body = await response.json();
+        const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error('Unable to load dashboard card settings.');
-        if (!Array.isArray(body.data)) throw new Error('The dashboard cards service returned invalid data.');
+        if (!body || !Array.isArray(body.data)) throw new Error('The dashboard cards service returned invalid data.');
         if (!controller.signal.aborted) {
           setAvailability(Object.fromEntries(body.data.map((item: CardAvailability) => [item.card_key, item.is_available])));
           setComingSoon(Object.fromEntries(body.data.map((item: CardAvailability) => [item.card_key, item.coming_soon])));
@@ -212,7 +212,7 @@ export default function ClientDashboardPage() {
     poa: { en: 'POA', ar: 'التوكيل', fil: 'POA', zh: '授权书' },
     projects: { en: 'Your Work', ar: 'أعمالك', fil: 'Iyong Trabaho', zh: '您的项目' },
     notifications: { en: 'News Feed', ar: 'الإشعارات', fil: 'Mga Abiso', zh: '通知' },
-    'customer-service': { en: 'Customer Service', ar: 'خدمة العملاء', fil: 'Serbisyo sa Customer', zh: '客户服务' },
+    doa: { en: 'DOA', ar: 'سند التنازل', fil: 'DOA', zh: '转让契约' },
   };
   const uiLabels = {
     en: { tutorial: 'Tutorial', chat: 'Chat Us', dashboard: 'Client dashboard', dashboardTitle: 'Client Dashboard', dashboardSubtitle: 'Dashboard services', services: 'Dashboard services', servicesCount: 'services', totalServices: 'Total services', availableServices: 'Available', comingSoonCount: 'Coming soon', newUpdatesCount: 'New updates', watch: 'Watch', unavailable: 'unavailable', notAssigned: 'not assigned', loading: 'loading', newUpdates: 'new updates', updatesUnavailable: 'Updates unavailable', comingSoon: 'Coming soon' },
