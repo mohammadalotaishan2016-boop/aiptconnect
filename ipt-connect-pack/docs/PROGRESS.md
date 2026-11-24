@@ -103,13 +103,33 @@
 - `client_type` stored on user profile, links to fee workbook pricing group (T9a)
 - Task file: `docs/tasks/T3-register.md`
 
+## T12a — Client Dashboard: Fix Errors, Update Boxes, Header Customer Service (2026-11-24)
+
+### Root cause of "Unable to reach the project service (Failed to fetch)"
+`page.tsx` fired 12+ simultaneous HTTP requests on load (auth + 8 card updates + tutorials + settings).
+Browser connection limit (~6) caused queued requests to timeout/fail at `browser.ts:119`.
+
+### Fix
+- Deferred `loadCardUpdates` by 3s so essential calls finish first
+- Safe `.json().catch(() => ({}))` on all response parses
+- Cached `accessState` in sessionStorage — no blocking "Checking..." screen
+- Removed `customer-service` box, added `doa` box (8 total)
+- Added Customer Service button in header (beside language selector)
+- Created DOA placeholder page
+
+### Files changed
+- `frontend/app/client-dashboard/page.tsx`
+- `frontend/src/components/ClientShell.tsx`
+- `frontend/app/client-home.css`
+- `frontend/app/client-dashboard/doa/page.tsx` (NEW)
+
 ## Next
-- **T10a: Client Device Management & Login Approval System** — task file: `docs/tasks/T10a-tenants-device-management.md`
-  - Backend infrastructure largely exists (devices, device_sessions, login_requests, approve_device_login RPC, login Edge Function)
-  - Needs: frontend `/clients` device columns + admin actions, login waiting/approval UI, client-side approve/deny flow
+- **T12a deploy**: needs `doa` edge function when feature is built out
+- **T11a deploy**: Apply migration, deploy quotations Edge Function, run initial materialization
 - T2a: Login page (status check, 5-attempt lockout, friendly error messages)
 - T3: Registration with client_type auto-fill (Chinese / Non Chinese by country)
 - Future: drop legacy `approval_status`, `account_status` columns from profiles once all app code reads `profiles.status`
+- Future: update `client-updates` edge function to use unified `status` column (currently checks legacy `approval_status`/`account_status`)
 - Run Supabase security and performance advisors
 
 ## Open questions / decisions

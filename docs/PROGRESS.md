@@ -699,9 +699,48 @@ from the spreadsheet workbook on every request.
 
 ---
 
+## T12a — Client Dashboard: Fix Errors, Update Boxes, Header Customer Service (2026-11-24)
+**Branch**: `task/t9a-spreadsheet-pricing`
+
+### Root cause of "Unable to reach the project service (Failed to fetch)"
+Client dashboard `page.tsx` fired 12+ simultaneous HTTP requests to Supabase edge functions
+on load (auth checks + 8 card-update fetches + tutorials + card settings). Browser connection
+limit (~6 for HTTP/2) caused requests to queue/timeout/fail at `browser.ts:119`.
+
+### What changed
+**`frontend/app/client-dashboard/page.tsx`**
+- Deferred `loadCardUpdates` by 3 seconds (no longer competes with essential calls)
+- All `response.json()` calls wrapped with `.catch(() => ({}))` for safe parsing
+- Removed `customer-service` from destinations/displayLabels/translatedLabels/cardUpdateSources
+- Added `doa` (Deed of Assignment) box after News Feed
+- Removed `doa` from cardUpdateSources (no backend edge function yet)
+
+**`frontend/src/components/ClientShell.tsx`**
+- Cached `accessState` in sessionStorage — returning clients skip "Checking..." screen
+- Added Customer Service button (icon + text) in header between language selector and divider
+- Added `customerService` translation to all 4 languages
+- Updated `readableDashboardRoutes`: removed `customer-service`, added `doa`
+
+**`frontend/app/client-home.css`**
+- Added `.client-home-service-btn` styles (pill button, icon-only on mobile)
+
+**`frontend/app/client-dashboard/doa/page.tsx`** (NEW)
+- Placeholder page: "Deed of Assignment — Coming soon"
+
+### Final 8 dashboard boxes
+1. Schedule of Fees, 2. Quotation, 3. Requirements, 4. Statements,
+5. POA, 6. Your Work, 7. News Feed, 8. DOA
+
+### TypeScript check
+`npx tsc --noEmit` — 0 errors
+
+---
+
 ## Open questions / decisions needed
 - T10a: `max_devices=2` uses hard deny (no approval flow) — confirm this is intended or should also use approval
 - T11a: Migration SQL needs to be applied via Supabase Dashboard SQL Editor before deploying
+- T12a: `doa` edge function needed when DOA feature is built out
+- T12a: `client-updates` edge function checks legacy `approval_status`/`account_status` columns (line 45) — may need updating to use unified `status` column
 
 ## Next tasks
 - **T11a deploy**: Apply migration, deploy quotations Edge Function, run initial materialization
