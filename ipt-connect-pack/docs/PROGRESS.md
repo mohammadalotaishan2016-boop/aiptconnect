@@ -123,6 +123,29 @@ Browser connection limit (~6) caused queued requests to timeout/fail at `browser
 - `frontend/app/client-home.css`
 - `frontend/app/client-dashboard/doa/page.tsx` (NEW)
 
+## T13a — POA Translation 502 Fix (2026-11-25)
+
+### Root cause
+LibreTranslate returned proper nouns and addresses unchanged as English text. Google Translate fallback was not configured. Both providers returned `null` → HTTP 502.
+
+### Fix
+Added carrier-sentence retry in `translateWithLibre()`: if direct translation returns mostly-Latin text, retries with `"I work at {name}"` or `"I live at {address}"` to give the model sentence context, then strips the Arabic carrier prefix. Replaced strict `/[A-Za-z]/` quality gate with proportional `isMostlyLatin()` (>40% Latin = reject).
+
+### Results (dev)
+- Applicant Name: 200 in ~7s (carrier retry)
+- Applicant Address: 200 in ~1.5s (carrier retry)
+- GPOA Simply Signed: title centered ✓
+- GPOA Apostille: Arabic justified ✓
+- Build: passed
+- No new dependencies, no database changes
+
+### Files changed
+- `frontend/app/api/poa/translate/route.ts` — carrier-sentence retry + `isMostlyLatin()` quality gate
+
+### Production status
+- Not deployed. Requires SSH tunnel to EC2 LibreTranslate for local dev.
+- No Google API key configured or required for development.
+
 ## Next
 - **T12a deploy**: needs `doa` edge function when feature is built out
 - **T11a deploy**: Apply migration, deploy quotations Edge Function, run initial materialization

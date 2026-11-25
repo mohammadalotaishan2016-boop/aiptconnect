@@ -27,6 +27,79 @@ function cleanTranslation(value: string, originalText: string) {
   return cleaned;
 }
 
+/** Returns true when the majority of alphabetic characters are Latin. */
+function isMostlyLatin(value: string): boolean {
+  let latin = 0;
+  let nonLatin = 0;
+  for (const ch of value) {
+    if (/[A-Za-z]/.test(ch)) latin++;
+    else if (/\p{L}/u.test(ch)) nonLatin++;
+  }
+  if (nonLatin === 0) return true;             // all-Latin or no letters
+  return latin / (latin + nonLatin) > 0.4;     // >40% Latin → mostly Latin
+}
+
+const CARRIER_PREFIXES_NAME = ['أنا أعمل في ', 'أعمل في '];
+const CARRIER_PREFIXES_ADDRESS = ['أنا أعيش في ', 'أعيش في '];
+
+async function libreTranslateOnce(text: string): Promise<string | null> {
+  const url = process.env.LIBRETRANSLATE_URL?.trim();
+  if (!url) return null;
+  try {
+    const response = await fetch(`${url}/translate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: text, source: 'en', target: 'ar' }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = await response.json().catch(() => ({})) as { translatedText?: unknown };
+    return response.ok && typeof body.translatedText === 'string' ? body.translatedText : null;
+  } catch { return null; }
+}
+
+async function translateWithLibre(text: string, kind: Kind): Promise<string | null> {
+  // Try direct translation first.
+  const direct = await libreTranslateOnce(text);
+  if (direct && !isMostlyLatin(direct)) return direct;
+
+  // Direct failed (returned mostly-Latin text). Retry with a carrier sentence
+  // that gives LibreTranslate enough context to transliterate proper nouns.
+  const carrier = kind === 'name'
+    ? `I work at ${text}`
+    : `I live at ${text}`;
+  const wrapped = await libreTranslateOnce(carrier);
+  if (!wrapped) return null;
+
+  // Strip the known Arabic carrier prefix.
+  const prefixes = kind === 'name' ? CARRIER_PREFIXES_NAME : CARRIER_PREFIXES_ADDRESS;
+  for (const prefix of prefixes) {
+    if (wrapped.startsWith(prefix)) {
+      const stripped = wrapped.slice(prefix.length).trim();
+      if (stripped && !isMostlyLatin(stripped)) return stripped;
+    }
+  }
+
+  // Carrier prefix not found or result still mostly Latin — give up.
+  return null;
+}
+
+async function translateWithGoogle(text: string): Promise<string | null> {
+  const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY?.trim();
+  if (!apiKey) return null;
+  try {
+    const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: text, source: 'en', target: 'ar', format: 'text' }),
+      signal: AbortSignal.timeout(8000),
+      cache: 'no-store',
+    });
+    const body = await response.json().catch(() => ({})) as { data?: { translations?: Array<{ translatedText?: unknown }> } };
+    const value = body.data?.translations?.[0]?.translatedText;
+    return response.ok && typeof value === 'string' ? value : null;
+  } catch { return null; }
+}
+
 export async function POST(request: Request) {
   const authorization = request.headers.get('authorization');
   const accessToken = authorization?.match(/^Bearer\s+(\S+)$/i)?.[1];
@@ -37,7 +110,7 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: 'invalid_input' }, { status: 400 }); }
   if (!input || typeof input !== 'object') return NextResponse.json({ error: 'invalid_input' }, { status: 400 });
   const { text, kind } = input as Record<string, unknown>;
-  if (typeof text !== 'string' || text.length > 500 || (kind !== 'name' && kind !== 'address')) {
+  if (typeof text !== 'string' || (kind !== 'name' && kind !== 'address')) {
     return NextResponse.json({ error: 'invalid_input' }, { status: 400 });
   }
   if (!text.trim()) return NextResponse.json({ arabic: '' });
@@ -55,29 +128,13 @@ export async function POST(request: Request) {
   else if (rate.count >= 30) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   else rate.count += 1;
 
-  const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
-  if (!apiKey) {
-    console.error('POA translation failed: GOOGLE_TRANSLATE_API_KEY is missing');
-    return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
-  }
-  const addressPrompt = kind === 'address'
-    ? 'Translate generic address terms into Arabic; phonetically transliterate proper names and place names. Preserve every digit run exactly and in its original position. '
-    : '';
-  try {
-    const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(apiKey)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: `${addressPrompt}${text.trim()}`, source: 'en', target: 'ar', format: 'text' }),
-      signal: AbortSignal.timeout(8000),
-      cache: 'no-store',
-    });
-    const body = await response.json().catch(() => ({})) as { data?: { translations?: Array<{ translatedText?: unknown }> } };
-    const value = body.data?.translations?.[0]?.translatedText;
-    if (!response.ok || typeof value !== 'string') return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
-    const arabic = cleanTranslation(value, text);
-    if (!arabic || /[A-Za-z]/.test(arabic)) return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
-    return NextResponse.json({ arabic }, { headers: { 'Cache-Control': 'private, no-store' } });
-  } catch {
-    return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
-  }
+  const trimmed = text.trim();
+  const libreRaw = await translateWithLibre(trimmed, kind as Kind);
+  const libreArabic = libreRaw ? cleanTranslation(libreRaw, text) : '';
+  const libreOk = Boolean(libreArabic && !isMostlyLatin(libreArabic));
+  const raw = libreOk ? libreRaw! : await translateWithGoogle(trimmed);
+  if (typeof raw !== 'string') return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
+  const arabic = libreOk ? libreArabic : cleanTranslation(raw, text);
+  if (!arabic || isMostlyLatin(arabic)) return NextResponse.json({ error: 'translation_failed' }, { status: 502 });
+  return NextResponse.json({ arabic }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
