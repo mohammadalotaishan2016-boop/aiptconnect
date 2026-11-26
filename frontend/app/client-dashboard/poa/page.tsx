@@ -18,16 +18,21 @@ const templates: Template[] = [
 ];
 const services = ['Registration', 'Renewal', 'Recording of change of name or change of address', 'Assignment', 'Licensing or licensing cancellation of trademarks', 'Goods limitation or cancellation', 'Amendment of the trademark logo', 'Cancellation of trademarks', 'Protection of trademarks, patents, industrial designs and copyrights', 'Concessions'];
 
+function wordAlignToCss(value: string): string {
+  return value === 'both' ? 'justify' : value;
+}
+
 function normalizeApostillePreview(root: HTMLElement) {
   const arabicPattern = /[\u0600-\u06ff]/;
   for (const table of Array.from(root.querySelectorAll('table'))) {
     table.dir = 'ltr';
     for (const row of Array.from(table.querySelectorAll('tr'))) {
       const cells = Array.from(row.children).filter((child): child is HTMLTableCellElement => child instanceof HTMLTableCellElement);
-      if (cells.length < 2) continue;
-      const firstIsArabic = arabicPattern.test(cells[0].textContent || '');
-      const secondIsEnglish = /[A-Za-z]/.test(cells[1].textContent || '');
-      if (firstIsArabic && secondIsEnglish) row.insertBefore(cells[1], cells[0]);
+      if (cells.length >= 2) {
+        const firstIsArabic = arabicPattern.test(cells[0].textContent || '');
+        const secondIsEnglish = /[A-Za-z]/.test(cells[1].textContent || '');
+        if (firstIsArabic && secondIsEnglish) row.insertBefore(cells[1], cells[0]);
+      }
       for (const cell of cells) {
         const isArabic = arabicPattern.test(cell.textContent || '');
         cell.dir = isArabic ? 'rtl' : 'ltr';
@@ -38,10 +43,22 @@ function normalizeApostillePreview(root: HTMLElement) {
           paragraph.dir = paragraphArabic ? 'rtl' : 'ltr';
           paragraph.lang = paragraphArabic ? 'ar' : 'en';
           paragraph.style.unicodeBidi = 'isolate';
-          paragraph.style.textAlign = paragraphAlignment('apostille', paragraph.textContent || '', paragraphArabic ? 'arabic' : 'english');
+          const apostilleAlign = wordAlignToCss(paragraphAlignment('apostille', paragraph.textContent || '', paragraphArabic ? 'arabic' : 'english'));
+          paragraph.style.setProperty('text-align', apostilleAlign, 'important');
         }
       }
     }
+  }
+}
+
+function normalizeSimplySignedPreview(root: HTMLElement) {
+  for (const paragraph of Array.from(root.querySelectorAll('p'))) {
+    paragraph.dir = 'ltr';
+    paragraph.lang = 'en';
+    const text = (paragraph.textContent || '').trim();
+    const isTitle = /Power\s+of\s+Attorney\s*\(POA\)/i.test(text);
+    const align = isTitle ? 'center' : wordAlignToCss(paragraphAlignment('simply-signed', text));
+    paragraph.style.setProperty('text-align', align, 'important');
   }
 }
 
@@ -136,6 +153,19 @@ function ClientPoaPage() {
     finally { setGenerating(false); }
   };
 
+  // Auto-regenerate preview when applicant name, address, or Arabic translations change.
+  const autoPreviewValues = useMemo(() => ({ name: applicantName.trim(), address: applicantAddress.trim(), nameAr: nameArabic.trim(), addressAr: addressArabic.trim() }), [applicantName, applicantAddress, nameArabic, addressArabic]);
+  useEffect(() => {
+    if (!templateBuffer.current) return;
+    if (!autoPreviewValues.name && !autoPreviewValues.address) return;
+    const timer = window.setTimeout(() => {
+      const values: PoaValues = { name: autoPreviewValues.name, address: autoPreviewValues.address, services: orderedServices.join(', '), countries: orderedCountries.map((item) => item.name).join(', ') };
+      const arabic: PoaValues = { name: autoPreviewValues.nameAr, address: isolateArabicValues(autoPreviewValues.addressAr), services: arabicServices, countries: joinedArabic.countries };
+      void generatePoaDocx(templateId, values, arabic, templateBuffer.current!).then(setGeneratedBlob).catch(() => {});
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [autoPreviewValues, templateId, orderedServices.length, selectedCountries.length, arabicServices, joinedArabic.countries]);
+
   useEffect(() => {
     if (!generatedBlob || !documentRef.current || !stylesRef.current) return;
     let active = true;
@@ -148,6 +178,7 @@ function ClientPoaPage() {
       .then(() => {
         if (active && renderToken.current === token) {
           if (templateId === 'apostille') normalizeApostillePreview(target);
+          else if (templateId === 'simply-signed') normalizeSimplySignedPreview(target);
           target.setAttribute('data-rendered', 'true');
         }
       })
@@ -258,8 +289,8 @@ function ClientPoaPage() {
   return <main className="poa-page client-poa-page"><div className="poa-generator-grid">
     <section className="poa-generator-form-panel" aria-label="POA application form">
       <section className="poa-choice-section poa-applicant-card"><div className="poa-section-heading"><span aria-hidden="true">♙</span><h1>Applicant</h1></div><div className="poa-applicant-fields">
-        <div className="poa-applicant-field"><label>Applicant Name <b>*</b><input value={applicantName} onChange={(event) => { setApplicantName(event.target.value); setGeneratedBlob(null); }} placeholder="Enter applicant or company name" /></label>{applicantName.trim() && <span className="poa-complete" role="status">✓ Applicant Name completed: {applicantName.trim()}</span>}<label className="poa-arabic-field">Applicant Name (Arabic)<div className="poa-arabic-edit-row"><input ref={arabicNameRef} dir="rtl" lang="ar" style={{ textAlign: 'right', unicodeBidi: 'plaintext' }} value={nameArabic} readOnly={false} onChange={(event) => { nameTranslation.onEdit(event.target.value); setGeneratedBlob(null); }} placeholder="Arabic applicant name" /><button type="button" onClick={() => { setEditingArabicName((value) => !value); if (!editingArabicName) requestAnimationFrame(() => arabicNameRef.current?.focus()); }}>{editingArabicName ? 'Done' : 'Edit'}</button></div>{["pending","loading"].includes(nameTranslation.status) && <small className="poa-translation-status">Translating…</small>}{nameTranslation.status === "error" && <small className="poa-translation-error">Translation failed, type the Arabic manually</small>}{(nameTranslation.manual || nameTranslation.status === "error") && <button type="button" className="poa-retranslate" onClick={nameTranslation.retranslate}>Re-translate</button>}</label></div>
-        <div className="poa-applicant-field"><label>Applicant Address <b>*</b><textarea value={applicantAddress} onChange={(event) => { setApplicantAddress(event.target.value); setGeneratedBlob(null); }} placeholder="Enter complete applicant address..." /></label>{applicantAddress.trim() && <span className="poa-complete" role="status">✓ Applicant Address completed: {applicantAddress.trim()}</span>}<label className="poa-arabic-field">Applicant Address (Arabic)<div className="poa-arabic-edit-row"><textarea ref={arabicAddressRef} dir="rtl" lang="ar" style={{ textAlign: 'right', unicodeBidi: 'plaintext' }} value={addressArabic} readOnly={false} onChange={(event) => { addressTranslation.onEdit(event.target.value); setGeneratedBlob(null); }} placeholder="Arabic applicant address" /><button type="button" onClick={() => { setEditingArabicAddress((value) => !value); if (!editingArabicAddress) requestAnimationFrame(() => arabicAddressRef.current?.focus()); }}>{editingArabicAddress ? 'Done' : 'Edit'}</button></div>{["pending","loading"].includes(addressTranslation.status) && <small className="poa-translation-status">Translating…</small>}{addressTranslation.status === "error" && <small className="poa-translation-error">Translation failed, type the Arabic manually</small>}{(addressTranslation.manual || addressTranslation.status === "error") && <button type="button" className="poa-retranslate" onClick={addressTranslation.retranslate}>Re-translate</button>}</label></div>
+        <div className="poa-applicant-field"><label>Applicant Name <b>*</b><input value={applicantName} onChange={(event) => { setApplicantName(event.target.value); }} placeholder="Enter applicant or company name" /></label>{applicantName.trim() && <span className="poa-complete" role="status">✓ Applicant Name completed: {applicantName.trim()}</span>}<label className="poa-arabic-field">Applicant Name (Arabic)<div className="poa-arabic-edit-row"><input ref={arabicNameRef} dir="rtl" lang="ar" style={{ textAlign: 'right', unicodeBidi: 'plaintext' }} value={nameArabic} readOnly={false} onChange={(event) => { nameTranslation.onEdit(event.target.value); }} placeholder="Arabic applicant name" /><button type="button" onClick={() => { setEditingArabicName((value) => !value); if (!editingArabicName) requestAnimationFrame(() => arabicNameRef.current?.focus()); }}>{editingArabicName ? 'Done' : 'Edit'}</button></div>{["pending","loading"].includes(nameTranslation.status) && <small className="poa-translation-status">Translating…</small>}{nameTranslation.status === "error" && <small className="poa-translation-error">Translation failed, type the Arabic manually</small>}{(nameTranslation.manual || nameTranslation.status === "error") && <button type="button" className="poa-retranslate" onClick={nameTranslation.retranslate}>Re-translate</button>}</label></div>
+        <div className="poa-applicant-field"><label>Applicant Address <b>*</b><textarea value={applicantAddress} onChange={(event) => { setApplicantAddress(event.target.value); }} placeholder="Enter complete applicant address..." /></label>{applicantAddress.trim() && <span className="poa-complete" role="status">✓ Applicant Address completed: {applicantAddress.trim()}</span>}<label className="poa-arabic-field">Applicant Address (Arabic)<div className="poa-arabic-edit-row"><textarea ref={arabicAddressRef} dir="rtl" lang="ar" style={{ textAlign: 'right', unicodeBidi: 'plaintext' }} value={addressArabic} readOnly={false} onChange={(event) => { addressTranslation.onEdit(event.target.value); }} placeholder="Arabic applicant address" /><button type="button" onClick={() => { setEditingArabicAddress((value) => !value); if (!editingArabicAddress) requestAnimationFrame(() => arabicAddressRef.current?.focus()); }}>{editingArabicAddress ? 'Done' : 'Edit'}</button></div>{["pending","loading"].includes(addressTranslation.status) && <small className="poa-translation-status">Translating…</small>}{addressTranslation.status === "error" && <small className="poa-translation-error">Translation failed, type the Arabic manually</small>}{(addressTranslation.manual || addressTranslation.status === "error") && <button type="button" className="poa-retranslate" onClick={addressTranslation.retranslate}>Re-translate</button>}</label></div>
       </div></section>
       <section className="poa-choice-section"><div className="poa-section-heading"><span aria-hidden="true">⚙</span><h2>Services</h2><button type="button" onClick={() => setSelectedServices(selectedServices.length === services.length ? [] : [...services])}>{selectedServices.length === services.length ? 'Clear All' : 'Select All'}</button></div><div className="poa-check-grid">{services.map((service) => <label key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggle(selectedServices, service, setSelectedServices)} />{service}</label>)}</div>{selectedServices.length > 0 && <> <p className="poa-complete poa-choice-complete" role="status">✓ Services selected: {orderedServices.join(', ')}</p><p className="poa-arabic-summary" dir="rtl" lang="ar">✓ الخدمات المحددة: {arabicServices}</p></>}</section>
       <section className="poa-choice-section"><div className="poa-section-heading"><span aria-hidden="true">⌕</span><h2>Countries</h2><button type="button" disabled={!countries.length} onClick={() => setSelectedCountries(selectedCountries.length === countries.length ? [] : countries.map((country) => country.id))}>{selectedCountries.length === countries.length && countries.length ? 'Clear All' : 'Select All'}</button></div><input className="poa-country-search" value={countrySearch} onChange={(event) => setCountrySearch(event.target.value)} placeholder="Search countries" aria-label="Search countries" /><div className="poa-check-grid poa-country-grid">{loadingCountries ? <span className="poa-no-countries">Loading available countries...</span> : filteredCountries.map((country) => <label key={country.id}><input type="checkbox" checked={selectedCountries.includes(country.id)} onChange={() => toggle(selectedCountries, country.id, setSelectedCountries)} />{country.name}</label>)}{!loadingCountries && !filteredCountries.length && <span className="poa-no-countries">{countryError || 'No countries available for your account.'}</span>}</div>{selectedCountries.length > 0 && <> <p className="poa-complete poa-choice-complete" role="status">✓ Countries selected: {orderedCountries.map((item) => item.name).join(', ')}</p>{arabicCountryResult.error ? <p className="poa-error poa-country-translation-error" role="alert">{arabicCountryResult.error}</p> : <p className="poa-arabic-summary" dir="rtl" lang="ar"><Check size={14} aria-hidden="true" /> الدول المحددة: {arabicCountries}</p>}</>}</section>

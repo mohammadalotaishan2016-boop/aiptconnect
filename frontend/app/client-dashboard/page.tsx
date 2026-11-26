@@ -103,7 +103,9 @@ export default function ClientDashboardPage() {
           throw new Error('The update status service returned an invalid response.');
         }
         const readAt = readBody.data as Record<string, string | null>;
-        const results = await Promise.all(cardUpdateSources.map(async source => {
+        const results: [string, { count: number; failed: boolean }][] = [];
+        for (const source of cardUpdateSources) {
+          if (!active) break;
           try {
             const items: UpdateItem[] = [];
             let page = 1;
@@ -139,12 +141,12 @@ export default function ClientDashboardPage() {
               }));
               return changedAt > lastSeen;
             }).length;
-            return [source.key, { count, failed: false }] as const;
+            results.push([source.key, { count, failed: false }]);
           } catch (cause) {
             console.error(`Could not load unread updates for ${source.key}:`, cause);
-            return [source.key, { count: 0, failed: true }] as const;
+            results.push([source.key, { count: 0, failed: true }]);
           }
-        }));
+        }
         if (active) setCardUpdates(Object.fromEntries(results));
       } catch (cause) {
         console.error('Could not load client dashboard unread update counts:', cause);
