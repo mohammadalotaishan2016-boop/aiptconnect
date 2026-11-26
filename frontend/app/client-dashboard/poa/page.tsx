@@ -59,6 +59,12 @@ function normalizeSimplySignedPreview(root: HTMLElement) {
     const isTitle = /Power\s+of\s+Attorney\s*\(POA\)/i.test(text);
     const align = isTitle ? 'center' : wordAlignToCss(paragraphAlignment('simply-signed', text));
     paragraph.style.setProperty('text-align', align, 'important');
+    if (isTitle) {
+      paragraph.style.setProperty('display', 'block', 'important');
+      for (const span of Array.from(paragraph.querySelectorAll('span'))) {
+        span.style.setProperty('text-align', 'center', 'important');
+      }
+    }
   }
 }
 

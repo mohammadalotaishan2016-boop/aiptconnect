@@ -41,6 +41,7 @@ function isMostlyLatin(value: string): boolean {
 
 const CARRIER_PREFIXES_NAME = ['أنا أعمل في ', 'أعمل في '];
 const CARRIER_PREFIXES_ADDRESS = ['أنا أعيش في ', 'أعيش في '];
+const CARRIER2_PREFIXES_ADDRESS = ['عنواني هو ', 'عنواني '];
 
 async function libreTranslateOnce(text: string): Promise<string | null> {
   const url = process.env.LIBRETRANSLATE_URL?.trim();
@@ -50,37 +51,69 @@ async function libreTranslateOnce(text: string): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: text, source: 'en', target: 'ar' }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(15000),
     });
     const body = await response.json().catch(() => ({})) as { translatedText?: unknown };
     return response.ok && typeof body.translatedText === 'string' ? body.translatedText : null;
   } catch { return null; }
 }
 
-async function translateWithLibre(text: string, kind: Kind): Promise<string | null> {
-  // Try direct translation first.
-  const direct = await libreTranslateOnce(text);
-  if (direct && !isMostlyLatin(direct)) return direct;
-
-  // Direct failed (returned mostly-Latin text). Retry with a carrier sentence
-  // that gives LibreTranslate enough context to transliterate proper nouns.
-  const carrier = kind === 'name'
-    ? `I work at ${text}`
-    : `I live at ${text}`;
-  const wrapped = await libreTranslateOnce(carrier);
-  if (!wrapped) return null;
-
-  // Strip the known Arabic carrier prefix.
-  const prefixes = kind === 'name' ? CARRIER_PREFIXES_NAME : CARRIER_PREFIXES_ADDRESS;
+function tryStripPrefixes(result: string, prefixes: string[]): string | null {
   for (const prefix of prefixes) {
-    if (wrapped.startsWith(prefix)) {
-      const stripped = wrapped.slice(prefix.length).trim();
+    if (result.startsWith(prefix)) {
+      const stripped = result.slice(prefix.length).trim();
       if (stripped && !isMostlyLatin(stripped)) return stripped;
     }
   }
-
-  // Carrier prefix not found or result still mostly Latin — give up.
   return null;
+}
+
+async function translateOneSegment(segment: string, kind: Kind): Promise<string | null> {
+  // Try direct translation first.
+  const direct = await libreTranslateOnce(segment);
+  if (direct && !isMostlyLatin(direct)) return direct;
+
+  // Carrier 1: "I work at …" / "I live at …"
+  const carrier1 = kind === 'name' ? `I work at ${segment}` : `I live at ${segment}`;
+  const wrapped1 = await libreTranslateOnce(carrier1);
+  if (wrapped1) {
+    const prefixes1 = kind === 'name' ? CARRIER_PREFIXES_NAME : CARRIER_PREFIXES_ADDRESS;
+    const result1 = tryStripPrefixes(wrapped1, prefixes1);
+    if (result1) return result1;
+  }
+
+  // Carrier 2 (address only): "My address is …" — works better for place names.
+  if (kind === 'address') {
+    const wrapped2 = await libreTranslateOnce(`My address is ${segment}`);
+    if (wrapped2) {
+      const result2 = tryStripPrefixes(wrapped2, CARRIER2_PREFIXES_ADDRESS);
+      if (result2) return result2;
+    }
+  }
+
+  return null;
+}
+
+async function translateWithLibre(text: string, kind: Kind): Promise<string | null> {
+  // Try the full text first (works for short inputs).
+  const full = await translateOneSegment(text, kind);
+  if (full) return full;
+
+  // For long addresses with multiple parts, split and translate each segment.
+  // Split on newlines or repeated address patterns (city, country boundaries).
+  const segments = text.split(/\n+/).flatMap(line =>
+    line.split(/(?<=(?:Saudi Arabia|Qatar|UAE|Bahrain|Kuwait|Oman|Jordan|Egypt|Iraq|Lebanon|Morocco|Tunisia|Algeria|Libya|Sudan|Yemen|Syria|Turkey|Iran|Pakistan|India|China|Japan|USA|UK|Canada|Australia|France|Germany|Italy|Spain))\s*/i)
+  ).map(s => s.trim()).filter(Boolean);
+
+  if (segments.length <= 1) return null;
+
+  const results: string[] = [];
+  for (const segment of segments) {
+    const translated = await translateOneSegment(segment, kind);
+    if (!translated) return null;
+    results.push(translated);
+  }
+  return results.join('\n');
 }
 
 async function translateWithGoogle(text: string): Promise<string | null> {
