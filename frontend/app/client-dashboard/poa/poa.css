@@ -9,6 +9,7 @@
 
 .poa-generated-docx{width:210mm;min-height:297mm;margin:12px auto;background:#fff;box-shadow:0 1px 8px #0c41542c}.poa-generated-docx .docx-wrapper{padding:0!important;background:#fff!important}.poa-generated-docx .docx{margin:0!important;box-shadow:none!important}.poa-preview-placeholder{padding:36px;color:#627f8c;text-align:center}.poa-preview-toolbar button:disabled{opacity:.5;cursor:not-allowed}@media print{.poa-generated-docx{width:auto;margin:0;box-shadow:none}.poa-generated-docx .docx-wrapper{padding:0!important}}
 
+.poa-generated-docx[data-template="simply-signed"] p[data-poa-title="true"]{text-align:center!important}
 .poa-generated-styles{display:none}@media print{.poa-generated-styles{display:block}}
 
 /* Rendered DOCX pages retain their own A4 dimensions and template margins. */
