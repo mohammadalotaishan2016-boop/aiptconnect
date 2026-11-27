@@ -870,7 +870,8 @@ export default function QuotationsPage() {
             <label className="client-country-field">Country *<select aria-label="Country" value={countryIds[0] ?? ""} disabled={!serviceSelectionConfirmed || lookupLoading} onChange={event => { setCountryIds(event.target.value ? [event.target.value] : []); setRequirementIds([]); setClassType(""); setSelectedClassNumbers([]); setError(""); }}><option value="">Select Country</option>{lookup.countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}</select></label>
             <div className="client-procedure-field"><span>Procedure * <small>(multiple allowed)</small></span><details ref={procedureDropdown}><summary>{!serviceSelectionConfirmed ? "Select service first" : procedureNames.length ? procedureNames.join(", ") : "Select Procedure"}</summary><div>{availableProcedures.map(procedure => <label key={procedure.id}><input type="checkbox" disabled={!serviceSelectionConfirmed} checked={procedureNames.includes(procedure.name)} onChange={event => { const checked = event.target.checked; setProcedureNames(current => checked ? [...current, procedure.name] : current.filter(name => name !== procedure.name)); setError(""); }} />{procedure.name}</label>)}</div></details></div>
             {category === "Trademark" && <>
-              <label className="client-class-type">Type of class *<select aria-label="Type of class" disabled={!classTypeSelectionReady || lookupLoading} value={classType} onChange={event => { setClassType(event.target.value as ClassType); setError(""); }}><option value="">{!serviceSelectionConfirmed || !countryIds.length ? "Select service and country first" : !procedureNames.length ? "Select procedure first" : "Select Type of class"}</option>{classTypeOptions.map(type => <option key={type} value={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}</select></label>
+              <label className="client-class-type">Type of class *<select aria-label="Type of class" disabled={!classTypeSelectionReady || lookupLoading || feeFetchInProgress} value={classType} onChange={event => { setClassType(event.target.value as ClassType); setError(""); }}><option value="">{!serviceSelectionConfirmed || !countryIds.length ? "Select service and country first" : !procedureNames.length ? "Select procedure first" : feeFetchInProgress ? "Loading class rates…" : classTypeOptions.length === 0 ? "No class types available" : "Select Type of class"}</option>{classTypeOptions.map(type => <option key={type} value={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}</select></label>
+              {classTypeSelectionReady && !feeFetchInProgress && classTypeOptions.length === 0 && <p style={{ color: '#d32f2f', fontSize: '0.85rem', margin: '4px 0 0' }}>No class types found for this country. Check that the spreadsheet has Multi class / Up to 3 classes / Up to 5 classes tabs with rates for this country.</p>}
               <fieldset className="client-class-entry-method" aria-label="Class input method">
                 <legend>Class input method *</legend>
                 <label><input aria-label="Select class numbers individually" type="radio" name="client-class-entry-mode" value="specific" checked={classEntryMode === "specific"} disabled={!classTypeSelectionReady || lookupLoading} onChange={() => changeClassEntryMode("specific")} /><span><strong>Select individually</strong><small>Choose exact classes 1-45</small></span></label>
@@ -1105,6 +1106,7 @@ export default function QuotationsPage() {
             selectionFees={selectionFees}
             allExactFeesFound={allExactFeesFound}
             loadingFees={lookupLoading}
+            feeFetchInProgress={feeFetchInProgress}
             retryFees={() => { lookupRequest.current = null; void loadLookup(); }}
             countries={lookup.countries}
             generateFees={generateFees}
@@ -1384,6 +1386,7 @@ function InvoiceModal(props: any) {
     selectionFees,
     allExactFeesFound,
     loadingFees,
+    feeFetchInProgress,
     retryFees,
     countries,
     generateFees,
@@ -1610,11 +1613,12 @@ function InvoiceModal(props: any) {
                   </select>
                 </label>
                 <label>Type of class *
-                  <select aria-label="Type of class" value={classType} onChange={(event) => setClassType(event.target.value as ClassType)} disabled={!classTypeSelectionReady}>
-                    <option value="">{!serviceSelectionConfirmed || !countryIds.length ? 'Select service and country first' : !procedureNames.length ? 'Select procedure first' : 'Select type of class'}</option>
+                  <select aria-label="Type of class" value={classType} onChange={(event) => setClassType(event.target.value as ClassType)} disabled={!classTypeSelectionReady || feeFetchInProgress}>
+                    <option value="">{!serviceSelectionConfirmed || !countryIds.length ? 'Select service and country first' : !procedureNames.length ? 'Select procedure first' : feeFetchInProgress ? 'Loading class rates…' : classTypeOptions.length === 0 ? 'No class types available' : 'Select type of class'}</option>
                     {classTypeOptions.map((type: ClassType) => <option key={type} value={type}>{type === 'Multi-class' ? 'Multi class' : type}</option>)}
                   </select>
                 </label>
+                {classTypeSelectionReady && !feeFetchInProgress && classTypeOptions.length === 0 && <p style={{ color: '#d32f2f', fontSize: '0.85rem', margin: '4px 0 0' }}>No class types found for the selected country/countries. Check that the spreadsheet has Multi class / Up to 3 classes / Up to 5 classes tabs with rates for these countries.</p>}
                 {classEntryMode === "specific" && <label>Number of classes *
                   <select aria-label="Number of classes" value={classCount} onChange={(event) => { const nextCount = Number(event.target.value); setClassCount(nextCount); setSelectedClassNumbers((current: number[]) => current.slice(0, nextCount)); }} disabled={!classTypeSelectionReady}>
                     {Array.from({ length: 45 }, (_, index) => index + 1).map(count => <option key={count} value={count}>{count} {count === 1 ? 'class' : 'classes'}</option>)}

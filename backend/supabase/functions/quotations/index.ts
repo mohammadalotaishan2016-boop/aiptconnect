@@ -151,15 +151,15 @@ async function materializeWorkbookFees(db: any, onlyClientType?: string, onlyShe
   if (workbookError) throw workbookError;
   const revision = Number(sharedWorkbook?.revision);
   if (!Number.isSafeInteger(revision) || revision < 1) throw Error('The saved fee workbook revision is invalid.');
-  // For sheet-at-a-time mode, fetch the specific sheet from the workbook JSON
+  // For sheet-at-a-time mode, extract only the requested sheet from JSONB on the database side
+  // to avoid loading the full workbook blob (10-50MB) into Deno memory.
   let workbook = sharedWorkbook.workbook;
   if (onlySheetIndex !== undefined) {
-    const { data: fullWb, error: fullErr } = await db.from('spreadsheet_workbooks').select('workbook').eq('id', true).single();
-    if (fullErr) throw fullErr;
-    const allSheets = fullWb?.workbook?.sheets ?? [];
-    if (onlySheetIndex < 0 || onlySheetIndex >= allSheets.length) return { revision, client_type: onlyClientType ?? 'all', sheet: onlySheetIndex, fees: 0, class_rates: 0, addons: 0 };
-    // Build a workbook with only this one sheet
-    workbook = { sheets: [allSheets[onlySheetIndex]] };
+    const { data: sheetRow, error: sheetErr } = await db.rpc('get_workbook_sheet', { sheet_index: onlySheetIndex });
+    if (sheetErr) throw sheetErr;
+    const sheet = sheetRow;
+    if (!sheet) return { revision, client_type: onlyClientType ?? 'all', sheet: onlySheetIndex, fees: 0, class_rates: 0, addons: 0 };
+    workbook = { sheets: [sheet] };
   }
   const { data: countryRows } = await allRows(() => db.from('countries').select('id,name').is('deleted_at', null).order('name'));
   const { data: procedureRows } = await allRows(() => db.from('procedures').select('id,description,services!inner(service)').is('deleted_at', null).order('id'));
@@ -192,13 +192,19 @@ async function materializeWorkbookFees(db: any, onlyClientType?: string, onlyShe
       ]);
     }
     const pricing = parseSpreadsheetPricing(workbook, countryRows ?? [], procedures, clientType);
+    // Deduplicate helper: last-wins by unique key to avoid "ON CONFLICT cannot affect row a second time"
+    const dedup = <T extends Record<string, unknown>>(rows: T[], keyFn: (r: T) => string): T[] => {
+      const map = new Map<string, T>();
+      for (const r of rows) map.set(keyFn(r), r);
+      return [...map.values()];
+    };
     // Upsert fees in batches of 500
-    const feeRows = pricing.fees.map((fee) => ({
+    const feeRows = dedup(pricing.fees.map((fee) => ({
       revision, client_type: clientType, country_id: fee.country_id, category: fee.category,
       procedure_name: fee.procedure_name, official_fee: fee.official_fee, attorney_fee: fee.attorney_fee,
       total_fee: fee.total_fee, currency: fee.currency ?? 'USD', available: fee.available !== false,
       issue: fee.issue ?? null,
-    }));
+    })), r => `${r.country_id}|${r.category}|${r.procedure_name}`);
     for (let i = 0; i < feeRows.length; i += 500) {
       const batch = feeRows.slice(i, i + 500);
       const { error } = await db.from('materialized_fees').upsert(batch, { onConflict: 'revision,client_type,country_id,category,procedure_name', ignoreDuplicates: false });
@@ -206,12 +212,12 @@ async function materializeWorkbookFees(db: any, onlyClientType?: string, onlyShe
     }
     totalFees += feeRows.length;
     // Upsert class rates
-    const classRows = pricing.class_rates.map((rate) => ({
+    const classRows = dedup(pricing.class_rates.map((rate) => ({
       revision, client_type: clientType, country_id: rate.country_id, class_type: rate.class_type,
       class_number: rate.class_number, official_fee: rate.official_fee, attorney_fee: rate.attorney_fee,
       total_fee: rate.total_fee, currency: rate.currency ?? 'USD', available: rate.available !== false,
       issue: rate.issue ?? null,
-    }));
+    })), r => `${r.country_id}|${r.class_type}|${r.class_number}`);
     for (let i = 0; i < classRows.length; i += 500) {
       const batch = classRows.slice(i, i + 500);
       const { error } = await db.from('materialized_class_rates').upsert(batch, { onConflict: 'revision,client_type,country_id,class_type,class_number', ignoreDuplicates: false });
@@ -226,12 +232,13 @@ async function materializeWorkbookFees(db: any, onlyClientType?: string, onlyShe
     for (const sf of pricing.state_fees) {
       addonRows.push({ revision, client_type: clientType, country_id: sf.country_id, fee_type: 'state', procedure_name: sf.procedure_name ?? null, official_fee: sf.official_fee, attorney_fee: sf.attorney_fee, total_fee: sf.total_fee, currency: sf.currency ?? 'USD' });
     }
-    for (let i = 0; i < addonRows.length; i += 500) {
-      const batch = addonRows.slice(i, i + 500);
+    const dedupedAddons = dedup(addonRows, r => `${r.country_id}|${r.fee_type}|${r.procedure_name}`);
+    for (let i = 0; i < dedupedAddons.length; i += 500) {
+      const batch = dedupedAddons.slice(i, i + 500);
       const { error } = await db.from('materialized_addon_fees').upsert(batch, { onConflict: 'revision,client_type,country_id,fee_type,procedure_name', ignoreDuplicates: false });
       if (error) throw error;
     }
-    totalAddons += addonRows.length;
+    totalAddons += dedupedAddons.length;
   }
   return { revision, client_type: onlyClientType ?? 'all', sheet: onlySheetIndex ?? 'all', fees: totalFees, class_rates: totalClassRates, addons: totalAddons };
 }
@@ -467,18 +474,17 @@ Deno.serve(async (request) => {
         request.headers.get('apikey') ?? '',
       ];
       for (const jwt of candidates) {
-        try {
-          const payload = JSON.parse(atob(jwt.split('.')[1] ?? ''));
-          if (payload.role === 'service_role') {
-            const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-            const matUrl = new URL(request.url);
-            const onlyType = matUrl.searchParams.get('client_type') ?? undefined;
-            const sheetParam = matUrl.searchParams.get('sheet');
-            const sheetIndex = sheetParam !== null ? Number(sheetParam) : undefined;
-            const result = await materializeWorkbookFees(db, onlyType, sheetIndex);
-            return json(result);
-          }
-        } catch { /* not a valid service_role JWT */ }
+        let payload: any;
+        try { payload = JSON.parse(atob(jwt.split('.')[1] ?? '')); } catch { continue; }
+        if (payload?.role === 'service_role') {
+          const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+          const matUrl = new URL(request.url);
+          const onlyType = matUrl.searchParams.get('client_type') ?? undefined;
+          const sheetParam = matUrl.searchParams.get('sheet');
+          const sheetIndex = sheetParam !== null ? Number(sheetParam) : undefined;
+          const result = await materializeWorkbookFees(db, onlyType, sheetIndex);
+          return json(result);
+        }
       }
     }
     const { db, user, profile } = await context(request);
